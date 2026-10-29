@@ -1,0 +1,280 @@
+// End-to-end checks in a real (headless) Chromium browser.
+// Usage: npm run build && npm test
+// Needs Playwright with Chromium available: `npm i -D playwright && npx playwright install chromium`.
+const { spawn } = require("node:child_process");
+const path = require("node:path");
+const { chromium } = require("playwright");
+
+const PORT = 4174;
+const BASE = `http://localhost:${PORT}/`;
+const SHOTS = process.env.SHOTS_DIR || path.join(__dirname, "..", "test-results");
+const results = [];
+const check = (name, ok, detail = "") => {
+  results.push({ name, ok, detail });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`);
+};
+
+async function startServer() {
+  const proc = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
+    cwd: path.join(__dirname, ".."),
+    stdio: "ignore",
+  });
+  for (let i = 0; i < 50; i++) {
+    try {
+      const r = await fetch(BASE);
+      if (r.ok) return proc;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  proc.kill();
+  throw new Error("preview server did not start (did you run `npm run build`?)");
+}
+
+// helpers that run inside the page
+const state = (p) => p.evaluate(() => window.__moonkrade.state());
+const places = (p) => p.evaluate(() => window.__moonkrade.places);
+const toScreen = (p, x, y) => p.evaluate(([x, y]) => window.__moonkrade.renderer.toScreen(x, y), [x, y]);
+async function waitStopped(p, timeout = 15000) {
+  await p.waitForFunction(() => !window.__moonkrade.state().moving, null, { timeout });
+}
+async function panelTitle(p) {
+  const el = await p.$(".panel h2");
+  return el ? el.textContent() : null;
+}
+
+async function desktopSuite(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p = await ctx.newPage();
+  const errors = [];
+  p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  p.on("pageerror", (e) => errors.push(String(e)));
+
+  await p.goto(BASE);
+  await p.waitForFunction(() => !!window.__moonkrade);
+  await p.waitForTimeout(800);
+
+  // The canvas should be painted with many different colours (not blank).
+  const colours = await p.evaluate(() => {
+    const c = document.querySelector("canvas.world");
+    const g = c.getContext("2d");
+    const set = new Set();
+    for (let i = 0; i < 400; i++) {
+      const d = g.getImageData(Math.floor(Math.random() * c.width), Math.floor(Math.random() * c.height), 1, 1).data;
+      set.add(`${d[0] >> 4},${d[1] >> 4},${d[2] >> 4}`);
+    }
+    return set.size;
+  });
+  check("world renders full-screen with real artwork", colours > 40, `${colours} distinct colour buckets`);
+
+  // Animation is running: two snapshots of the canvas differ.
+  const changed = await p.evaluate(async () => {
+    const c = document.querySelector("canvas.world");
+    const a = c.toDataURL();
+    await new Promise((r) => setTimeout(r, 400));
+    return a !== c.toDataURL();
+  });
+  check("environment is animated", changed);
+
+  check("intro is shown first", await p.isVisible(".intro-enter"));
+  await p.click(".intro-enter");
+  await p.waitForTimeout(1600);
+  check("entering hides the intro", !(await p.isVisible(".intro-enter")));
+
+  // Tap the sand: the visitor walks there and stops.
+  let s0 = await state(p);
+  let target = { x: s0.x + 300, y: 900 };
+  let sp = await toScreen(p, target.x, target.y);
+  await p.mouse.click(sp.x, sp.y);
+  await p.waitForTimeout(150);
+  check("tapping sand starts walking", (await state(p)).moving);
+  await waitStopped(p);
+  let s1 = await state(p);
+  check("visitor stops at the tapped spot", Math.abs(s1.x - target.x) < 3 && Math.abs(s1.y - target.y) < 3, `at ${s1.x},${s1.y}`);
+
+  // Tap the open sea: the visitor stays on the sand.
+  sp = await toScreen(p, s1.x + 100, 650);
+  await p.mouse.click(sp.x, sp.y);
+  await waitStopped(p);
+  s1 = await state(p);
+  check("tapping the sea keeps the visitor on the beach", s1.y >= 805, `y=${s1.y}`);
+
+  // Rapid repeated taps: the last tap wins, no jitter.
+  for (const dx of [-200, 150, -80, 60]) {
+    const q = await toScreen(p, s1.x + dx, 880);
+    await p.mouse.click(q.x, q.y);
+    await p.waitForTimeout(40);
+  }
+  await waitStopped(p);
+  const s2 = await state(p);
+  check("repeated taps: the last tap decides", Math.abs(s2.x - (s1.x + 60)) < 3 && Math.abs(s2.y - 880) < 3, `at ${s2.x},${s2.y}`);
+
+  // Every place via the dock: walk there, stop at the anchor, the right card opens.
+  for (const pl of await places(p)) {
+    await p.click(`.dock button[aria-label="Walk to ${pl.name}"]`);
+    await p.waitForSelector(".panel h2", { timeout: 15000 });
+    const st = await state(p);
+    const title = await panelTitle(p);
+    check(`dock → ${pl.name}: arrives and opens its card`, title === pl.name && Math.abs(st.x - pl.anchor.x) < 2 && Math.abs(st.y - pl.anchor.y) < 2, `title="${title}" at ${st.x},${st.y}`);
+    await p.screenshot({ path: path.join(SHOTS, `desktop-${pl.id}.png`) });
+  }
+
+  // Walking out onto the pier never crosses the water.
+  await p.click('.dock button[aria-label="Walk to Festival Entrance"]');
+  await p.waitForSelector(".panel h2");
+  await p.click(".panel-close");
+  const pier = (await places(p)).find((x) => x.id === "shore");
+  await p.click('.dock button[aria-label="Walk to Moonlit Shore"]');
+  const samples = [];
+  for (let i = 0; i < 80; i++) {
+    samples.push(await state(p));
+    if (!samples[samples.length - 1].moving && i > 3) break;
+    await p.waitForTimeout(60);
+  }
+  const offGround = samples.filter((s) => s.y < 805 && (s.x < 1614 || s.x > 1666));
+  check("route to the pier stays on sand and planks", offGround.length === 0, `${samples.length} samples, ${offGround.length} in the water`);
+  await p.waitForSelector(".panel h2");
+
+  // Float a krathong at the Moonlit Shore.
+  await p.click(".panel-action");
+  await p.waitForTimeout(300);
+  let st = await state(p);
+  check("floating a krathong works and closes the card", st.stats.krathongsFloated === 1 && !(await p.$(".panel")));
+  await p.waitForTimeout(1500);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-floating.png") });
+
+  // Memory Corner shows the real count from this visit.
+  await p.click('.dock button[aria-label="Walk to Memory Corner"]');
+  await p.waitForSelector(".panel-stat");
+  const stat = await p.textContent(".panel-stat strong");
+  check("Memory Corner shows krathongs floated this visit", stat === "1", `shows ${stat}`);
+
+  // Escape closes the card.
+  await p.keyboard.press("Escape");
+  check("Escape closes the card", !(await p.$(".panel")));
+
+  // Clicking the stall artwork itself (not the marker) visits it.
+  const boutique = (await places(p)).find((x) => x.id === "boutique");
+  await p.waitForTimeout(300);
+  sp = await toScreen(p, (boutique.hitArea.x0 + boutique.hitArea.x1) / 2, boutique.hitArea.y1 - 30);
+  await p.mouse.click(sp.x, sp.y);
+  await p.waitForSelector(".panel h2", { timeout: 15000 });
+  check("clicking the boutique artwork walks there and opens it", (await panelTitle(p)) === "Krathong Boutique");
+
+  // Clicking the glowing marker visits too.
+  await p.click(".panel-close");
+  await p.click('.marker[aria-label="Walk to Flower & Decoration Stall"]');
+  await p.waitForSelector(".panel h2", { timeout: 15000 });
+  check("clicking a glowing marker walks there", (await panelTitle(p)) === "Flower & Decoration Stall");
+  await p.click(".panel-action");
+  check("flower stall action runs", !(await p.$(".panel")));
+
+  // Tapping a curio reacts without walking away.
+  const before = await state(p);
+  const shell = await p.evaluate(() => window.__moonkrade.curios.find((c) => c.id === "shell"));
+  // walk close so it is on screen
+  await p.evaluate(([x]) => window.__moonkrade.visitor.walkTo({ x, y: 960 }), [shell.at.x - 80]);
+  await waitStopped(p);
+  sp = await toScreen(p, shell.at.x, shell.at.y - 12);
+  await p.mouse.click(sp.x, sp.y);
+  await p.waitForTimeout(500);
+  const after = await state(p);
+  check("tapping the shell reacts and doesn't move the visitor", after.stats.curioTaps === before.stats.curioTaps + 1 && !after.moving);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-shell.png") });
+
+  // Keyboard walking.
+  const k0 = await state(p);
+  await p.keyboard.down("ArrowLeft");
+  await p.waitForTimeout(500);
+  await p.keyboard.up("ArrowLeft");
+  const k1 = await state(p);
+  check("arrow keys walk the visitor", k1.x < k0.x - 50, `${k0.x} → ${k1.x}`);
+
+  // Frame rate (headless software rendering, so only a rough indication).
+  const fps = await p.evaluate(() => new Promise((res) => {
+    let n = 0; const t0 = performance.now();
+    const f = () => { n++; performance.now() - t0 < 2000 ? requestAnimationFrame(f) : res(Math.round(n / 2)); };
+    requestAnimationFrame(f);
+  }));
+  check("frame rate measured (headless, rough)", fps > 0, `${fps} fps`);
+
+  check("no console errors on desktop", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+async function phoneSuite(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  const p = await ctx.newPage();
+  const errors = [];
+  p.on("pageerror", (e) => errors.push(String(e)));
+  p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  await p.goto(BASE);
+  await p.waitForFunction(() => !!window.__moonkrade);
+  await p.tap(".intro-enter");
+  await p.waitForTimeout(1600);
+  await p.screenshot({ path: path.join(SHOTS, "phone-start.png") });
+
+  const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  check("phone: no horizontal page overflow", !overflow);
+
+  const v = await p.evaluate(() => window.__moonkrade.state().view);
+  check("phone: scene is recomposed, not shrunk", v.visW < 400 && v.scale > 1, `shows ${Math.round(v.visW)}×${Math.round(v.visH)} world units at ${v.scale.toFixed(2)}×`);
+
+  const s0 = await state(p);
+  const sp = await toScreen(p, s0.x + 120, 930);
+  await p.touchscreen.tap(sp.x, sp.y);
+  await waitStopped(p);
+  const s1 = await state(p);
+  check("phone: tap the sand to walk", Math.abs(s1.x - (s0.x + 120)) < 3, `${s0.x} → ${s1.x}`);
+
+  for (const pl of await places(p)) {
+    await p.tap(`.dock button[aria-label="Walk to ${pl.name}"]`);
+    await p.waitForSelector(".panel h2", { timeout: 20000 });
+    const st = await state(p);
+    const onScreen = await toScreen(p, st.x, st.y);
+    const panelBox = await p.locator(".panel").boundingBox();
+    const visible = onScreen.x > 0 && onScreen.x < 390 && onScreen.y < 844 && onScreen.y > panelBox.y + panelBox.height;
+    check(`phone: dock → ${pl.name} opens its card with the visitor still visible`, (await panelTitle(p)) === pl.name && visible, `visitor at screen ${Math.round(onScreen.x)},${Math.round(onScreen.y)}; card ends at ${Math.round(panelBox.y + panelBox.height)}`);
+    await p.screenshot({ path: path.join(SHOTS, `phone-${pl.id}.png`) });
+  }
+
+  const small = await p.evaluate(() =>
+    [...document.querySelectorAll(".dock button, .panel-close, .panel-action")]
+      .map((b) => b.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height < 40).length);
+  check("phone: touch targets are at least 40px tall", small === 0, `${small} too small`);
+  check("no console errors on phone", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+async function reducedMotionSuite(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, reducedMotion: "reduce" });
+  const p = await ctx.newPage();
+  const errors = [];
+  p.on("pageerror", (e) => errors.push(String(e)));
+  await p.goto(BASE);
+  await p.waitForFunction(() => !!window.__moonkrade);
+  await p.click(".intro-enter");
+  await p.click('.dock button[aria-label="Walk to Krathong Boutique"]');
+  await p.waitForSelector(".panel h2", { timeout: 15000 });
+  check("reduced motion: world still works", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+(async () => {
+  require("node:fs").mkdirSync(SHOTS, { recursive: true });
+  const server = await startServer();
+  const browser = await chromium.launch();
+  try {
+    await desktopSuite(browser);
+    await phoneSuite(browser);
+    await reducedMotionSuite(browser);
+  } catch (e) {
+    check("test run finished without crashing", false, String(e));
+  } finally {
+    await browser.close();
+    server.kill();
+  }
+  const failed = results.filter((r) => !r.ok);
+  console.log(`\n${results.length - failed.length}/${results.length} checks passed. Screenshots in ${SHOTS}`);
+  process.exit(failed.length ? 1 : 0);
+})();
