@@ -1,4 +1,4 @@
-/* MOONKRADE interface. The illustrated world is the interface; everything here is a small overlay.
+/* Festival interface. The illustrated world is the interface; everything here is a small overlay.
    Edition colours come from the festival config (applied in main.tsx); these are fallbacks. */
 :root {
   --night: #0d1440;
@@ -58,7 +58,7 @@ button { font: inherit; color: inherit; }
   text-shadow: 0 1px 6px rgba(8, 10, 40, 0.8);
 }
 .entered .brand { opacity: 1; }
-.brand-name { font-family: var(--font-round); font-weight: 600; letter-spacing: 0.16em; font-size: 15px; }
+.brand-name { font-family: var(--font-th); font-weight: 500; letter-spacing: 0.03em; font-size: 15px; }
 .brand-tag { font-size: 12px; opacity: 0.75; }
 
 /* ---------------------------------------------------------------- place markers */
@@ -145,50 +145,68 @@ button { font: inherit; color: inherit; }
 }
 .marker-name { font-size: 15px; font-weight: 500; }
 
-/* ---------------------------------------------------------------- dock */
+/* ---------------------------------------------------------------- map button */
 .dock {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--safe-bottom) + 12px);
+  left: calc(var(--safe-left) + 16px);
+  bottom: calc(var(--safe-bottom) + 14px);
   display: flex;
-  justify-content: center;
-  padding: 0 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   transition: opacity 0.8s 0.6s;
-  pointer-events: none;
 }
-.dock.is-hidden { opacity: 0; }
+.dock.is-hidden { opacity: 0; pointer-events: none; }
+.map-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px 10px 14px;
+  border: 2px solid rgba(255, 244, 226, 0.5);
+  border-radius: 999px;
+  background: rgba(20, 18, 70, 0.7);
+  color: var(--moonlight);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.map-toggle:hover { background: rgba(40, 34, 110, 0.8); }
+.map-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.dock.is-open .map-toggle { background: var(--paper); color: var(--ink); border-color: var(--ink); }
 .dock ul {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
   gap: 6px;
   margin: 0;
-  padding: 5px;
+  padding: 8px;
   list-style: none;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-radius: 999px;
-  background: rgba(20, 18, 70, 0.55);
-  pointer-events: auto;
+  border-radius: 20px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 0 10px 30px rgba(5, 4, 30, 0.45);
+  animation: map-in 0.18s ease-out;
 }
-.dock.is-hidden ul { pointer-events: none; }
-.dock ul::-webkit-scrollbar { display: none; }
-.dock button {
-  flex: none;
-  min-height: 40px;
-  padding: 8px 14px;
+@keyframes map-in { from { opacity: 0; transform: translateY(8px); } }
+.dock ul button {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--moonlight);
+  border-radius: 14px;
+  background: rgba(42, 29, 74, 0.07);
+  color: var(--ink);
+  font: inherit;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
-.dock button:hover { background: rgba(255, 244, 226, 0.12); }
-.dock button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-.dock button.active { background: var(--paper); color: var(--ink); }
+.dock ul button:hover { background: rgba(239, 111, 142, 0.18); }
+.dock ul button:focus-visible { outline: 2px solid var(--rose); outline-offset: -2px; }
+.dock ul button.active { background: var(--ink); color: var(--paper); }
 
 /* ---------------------------------------------------------------- place panel */
 .panel {
@@ -330,29 +348,41 @@ button { font: inherit; color: inherit; }
 .intro-eyebrow { margin: 0 0 4px; font-family: var(--font-th); color: var(--gold); font-size: 15px; letter-spacing: 0.06em; }
 .intro h1 {
   margin: 0;
-  font-family: var(--font-round);
-  font-size: clamp(46px, 12vw, 96px);
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-family: var(--font-th);
+  font-size: clamp(36px, 10vw, 80px);
+  white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
   color: var(--moonlight);
   text-shadow: 0 4px 0 var(--ink), 0 0 40px rgba(255, 207, 110, 0.5);
 }
 .intro-tagline { margin: 6px 0 2px; font-size: 20px; font-weight: 500; }
 .intro-edition { margin: 0 0 26px; font-size: 15px; opacity: 0.8; }
-.intro-enter {
-  min-height: 52px;
-  padding: 12px 28px;
+.intro-pick { margin: 0 0 12px; font-size: 15px; color: var(--gold); }
+.intro-chars { display: flex; justify-content: center; gap: 14px; }
+.intro-char {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 108px;
+  padding: 8px 14px 10px;
   border: 3px solid var(--ink);
-  border-radius: 999px;
-  background: var(--gold);
+  border-radius: 22px;
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-th);
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 5px 0 var(--ink), 0 0 36px rgba(255, 207, 110, 0.45);
-  animation: breathe 3s ease-in-out infinite;
+  box-shadow: 0 5px 0 var(--ink), 0 0 30px rgba(255, 207, 110, 0.35);
+  transition: transform 0.15s;
 }
-.intro-enter:focus-visible { outline: 3px solid var(--moonlight); outline-offset: 4px; }
+.intro-char:first-child { animation: breathe 3s ease-in-out infinite; }
+.intro-char:hover { transform: translateY(-3px); }
+.intro-char:focus-visible { outline: 3px solid var(--moonlight); outline-offset: 4px; }
+.intro-portrait { width: 72px; height: 96px; border-radius: 14px; background: radial-gradient(circle at 50% 40%, #ffe9b8, #f3c77a); }
 @keyframes breathe {
   0%, 100% { box-shadow: 0 5px 0 var(--ink), 0 0 24px rgba(255, 207, 110, 0.35); }
   50% { box-shadow: 0 5px 0 var(--ink), 0 0 44px rgba(255, 207, 110, 0.7); }
@@ -360,7 +390,7 @@ button { font: inherit; color: inherit; }
 .intro-help { margin-top: 18px; font-size: 14px; opacity: 0.8; }
 
 @media (prefers-reduced-motion: reduce) {
-  .marker-dot, .intro-enter { animation: none; }
+  .marker-dot, .intro-char { animation: none; }
   .panel { animation: none; }
 }
 

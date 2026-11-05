@@ -64,12 +64,27 @@ export type WorldLayout = {
 export type VisitorLook = {
   skin: string;
   hair: string;
+  /** Shirt, blouse or dress colour. */
   top: string;
+  /** Trousers, shorts or skirt colour. */
   bottom: string;
+  /** Pattern, hem band and hair-tie colour. */
   accent: string;
   outline: string;
-  /** Hair bun with a jasmine flower (default true). */
-  bun?: boolean;
+  figure: "man" | "woman";
+  /** Men wear shirts with trousers or shorts; skirts, pha sin and dresses are for women and girls. */
+  outfit: "shirt-pants" | "shirt-shorts" | "blouse-pants" | "blouse-skirt" | "pha-sin" | "dress";
+  hairStyle: "short" | "crop" | "bald" | "long" | "ponytail" | "bob" | "bun";
+  age?: "adult" | "kid" | "elder";
+  sleeves?: "short" | "long" | "none";
+  collar?: boolean;
+  pattern?: "floral" | "stripes" | "plaid";
+  shoes?: string;
+  /** A plumeria tucked behind the ear. */
+  flower?: boolean;
+  glasses?: boolean;
+  /** Small height variation, about 0.94 to 1.06. */
+  height?: number;
 };
 
 export type FestivalConfig = {
@@ -77,11 +92,12 @@ export type FestivalConfig = {
   brand: string;
   tagline: string;
   edition: string;
-  intro: { eyebrow: string; enterLabel: string; help: string };
+  intro: { eyebrow: string; enterLabel: string; pickLabel: string; help: string };
   /** Words used by the shared interface, so every edition can be fully localised. */
   ui: {
     walkTo: string; // prefix for screen-reader labels: "เดินไป"
     close: string;
+    mapLabel: string;
     placesLabel: string;
     wishTitle: string;
     sampleTag: string;
@@ -93,7 +109,8 @@ export type FestivalConfig = {
   places: Place[];
   curios: Curio[];
   layout: WorldLayout;
-  visitor: VisitorLook;
+  /** Characters the player can be. The first is the default. */
+  visitors: { id: string; label: string; look: VisitorLook }[];
   /** CSS custom properties applied to the page for this edition. */
   theme: Record<string, string>;
 };
@@ -122,7 +139,7 @@ export type Scene = {
   /** Drawn over everyone (sky lanterns, sparkles). */
   drawTop(ctx: CanvasRenderingContext2D, t: number): void;
   /** Runs a place's action. Returns false if the action is unknown. */
-  runAction(placeId: string, actionId: string, visitor: Point, input?: { wish?: string }): boolean;
+  runAction(placeId: string, actionId: string, visitor: Point & { look: VisitorLook }, input?: { wish?: string }): boolean;
   /** A tap on the world that isn't a place: krathongs on the water, creatures... null if nothing there. */
   tap(p: Point): TapResult | null;
   /** True while the visitor is away doing something (e.g. riding the Ferris wheel): hide them and ignore walking. */

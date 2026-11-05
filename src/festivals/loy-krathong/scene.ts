@@ -1,7 +1,8 @@
 // The living part of the Loy Krathong world: everything that moves or reacts.
-import type { Actor, CameraView, Point, Scene, TapResult } from "../types";
+import type { Actor, CameraView, Point, Scene, TapResult, VisitorLook } from "../types";
 import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../../engine/math";
-import { drawKawaiiVisitor } from "../../engine/visitor";
+import { drawPerson, type Hold } from "../../engine/person";
+import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
 import { drawKrathong, landPath, lights, paintBack, paintFront, shoreY } from "./scenery";
 import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
@@ -199,67 +200,54 @@ export function createLoyKrathongScene(): Scene {
   }
 
   // ---------------------------------------------------- festival-goers
-  const looks = [
-    { skin: "#f2c4a4", hair: "#2a1a30", top: "#8fd8c8", bottom: "#5a6ac8", accent: "#ffe7a3", outline: OUTLINE, bun: false },
-    { skin: "#ffd9c0", hair: "#4a2a40", top: "#ffa8c2", bottom: "#8a5ab8", accent: "#ffe7a3", outline: OUTLINE },
-    { skin: "#e0a888", hair: "#1e1428", top: "#fff4e2", bottom: "#c0506e", accent: "#ffcf6e", outline: OUTLINE, bun: false },
-    { skin: "#f6c9a8", hair: "#3a2a2a", top: "#c9b6ff", bottom: "#ef6f8e", accent: "#fff4e2", outline: OUTLINE },
-  ];
   const d = config.layout.depth;
   const depthScale = (y: number) => lerp(d.scaleBack, d.scaleFront, clamp((y - d.yBack) / (d.yFront - d.yBack), 0, 1));
-  type Folk = { x: number; y: number; f: number; look: (typeof looks)[number]; idle: number; walk: boolean; x0: number; x1: number; phase: number; size: number; balloon?: string; dance?: boolean; drawY?: number };
-  const stand = (x: number, y: number, f: number, extra: Partial<Folk> = {}): Folk =>
-    ({ x, y, f, look: looks[(x * 7 + y) % looks.length | 0], idle: x % 7, walk: false, x0: 0, x1: 0, phase: 0, size: 1, ...extra });
+  // everyone gets their own outfit from crowd.ts: grown-ups and children take turns through the list
+  const grownUps = crowdLooks.filter((l) => l.age !== "kid");
+  const kids = crowdLooks.filter((l) => l.age === "kid");
+  let nextGrownUp = 0, nextKid = 0;
+  type Folk = { x: number; y: number; f: number; look: VisitorLook; idle: number; walk: boolean; x0: number; x1: number; phase: number; kid?: boolean; hold?: Hold; holdColor?: string; dance?: boolean; drawY?: number };
+  const stand = (x: number, y: number, f: number, extra: Partial<Folk> = {}): Folk => {
+    const look = extra.kid ? kids[nextKid++ % kids.length] : grownUps[nextGrownUp++ % grownUps.length];
+    // older men lean on a walking stick
+    const hold = extra.hold ?? (look.age === "elder" && look.hairStyle === "bald" ? "cane" : undefined);
+    return { x, y, f, look, idle: x % 7, walk: false, x0: 0, x1: 0, phase: 0, ...extra, hold };
+  };
   const stroll = (x0: number, x1: number, y: number, extra: Partial<Folk> = {}): Folk =>
     stand(rand(x0, x1), y, Math.random() < 0.5 ? 1 : -1, { walk: true, x0, x1, ...extra });
+  const balloon = (holdColor: string): Partial<Folk> => ({ kid: true, hold: "balloon", holdColor });
   const folks: Folk[] = [
     // at the temple
-    stand(230, 836, 1), stand(360, 832, -1), stand(470, 846, 1, { size: 0.75, balloon: "#ffd84a" }),
+    stand(230, 836, 1), stand(360, 832, -1), stand(470, 846, 1, balloon("#ffd84a")),
     // queueing for the Ferris wheel
-    stand(800, 830, 1), stand(918, 834, -1), stand(950, 856, -1, { size: 0.75, balloon: "#ef5a5a" }),
+    stand(800, 830, 1), stand(918, 834, -1), stand(950, 856, -1, balloon("#ef5a5a")),
     // dancers on the stage and the crowd watching
     stand(1080, GROUND, 1, { dance: true, drawY: STAGE.floor }), stand(1150, GROUND, -1, { dance: true, drawY: STAGE.floor }),
     stand(1215, GROUND, -1, { dance: true, drawY: STAGE.floor }),
-    stand(1070, 862, -1), stand(1120, 880, 1, { dance: true }), stand(1200, 868, -1), stand(1250, 890, 1, { size: 0.75, balloon: "#5aa0ef" }),
+    stand(1070, 862, -1), stand(1120, 880, 1, { dance: true }), stand(1200, 868, -1), stand(1250, 890, 1, balloon("#5aa0ef")),
     // at the game booths
-    stand(1330, 830, 1), stand(1400, 836, -1, { size: 0.78 }), stand(1500, 832, 1), stand(1575, 840, -1),
-    // shopping for krathongs and out on the pier
-    stand(1690, 834, 1), stand(1795, 840, -1), stand(1835, 836, 1), stand(1975, 842, -1),
+    stand(1330, 830, 1), stand(1400, 836, -1, { kid: true }), stand(1500, 832, 1), stand(1575, 840, -1),
+    // carrying krathongs from the shop out to the pier
+    stand(1690, 834, 1), stand(1795, 840, 1, { hold: "krathong" }), stand(1835, 836, 1, { hold: "krathong" }), stand(1975, 842, -1, { hold: "krathong" }),
     // the cotton candy stall, the memory corner, the flower stall
-    stand(2070, 836, 1, { size: 0.75, balloon: "#ff8fc0" }), stand(2130, 840, -1),
+    stand(2070, 836, 1, balloon("#ff8fc0")), stand(2130, 840, -1, { hold: "cottonCandy" }),
     stand(2240, 846, 1), stand(2560, 834, 1), stand(2660, 838, -1),
   ];
   folks.push(
     stroll(700, 1600, 925),
-    stroll(800, 1400, 955, { size: 0.75, balloon: "#4fc08a" }),
-    stroll(1500, 2300, 945),
+    stroll(800, 1400, 955, balloon("#4fc08a")),
+    stroll(1500, 2300, 945, { hold: "krathong" }),
     stroll(1960, 2700, 915),
     stroll(300, 900, 950),
-    stroll(2200, 2720, 960, { size: 0.78 }),
+    stroll(2200, 2720, 960, { kid: true, hold: "cottonCandy" }),
   );
 
   const folkActors: Actor[] = folks.map((p) => ({
     get y() { return p.y; },
     draw(ctx, t) {
-      const y = p.drawY ?? p.y;
-      const sc = depthScale(p.y) * 0.95 * p.size;
-      if (p.balloon) {
-        const bx = p.x + 12 * sc * p.f, by = y - 92 * sc + Math.sin(t * 1.6 + p.idle) * 3;
-        ctx.strokeStyle = "rgba(255,255,255,0.6)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(p.x + 10 * sc * p.f, y - 26 * sc);
-        ctx.quadraticCurveTo(bx - 4, by + 30 * sc, bx, by + 12 * sc);
-        ctx.stroke();
-        ctx.fillStyle = p.balloon;
-        ctx.strokeStyle = OUTLINE;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.ellipse(bx, by, 9 * sc, 11 * sc, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-      drawKawaiiVisitor(ctx, p.x, y, sc, p.f, p.phase, p.walk ? 0.8 : 0, t + p.idle, p.look, p.dance ? 1 : 0);
+      const sc = depthScale(p.y) * 0.95;
+      drawPerson(ctx, p.x, p.drawY ?? p.y, sc, p.f, p.phase, p.walk ? 0.8 : 0, t + p.idle, p.look,
+        { dance: p.dance ? 1 : 0, hold: p.hold, holdColor: p.holdColor });
     },
   }));
 
@@ -268,6 +256,7 @@ export function createLoyKrathongScene(): Scene {
   // ---------------------------------------------------- Ferris wheel and stage music
   let wheelA = 0;
   const ride = { active: false, cabin: 0, turned: 0 };
+  const rider = { look: config.visitors[0].look };
   const notes: { x: number; y: number; life: number; vx: number; c: string }[] = [];
   let nextNote = 0;
 
@@ -655,7 +644,7 @@ export function createLoyKrathongScene(): Scene {
       ctx.lineTo(0, 8);
       ctx.stroke();
       if (ride.active && i === ride.cabin) {
-        drawKawaiiVisitor(ctx, 0, 27, 0.5, 1, 0, 0, t, config.visitor);
+        drawPerson(ctx, 0, 27, 0.42, 1, 0, 0, t, rider.look);
         glow(ctx, 0, 14, 30, "255,214,140", 0.4);
       }
       // roof
@@ -869,6 +858,7 @@ export function createLoyKrathongScene(): Scene {
         let best = 0, bestY = -Infinity;
         for (let i = 0; i < WHEEL.cabins; i++) { const c = cabinPos(i); if (c.y > bestY) { bestY = c.y; best = i; } }
         Object.assign(ride, { active: true, cabin: best, turned: 0 });
+        rider.look = visitor.look;
         return true;
       }
       if (placeId === "stage" && actionId === "dance") {

@@ -7,7 +7,7 @@ import { dist } from "./engine/math";
 import { Intro } from "./components/Intro";
 import { PlaceMarkers } from "./components/PlaceMarkers";
 import { PlacePanel } from "./components/PlacePanel";
-import { PlaceDock } from "./components/PlaceDock";
+import { MapMenu } from "./components/MapMenu";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
@@ -42,7 +42,7 @@ export default function App() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const scene = festival.createScene();
-    const visitor = createVisitor(config.layout, config.visitor);
+    const visitor = createVisitor(config.layout, config.visitors[0].look);
     const renderer = createRenderer(canvas, config, scene, visitor);
     engineRef.current = { renderer, visitor, scene };
 
@@ -71,13 +71,13 @@ export default function App() {
     renderer.start();
 
     // Hooks for automated browser checks (tests/smoke.cjs).
-    (window as unknown as { __moonkrade: unknown }).__moonkrade = {
+    (window as unknown as { __fair: unknown }).__fair = {
       visitor,
       renderer,
       places: config.places.map((p) => ({ id: p.id, name: p.name, anchor: p.anchor, marker: p.marker, hitArea: p.hitArea })),
       curios: config.curios,
       scene,
-      state: () => ({ x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
+      state: () => ({ look: visitor.look.figure, x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
     };
     return () => renderer.stop();
   }, []);
@@ -101,8 +101,10 @@ export default function App() {
     e.visitor.walkTo(place.anchor, () => setOpenId(id));
   }, [say]);
 
-  const enter = useCallback(() => {
+  const enter = useCallback((visitorId?: string) => {
     if (entered) return;
+    const chosen = config.visitors.find((v) => v.id === visitorId);
+    if (chosen && engineRef.current) engineRef.current.visitor.look = chosen.look;
     setEntered(true);
     engineRef.current?.renderer.follow(true);
     setReveal(true);
@@ -211,7 +213,7 @@ export default function App() {
       <canvas
         ref={canvasRef}
         className="world"
-        aria-label={`${config.brand}: ${config.edition} งานวัดริมทะเลใต้พระจันทร์เต็มดวง`}
+        aria-label={`${config.brand} ${config.tagline} ใต้พระจันทร์เต็มดวง`}
         role="img"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -234,7 +236,7 @@ export default function App() {
         ui={config.ui}
       />
 
-      <PlaceDock places={config.places} active={target} onVisit={visit} hidden={!entered} ui={config.ui} />
+      <MapMenu places={config.places} active={target} onVisit={visit} hidden={!entered} ui={config.ui} />
 
       {openPlace && (
         <PlacePanel

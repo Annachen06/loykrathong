@@ -1,21 +1,24 @@
 // Everything specific to the Loy Krathong edition lives in this folder.
+// The name of the fair (brand) also appears on the entrance arch.
 // Text, places, layout and colours are plain data so they're easy to edit.
 import type { FestivalConfig } from "../types";
 
 export const loyKrathongConfig: FestivalConfig = {
   id: "loy-krathong",
-  brand: "MOONKRADE",
+  brand: "ลอยกระทงริมเล",
   tagline: "งานวัดเล็กๆ ริมทะเล",
-  edition: "ลอยกระทงใต้แสงจันทร์",
+  edition: "ไหว้พระ เล่นเกม รำวง แล้วไปลอยกระทงกัน",
   intro: {
     eyebrow: "คืนวันเพ็ญ เดือนสิบสอง",
     enterLabel: "เข้างาน",
+    pickLabel: "เลือกตัวละคร แล้วเข้างานได้เลย",
     help: "แตะพื้นทรายเพื่อเดิน แตะดวงไฟเพื่อไปเที่ยวซุ้มต่างๆ",
   },
   welcomeHint: "แตะพื้นทรายเพื่อเดิน หรือแตะดวงไฟเพื่อไปเที่ยว",
   ui: {
     walkTo: "เดินไป",
     close: "ปิด",
+    mapLabel: "แผนที่งาน",
     placesLabel: "สถานที่ในงาน",
     wishTitle: "คำอธิษฐาน",
     sampleTag: "ตัวอย่าง",
@@ -154,14 +157,25 @@ export const loyKrathongConfig: FestivalConfig = {
     depth: { yBack: 630, yFront: 975, scaleBack: 0.8, scaleFront: 1.25 },
   },
 
-  visitor: {
-    skin: "#ffd9c0",
-    hair: "#3a2240",
-    top: "#ffd27a",
-    bottom: "#ef6f8e",
-    accent: "#ffe7a3",
-    outline: "#2a1d4a",
-  },
+  // Who you are at the fair. The first one is picked unless the player chooses another on the welcome screen.
+  visitors: [
+    {
+      id: "woman",
+      label: "ผู้หญิง",
+      look: {
+        figure: "woman", outfit: "pha-sin", hairStyle: "bun", flower: true, sleeves: "short",
+        skin: "#f6d2b8", hair: "#2a1a24", top: "#ffd27a", bottom: "#ef6f8e", accent: "#fff0b8", outline: "#2a1d4a",
+      },
+    },
+    {
+      id: "man",
+      label: "ผู้ชาย",
+      look: {
+        figure: "man", outfit: "shirt-pants", hairStyle: "short", collar: true, pattern: "floral",
+        skin: "#eec1a0", hair: "#1c1418", top: "#ffd27a", bottom: "#34406e", accent: "#ef6f8e", outline: "#2a1d4a", height: 1.03,
+      },
+    },
+  ],
 
   theme: {
     "--night": "#0d1440",

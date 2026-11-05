@@ -1,6 +1,7 @@
 // Static artwork for the Loy Krathong world, drawn once per resize into two cached layers.
 // Style rules: rounded shapes, one dark-indigo outline colour on near objects,
 // soft pastel fills, warm lantern light against a deep-blue night.
+import { loyKrathongConfig } from "./config";
 import { glow, lerp, seeded } from "../../engine/math";
 import { W, H, HORIZON, SHORE, GROUND, PIER, OUTLINE, WHEEL, STAGE, TEMPLE } from "./world";
 
@@ -753,18 +754,23 @@ function gate(ctx: CanvasRenderingContext2D, cx: number, base: number) {
   });
   ctx.save();
   ctx.fillStyle = "#fff4e2";
-  ctx.font = "600 15px Fredoka, sans-serif";
+  ctx.font = "500 15px Mitr, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const text = "MOONKRADE";
-  for (let i = 0; i < text.length; i++) {
-    const t = (i + 0.5) / text.length;
-    const px = lerp(cx - half - 4, cx + half + 4, t);
+  // Thai vowel and tone marks ride on the letter before them, so keep them together when spacing the letters along the arch.
+  const glyphs = Array.from(loyKrathongConfig.brand).reduce<string[]>((out, ch) => {
+    if (/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/.test(ch) && out.length) out[out.length - 1] += ch;
+    else out.push(ch);
+    return out;
+  }, []);
+  for (let i = 0; i < glyphs.length; i++) {
+    const t = (i + 0.5) / glyphs.length;
+    const px = lerp(cx - half - 8, cx + half + 8, t);
     const py = base - h + 13 - Math.sin(t * Math.PI) * 23;
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate((t - 0.5) * 0.7);
-    ctx.fillText(text[i], 0, 0);
+    ctx.fillText(glyphs[i], 0, 0);
     ctx.restore();
   }
   ctx.restore();
