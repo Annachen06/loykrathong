@@ -81,6 +81,8 @@ export type WorldLayout = {
   /** On portrait phones, show only this much of the world's height (the bottom part),
    *  so the ground and characters stay a comfortable size instead of shrinking. */
   portraitHeight: number;
+  /** Colour of the night above the top of the world, seen when the camera pulls far out (the Ferris wheel view). */
+  skyTop?: string;
   walkAreas: WalkArea[];
   /** Where to step when moving between two walk areas. */
   junctions: { a: string; b: string; via: Point }[];
@@ -168,7 +170,7 @@ export type Scene = {
   paintFront(ctx: CanvasRenderingContext2D): void;
   update(dt: number, visitor: Point): void;
   /** Optional: take over the camera (centre and zoom), e.g. while riding the Ferris wheel. null = follow the visitor. */
-  camera?(): { x: number; y: number; zoom: number } | null;
+  camera?(): { x: number; y: number; zoom: number; wide?: boolean } | null;
   /** Animated layer between back and front (stars, moon, water, things floating on it). */
   drawMiddle(ctx: CanvasRenderingContext2D, t: number, cam: CameraView): void;
   /** Animated layer over the front scenery but behind people (lights, palms, foam). */

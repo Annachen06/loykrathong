@@ -4,7 +4,7 @@ import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../
 import { drawPerson, type Hold, type Pose } from "../../engine/person";
 import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
-import { drawKrathong, landPath, lights, paintBack, paintFront, shoreY } from "./scenery";
+import { drawKrathong, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
 import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
 
 type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string };
@@ -25,6 +25,11 @@ export function createLoyKrathongScene(): Scene {
     if (x < 780 && y > 360) continue; // behind the hills
     if (dist(x, y, MOON.x, MOON.y) < MOON.r * 2.2) continue;
     stars.push({ x, y, s: 0.8 + r() * 1.8, p: r() * 6.28, f: 0.6 + r() * 2 });
+  }
+  // more stars above the top of the world, seen only from high up in the Ferris wheel
+  const highStars: typeof stars = [];
+  for (let i = 0; i < 260; i++) {
+    highStars.push({ x: r() * W, y: -r() * 1000, s: 0.8 + r() * 1.8, p: r() * 6.28, f: 0.6 + r() * 2 });
   }
 
   const floaters: Floater[] = [];
@@ -632,10 +637,19 @@ export function createLoyKrathongScene(): Scene {
   function drawMiddle(ctx: CanvasRenderingContext2D, t: number, cam: CameraView) {
     lastCam = cam;
     const M = moonAt(cam);
+    if (cam.y < 0) {
+      for (const s of highStars) {
+        if (s.y < cam.y) continue;
+        ctx.fillStyle = `rgba(240,240,255,${0.3 + 0.6 * (0.5 + 0.5 * Math.sin(t * s.f + s.p))})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.s * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     // Everything in this layer sits behind the land on the left: clip it out.
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, W, H);
+    ctx.rect(0, Math.min(0, cam.y), W, H - Math.min(0, cam.y)); // from high up the sky reaches above the top of the world
     landPath(ctx);
     ctx.clip("evenodd");
     for (const s of stars) {
@@ -866,6 +880,7 @@ export function createLoyKrathongScene(): Scene {
 
   function drawWheel(ctx: CanvasRenderingContext2D, t: number) {
     if (ride.active && ride.t > 1.6) return; // you're riding it: the view from the cabin doesn't show the wheel
+    wheelStand(ctx);
     const { x, hubY, r: R, cabins } = WHEEL;
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#cfc6ef";
@@ -1166,8 +1181,11 @@ export function createLoyKrathongScene(): Scene {
       if (ride.active) {
         const c = cabinPos(ride.cabin);
         if (ride.t < 1.6) return { x: c.x, y: c.y + 30, zoom: 1.6 }; // stepping into the cabin
-        // inside: a wide view out over the fair and the sea, rising and falling with the cabin
-        return { x: 1560 + (c.x - WHEEL.x) * 0.4, y: c.y + 60, zoom: 1.15 };
+        // inside: the higher the cabin, the further you can see. The camera pulls back so the fair
+        // looks small below, and the sky opens up above it.
+        const high = clamp((WHEEL.hubY + WHEEL.r - c.y) / (WHEEL.r * 2), 0, 1);
+        const portrait = lastCam.w < lastCam.h;
+        return { x: 1640 + (c.x - WHEEL.x) * 0.5, y: H, zoom: portrait ? 0.8 - 0.38 * high : 0.85 - 0.33 * high, wide: true };
       }
       // out on the pier: come in close, with the water and the krathongs ahead
       if (pierFade > 0.6 && you.y < GROUND - 6) return { x: you.x, y: you.y - 110, zoom: 1.6 };

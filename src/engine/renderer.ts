@@ -33,7 +33,8 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     if (over) {
       return {
         x: clamp(over.x - view.visW / 2, 0, Math.max(0, W - view.visW)),
-        y: clamp(over.y - view.visH / 2, 0, Math.max(0, H - view.visH)),
+        // a wide view may show more height than the world has: keep the ground at the bottom, open sky above
+        y: over.wide && view.visH > H ? H - view.visH : clamp(over.y - view.visH / 2, 0, Math.max(0, H - view.visH)),
       };
     }
     const focusX = following ? visitor.x : config.layout.spawn.x + view.visW * 0.35;
@@ -76,9 +77,15 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     cam.y = t.y;
   }
 
+  // Copy the part of a cached layer that is on screen. The camera can look past the world's edges
+  // (the wide view from the Ferris wheel), so only the overlapping part is copied.
   const blit = (layer: HTMLCanvasElement) => {
     const k = view.layerK;
-    ctx.drawImage(layer, cam.x * k, cam.y * k, view.visW * k, view.visH * k, 0, 0, canvas.width, canvas.height);
+    const x0 = Math.max(0, cam.x), y0 = Math.max(0, cam.y);
+    const x1 = Math.min(W, cam.x + view.visW), y1 = Math.min(H, cam.y + view.visH);
+    if (x1 <= x0 || y1 <= y0) return;
+    const s = view.scale * view.zoom * view.dpr;
+    ctx.drawImage(layer, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, (x0 - cam.x) * s, (y0 - cam.y) * s, (x1 - x0) * s, (y1 - y0) * s);
   };
 
   function frame(now: number) {
@@ -88,8 +95,10 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
 
     scene.update(dt, visitor);
     visitor.update(dt);
-    let wantZoom = (following && scene.camera?.()?.zoom) || 1;
-    if (view.vw / view.vh < 0.9) wantZoom = 1 + (wantZoom - 1) * 0.6; // phones are already close in
+    const over = following ? scene.camera?.() : null;
+    let wantZoom = over?.zoom || 1;
+    if (over?.wide) wantZoom = Math.max(wantZoom, view.vw / (view.scale * W)); // never wider than the world
+    else if (view.vw / view.vh < 0.9) wantZoom = 1 + (wantZoom - 1) * 0.6; // phones are already close in
     view.zoom = lerp(view.zoom, wantZoom, Math.min(1, dt * 1.6));
     if (Math.abs(view.zoom - wantZoom) < 0.002) view.zoom = wantZoom;
     view.visW = view.vw / (view.scale * view.zoom);
@@ -98,10 +107,15 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     const ease = Math.min(1, dt * (following ? 3.2 : 0.5));
     cam.x = lerp(cam.x, t.x, ease);
     cam.y = lerp(cam.y, t.y, ease);
+    // never show past the sides or the bottom of the world while easing (zoom and camera move together)
+    cam.x = clamp(cam.x, 0, Math.max(0, W - view.visW));
+    cam.y = view.visH <= H ? clamp(cam.y, 0, H - view.visH) : Math.min(cam.y, H - view.visH);
 
     const s = view.scale * view.zoom * view.dpr;
     const world = () => ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = config.layout.skyTop ?? "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     blit(back);
     world();
     scene.drawMiddle(ctx, time, { x: cam.x, y: cam.y, w: view.visW, h: view.visH });

@@ -8,6 +8,8 @@ export type SoundName = "firework" | "bell" | "splash" | "pop" | "chime" | "pick
 export type Sound = ReturnType<typeof createSound>;
 
 const STORE_KEY = "fair-sound-muted";
+/** Overall loudness. The fair should sit in the background, not fill the room. */
+const VOLUME = 0.5;
 
 export function createSound(stageX: number) {
   let ac: AudioContext | null = null;
@@ -44,13 +46,13 @@ export function createSound(stageX: number) {
     if (!Ctx) return;
     ac = new Ctx();
     master = ac.createGain();
-    master.gain.value = muted ? 0 : 1;
+    master.gain.value = muted ? 0 : VOLUME;
     master.connect(ac.destination);
     const bus = (v: number) => { const g = ac!.createGain(); g.gain.value = v; g.connect(master); return g; };
     musicBus = bus(0.3);
     crowdBus = bus(0.18);
     wavesBus = bus(0.22);
-    fxBus = bus(0.5);
+    fxBus = bus(0.4);
 
     // two seconds of soft noise, reused by everything that hisses
     noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
@@ -187,8 +189,8 @@ export function createSound(stageX: number) {
   function ching(t: number, v: number) {
     const a = ac!;
     const g = a.createGain();
-    env(g, t, 0.12 * v, 0.7);
-    for (const f of [2480, 3710, 5150]) {
+    env(g, t, 0.06 * v, 0.6);
+    for (const f of [2480, 3710]) {
       const o = a.createOscillator();
       o.frequency.value = f;
       o.connect(g);
@@ -206,7 +208,7 @@ export function createSound(stageX: number) {
     hp.type = "highpass";
     hp.frequency.value = 5000;
     const g = a.createGain();
-    env(g, t, 0.5, 0.06);
+    env(g, t, 0.25, 0.05);
     s.connect(hp).connect(g).connect(musicBus);
     s.start(t, Math.random());
     s.stop(t + 0.08);
@@ -268,9 +270,9 @@ export function createSound(stageX: number) {
     if (!ac) return;
     const t = ac.currentTime;
     const near = onStage ? 1 : clamp(1 - Math.abs(x - stageX) / 1500, 0.12, 1);
-    musicBus.gain.setTargetAtTime(0.45 * near * (inCabin ? 0.5 : 1), t, 0.3);
-    crowdBus.gain.setTargetAtTime(inCabin ? 0.1 : 0.26, t, 0.5);
-    wavesBus.gain.setTargetAtTime(y < 800 ? 0.45 : 0.28, t, 0.6);
+    musicBus.gain.setTargetAtTime(0.3 * near * (inCabin ? 0.4 : 1), t, 0.3);
+    crowdBus.gain.setTargetAtTime(inCabin ? 0.06 : 0.18, t, 0.5);
+    wavesBus.gain.setTargetAtTime(y < 800 ? 0.3 : 0.2, t, 0.6);
   }
 
   return {
@@ -282,7 +284,7 @@ export function createSound(stageX: number) {
     setMuted(m: boolean) {
       muted = m;
       try { localStorage.setItem(STORE_KEY, m ? "1" : "0"); } catch { /* ignore */ }
-      if (ac) master.gain.setTargetAtTime(m ? 0 : 1, ac.currentTime, 0.1);
+      if (ac) master.gain.setTargetAtTime(m ? 0 : VOLUME, ac.currentTime, 0.1);
     },
     stop() {
       window.clearInterval(timer);

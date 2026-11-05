@@ -204,6 +204,7 @@ export const loyKrathongConfig: FestivalConfig = {
     focusY: 600,
     viewHeight: 780,
     portraitHeight: 660,
+    skyTop: "#081046",
     walkAreas: [
       { id: "beach", rect: { x0: 60, y0: 805, x1: 2740, y1: 975 } },
       { id: "pier", rect: { x0: 1876, y0: 628, x1: 1924, y1: 812 } },

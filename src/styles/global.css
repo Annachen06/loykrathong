@@ -354,12 +354,14 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 18px 60px rgba(4, 4, 24, 0.6);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+  container-type: inline-size;
 }
 .intro-eyebrow { margin: 0 0 4px; font-family: var(--font-th); color: var(--gold); font-size: 15px; letter-spacing: 0.06em; }
 .intro h1 {
   margin: 0;
   font-family: var(--font-th);
-  font-size: clamp(36px, 10vw, 80px);
+  font-size: clamp(30px, 9vw, 58px);
+  font-size: min(64px, 13cqi); /* sized to the card, so the name always fits inside it */
   white-space: nowrap;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -639,25 +641,9 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
 /* inside the Ferris wheel cabin */
 .ride-view { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.9s; }
 .ride-view.on { opacity: 1; }
-.ride-roof {
-  position: absolute; left: 0; right: 0; top: 0; height: 9%;
-  background: #ef6f8e;
-  border-bottom: 5px solid var(--ink);
-  border-radius: 0 0 50% 50% / 0 0 40% 40%;
-  box-shadow: inset 0 -10px 0 rgba(255, 255, 255, 0.18);
-}
-.ride-post { position: absolute; top: 0; bottom: 0; width: max(14px, 2.4%); background: #ef6f8e; border: 5px solid var(--ink); border-top: 0; border-bottom: 0; }
-.ride-post.left { left: 0; border-left: 0; }
-.ride-post.right { right: 0; border-right: 0; }
-.ride-rail {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 12%;
-  background: #ef6f8e;
-  border-top: 5px solid var(--ink);
-  box-shadow: inset 0 10px 0 rgba(255, 255, 255, 0.18);
-}
-.ride-rider { position: absolute; left: max(24px, 6%); top: -150px; width: 180px; height: 220px; }
+.ride-cabin { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ride-caption {
-  position: absolute; left: 50%; top: calc(9% + 14px); transform: translateX(-50%);
+  position: absolute; left: 50%; top: calc(var(--safe-top) + 16px); transform: translateX(-50%);
   margin: 0; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--ink);
   background: var(--paper); color: var(--ink); font-size: 13px; white-space: nowrap;
 }
@@ -684,3 +670,7 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
 .sound-toggle.is-hidden { opacity: 0; pointer-events: none; }
 .sound-toggle[aria-pressed="false"] { opacity: 0.75; }
 .sound-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (max-width: 560px) {
+  /* below the name and the sound button on a phone */
+  .ride-caption { top: calc(var(--safe-top) + 66px); }
+}

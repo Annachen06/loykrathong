@@ -348,7 +348,7 @@ function pole(ctx: CanvasRenderingContext2D, x: number, top: number, horns = fal
   }
 }
 
-function wheelStand(ctx: CanvasRenderingContext2D) {
+export function wheelStand(ctx: CanvasRenderingContext2D) {
   const { x, hubY } = WHEEL;
   for (const dx of [-80, 80]) {
     outlined(ctx, "#7a6a9a", () => {
@@ -901,7 +901,6 @@ export function paintFront(ctx: CanvasRenderingContext2D) {
   sand(ctx);
   pier(ctx);
   templeGrounds(ctx);
-  wheelStand(ctx);
   pole(ctx, 1278, 560, true);
   stage(ctx);
   gameBooths(ctx);
