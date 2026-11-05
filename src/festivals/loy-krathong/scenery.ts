@@ -265,7 +265,7 @@ function ubosot(ctx: CanvasRenderingContext2D, x: number, base: number) {
 
 function templeGrounds(ctx: CanvasRenderingContext2D) {
   // paved courtyard the buildings stand on
-  outlined(ctx, "#8f86b8", () => ctx.rect(30, GROUND - 22, 590, 22), 2);
+  outlined(ctx, "#b3a48e", () => ctx.rect(30, GROUND - 22, 590, 22), 2);
   ctx.fillStyle = "rgba(255,240,220,0.12)";
   for (let x = 40; x < 610; x += 26) ctx.fillRect(x, GROUND - 20, 1.5, 18);
 
@@ -492,9 +492,10 @@ function foodStall(ctx: CanvasRenderingContext2D, x: number, w: number, stripe: 
 
 function sand(ctx: CanvasRenderingContext2D) {
   const g = ctx.createLinearGradient(0, SHORE - 10, 0, H);
-  g.addColorStop(0, "#a48cc4");
-  g.addColorStop(0.3, "#8a74b4");
-  g.addColorStop(1, "#4e3f86");
+  // beach sand at night: warm and earthy, lit by the fair's lamps
+  g.addColorStop(0, "#b8987a");
+  g.addColorStop(0.3, "#a3826a");
+  g.addColorStop(1, "#5e4a44");
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(0, H);
@@ -508,12 +509,12 @@ function sand(ctx: CanvasRenderingContext2D) {
   for (let i = 0; i < 2200; i++) {
     const x = r() * W;
     const y = SHORE + 10 + r() * (H - SHORE);
-    ctx.fillStyle = `rgba(255,236,220,${0.04 + r() * 0.08})`;
+    ctx.fillStyle = r() < 0.5 ? `rgba(255,236,200,${0.06 + r() * 0.1})` : `rgba(70,48,36,${0.06 + r() * 0.1})`;
     ctx.fillRect(x, y, 1.8, 1.8);
   }
   const wet = ctx.createLinearGradient(0, SHORE, 0, SHORE + 36);
-  wet.addColorStop(0, "rgba(200,205,255,0.35)");
-  wet.addColorStop(1, "rgba(200,205,255,0)");
+  wet.addColorStop(0, "rgba(70,52,46,0.45)"); // darker damp sand at the water's edge
+  wet.addColorStop(1, "rgba(70,52,46,0)");
   ctx.fillStyle = wet;
   ctx.fillRect(0, SHORE, W, 36);
 }

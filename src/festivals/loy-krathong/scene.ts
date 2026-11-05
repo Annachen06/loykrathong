@@ -787,6 +787,24 @@ export function createLoyKrathongScene(): Scene {
         ctx.stroke();
       }
     }
+    // foam where the waves meet the beach: drawn behind the sand and the stalls, so it only shows at the water's edge
+    for (let j = 0; j < 2; j++) {
+      const phase = t * 0.7 + j * Math.PI;
+      const reach = (Math.sin(phase) * 0.5 + 0.5) * 12;
+      ctx.strokeStyle = `rgba(235,238,255,${0.3 + 0.15 * Math.cos(phase)})`;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      let pen = false;
+      for (let x = 0; x <= W; x += 20) {
+        if (x > PIER.x0 - 26 && x < PIER.x1 + 26) { pen = false; continue; }
+        const y = shoreY(x) - 3 - reach * 0.7 + Math.sin(x * 0.031 + t) * 1.5;
+        pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        pen = true;
+      }
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
@@ -847,6 +865,7 @@ export function createLoyKrathongScene(): Scene {
   }
 
   function drawWheel(ctx: CanvasRenderingContext2D, t: number) {
+    if (ride.active && ride.t > 1.6) return; // you're riding it: the view from the cabin doesn't show the wheel
     const { x, hubY, r: R, cabins } = WHEEL;
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#cfc6ef";
@@ -929,24 +948,6 @@ export function createLoyKrathongScene(): Scene {
   }
 
   function drawGround(ctx: CanvasRenderingContext2D, t: number, highlight: string | null) {
-    // foam at the waterline
-    for (let j = 0; j < 2; j++) {
-      const phase = t * 0.7 + j * Math.PI;
-      const reach = (Math.sin(phase) * 0.5 + 0.5) * 12;
-      ctx.strokeStyle = `rgba(235,238,255,${0.3 + 0.15 * Math.cos(phase)})`;
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      let pen = false;
-      for (let x = 0; x <= W; x += 20) {
-        if (x > PIER.x0 - 26 && x < PIER.x1 + 26) { pen = false; continue; }
-        const y = shoreY(x) - 3 + reach + Math.sin(x * 0.031 + t) * 2;
-        pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-        pen = true;
-      }
-      ctx.stroke();
-    }
-
     // place highlight: a warm glow over the selected stall
     if (highlight) {
       const p = config.places.find((q) => q.id === highlight);
@@ -1163,11 +1164,10 @@ export function createLoyKrathongScene(): Scene {
     actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, ringActor],
     camera() {
       if (ride.active) {
-        // look out of the cabin: away from the hub and a little down at the fair
         const c = cabinPos(ride.cabin);
-        const a = Math.atan2(c.y - WHEEL.hubY, c.x - WHEEL.x);
-        const k = Math.min(1, ride.t / 1.6);
-        return { x: c.x + Math.cos(a) * 130 * k, y: c.y + (50 + Math.sin(a) * 50) * k, zoom: 1.7 };
+        if (ride.t < 1.6) return { x: c.x, y: c.y + 30, zoom: 1.6 }; // stepping into the cabin
+        // inside: a wide view out over the fair and the sea, rising and falling with the cabin
+        return { x: 1560 + (c.x - WHEEL.x) * 0.4, y: c.y + 60, zoom: 1.15 };
       }
       // out on the pier: come in close, with the water and the krathongs ahead
       if (pierFade > 0.6 && you.y < GROUND - 6) return { x: you.x, y: you.y - 110, zoom: 1.6 };
