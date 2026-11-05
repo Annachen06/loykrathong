@@ -1,7 +1,10 @@
 // The visitor character: simple tap-to-walk movement. The drawing itself lives in person.ts.
 import type { Point, VisitorLook, WorldLayout } from "../festivals/types";
 import { clamp, dist, lerp } from "./math";
-import { drawPerson } from "./person";
+import { drawPerson, type Hold } from "./person";
+
+/** Things the visitor can stop and do: kneel and pray, shake fortune sticks, kneel to float a krathong. */
+export type Activity = "pray" | "fortune" | "float";
 import { isWalkable, planPath } from "./walk";
 
 const WALK_SPEED = 250; // world units per second
@@ -13,6 +16,12 @@ export type Visitor = ReturnType<typeof createVisitor>;
 export function createVisitor(layout: WorldLayout, look: VisitorLook) {
   const v = {
     look, // can be swapped when the player picks a character
+    /** What's in the visitor's hand (a krathong, a prize, a garland...). */
+    hold: undefined as Hold | undefined,
+    holdColor: undefined as string | undefined,
+    holdColor2: undefined as string | undefined,
+    act: null as null | { kind: Activity; start: number; until: number; done?: () => void },
+    pose: { kneel: 0, wai: 0, bow: 0 },
     x: layout.spawn.x,
     y: layout.spawn.y,
     facing: 1 as 1 | -1,
@@ -29,6 +38,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
     /** Walk to a point. A new call simply replaces the old trip. */
     walkTo(target: Point, onArrive?: () => void): Point {
       v.danceUntil = 0;
+      v.act = null;
       v.path = planPath(layout, v, target);
       v.onArrive = onArrive ?? null;
       return v.path[v.path.length - 1];
@@ -39,6 +49,15 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
     /** Dance on the spot for a few seconds (walking stops it). */
     dance(seconds: number) { v.stop(); v.danceUntil = v.clock + seconds; },
     get dancing() { return v.clock < v.danceUntil; },
+
+    /** Stop and do something for a while (walking away cancels it). `done` runs when it finishes. */
+    perform(kind: Activity, seconds: number, facing?: 1 | -1, done?: () => void) {
+      v.stop();
+      v.danceUntil = 0;
+      if (facing) v.facing = facing;
+      v.act = { kind, start: v.clock, until: v.clock + seconds, done };
+    },
+    get busy() { return v.act !== null; },
 
     update(dt: number) {
       v.clock += dt;
@@ -80,6 +99,34 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       if (moved) v.phase += dt * 12;
       if (moved) v.danceUntil = 0;
       v.danceAmount = lerp(v.danceAmount, v.dancing ? 1 : 0, Math.min(1, dt * 6));
+      if (moved && v.act) v.act = null;
+
+      // ease into the pose for the current activity
+      const a = v.act;
+      const el = a ? v.clock - a.start : 0;
+      let kneel = 0, wai = 0, bow = 0;
+      if (a) {
+        const ending = a.until - v.clock < 0.6; // stand up again at the end
+        kneel = ending ? 0 : 1;
+        if (a.kind === "pray") {
+          wai = ending ? 0 : 1;
+          // three slow bows (krap) in the middle of the prayer
+          const k = (el - 1.4) / 4.2;
+          bow = k > 0 && k < 1 ? Math.max(0, Math.sin(k * Math.PI * 3)) * 0.9 : 0;
+        } else if (a.kind === "fortune") {
+          bow = 0.18 + (el > 0.6 && el < a.until - a.start - 1.2 ? Math.sin(v.clock * 30) * 0.05 : 0);
+        } else {
+          bow = ending ? 0 : 0.3;
+        }
+        if (v.clock >= a.until) {
+          v.act = null;
+          a.done?.();
+        }
+      }
+      const e = Math.min(1, dt * 5);
+      v.pose.kneel = lerp(v.pose.kneel, kneel, e);
+      v.pose.wai = lerp(v.pose.wai, wai, e);
+      v.pose.bow = lerp(v.pose.bow, bow, Math.min(1, dt * 4));
     },
 
     draw(ctx: CanvasRenderingContext2D, t: number) {
@@ -95,7 +142,9 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       ctx.ellipse(v.x, v.y, (21 + pulse * 3) * s, (6.5 + pulse) * s, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-      drawPerson(ctx, v.x, v.y, s * 1.08, v.facing, v.phase, v.stride, t, v.look, { dance: v.danceAmount });
+      drawPerson(ctx, v.x, v.y, s * 1.08, v.facing, v.phase, v.stride, t, v.look, {
+        dance: v.danceAmount, ...v.pose, hold: v.hold, holdColor: v.holdColor, holdColor2: v.holdColor2,
+      });
     },
   };
   return v;

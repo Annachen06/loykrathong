@@ -1,21 +1,42 @@
 import { useEffect, useRef, useState } from "react";
+import type { HeldThing } from "../festivals/types";
 
-// Two small temple-fair games. Prizes are just for fun: nothing is collected or stored.
+// Two small temple-fair games. Winning hands you a prize: soft toys are carried by your character,
+// and every prize is listed on your souvenir card at the Memory Corner. Nothing costs money.
+
+export type Prize = { name: string; hold?: HeldThing };
+type OnPrize = (p: Prize) => void;
 
 const BALLOON_COLOURS = ["#ef5a5a", "#ffd84a", "#4fc08a", "#5aa0ef", "#ff8fc0", "#c9b6ff"];
 
-function prizeFor(score: number, game: "darts" | "rings") {
-  if (game === "darts") return ["เกือบได้แล้ว ลองอีกทีนะ", "ได้ลูกอมรสมะม่วง", "ได้พวงกุญแจเปลือกหอย", "ได้ตุ๊กตาปลาดาวตัวใหญ่!"][score];
-  return ["ห่วงไม่ลงเลย ลองอีกทีนะ", "ได้ขนมสายไหมหนึ่งไม้", "ได้ตุ๊กตาแมงกะพรุน", "ได้ตุ๊กตากระต่ายส่องจันทร์!"][score];
+const PRIZES: Record<"darts" | "rings", (Prize | null)[]> = {
+  darts: [null, { name: "ลูกอมรสมะม่วง" }, { name: "พวงกุญแจเปลือกหอย" }, { name: "ตุ๊กตาปลาดาวตัวใหญ่", hold: "plushStar" }],
+  rings: [null, { name: "สายไหมหนึ่งไม้", hold: "cottonCandy" }, { name: "ตุ๊กตาแมงกะพรุน", hold: "plushJelly" }, { name: "ตุ๊กตากระต่ายส่องจันทร์", hold: "plushRabbit" }],
+};
+
+function prizeText(score: number, game: "darts" | "rings") {
+  const p = PRIZES[game][score];
+  if (!p) return game === "darts" ? "เกือบได้แล้ว ลองอีกทีนะ" : "ห่วงไม่ลงเลย ลองอีกทีนะ";
+  return p.hold ? `ได้${p.name}! ถืออยู่ในมือตัวละครแล้ว` : `ได้${p.name}! เก็บไว้ในการ์ดที่ระลึกแล้ว`;
+}
+
+/** Hand over the prize once, when a round ends. */
+function usePrize(done: boolean, score: number, game: "darts" | "rings", onPrize: OnPrize) {
+  useEffect(() => {
+    const p = PRIZES[game][score];
+    if (done && p) onPrize(p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
 }
 
 /** Balloon darts: balloons drift on the board; tap one to throw a dart at it. Three darts. */
-function BalloonDarts() {
+function BalloonDarts({ onPrize }: { onPrize: OnPrize }) {
   const [darts, setDarts] = useState(3);
   const [popped, setPopped] = useState<number[]>([]);
   const [misses, setMisses] = useState<{ x: number; y: number }[]>([]);
   const [round, setRound] = useState(0);
   const done = darts === 0;
+  usePrize(done, popped.length, "darts", onPrize);
 
   const hit = (i: number | null, miss?: { x: number; y: number }) => {
     if (done) return;
@@ -58,7 +79,7 @@ function BalloonDarts() {
       <div className="game-status" aria-live="polite">
         {done ? (
           <>
-            <strong>แตก {popped.length} ลูก · {prizeFor(popped.length, "darts")}</strong>
+            <strong>แตก {popped.length} ลูก · {prizeText(popped.length, "darts")}</strong>
             <button type="button" className="game-again" onClick={again}>เล่นอีกครั้ง</button>
           </>
         ) : (
@@ -70,7 +91,7 @@ function BalloonDarts() {
 }
 
 /** Ring toss: the ring's aim sweeps across the bottles; press "โยน" to throw. Three rings. */
-function RingToss() {
+function RingToss({ onPrize }: { onPrize: OnPrize }) {
   const [rings, setRings] = useState(3);
   const [hits, setHits] = useState<number[]>([]);
   const [last, setLast] = useState<string>("");
@@ -78,6 +99,7 @@ function RingToss() {
   const marker = useRef<HTMLDivElement>(null);
   const done = rings === 0;
   const BOTTLES = [0.1, 0.3, 0.5, 0.7, 0.9];
+  usePrize(done, hits.length, "rings", onPrize);
 
   useEffect(() => {
     if (done) return;
@@ -115,7 +137,7 @@ function RingToss() {
       <div className="game-status" aria-live="polite">
         {done ? (
           <>
-            <strong>คล้องได้ {hits.length} วง · {prizeFor(hits.length, "rings")}</strong>
+            <strong>คล้องได้ {hits.length} วง · {prizeText(hits.length, "rings")}</strong>
             <button type="button" className="game-again" onClick={again}>เล่นอีกครั้ง</button>
           </>
         ) : (
@@ -129,7 +151,7 @@ function RingToss() {
   );
 }
 
-export function FairGames() {
+export function FairGames({ onPrize }: { onPrize: OnPrize }) {
   const [tab, setTab] = useState<"darts" | "rings">("darts");
   return (
     <div className="fair-games">
@@ -137,8 +159,8 @@ export function FairGames() {
         <button type="button" role="tab" aria-selected={tab === "darts"} className={tab === "darts" ? "on" : ""} onClick={() => setTab("darts")}>ปาเป้าลูกโป่ง</button>
         <button type="button" role="tab" aria-selected={tab === "rings"} className={tab === "rings" ? "on" : ""} onClick={() => setTab("rings")}>โยนห่วง</button>
       </div>
-      {tab === "darts" ? <BalloonDarts /> : <RingToss />}
-      <p className="game-fine">ของรางวัลเป็นของเล่นในเกม ไม่ได้เก็บไว้และไม่มีค่าใช้จ่าย</p>
+      {tab === "darts" ? <BalloonDarts onPrize={onPrize} /> : <RingToss onPrize={onPrize} />}
+      <p className="game-fine">ตุ๊กตาจะอยู่ในมือตัวละคร ของรางวัลทั้งหมดดูได้ที่มุมความทรงจำ เล่นฟรี</p>
     </div>
   );
 }

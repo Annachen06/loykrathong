@@ -645,28 +645,52 @@ function stall(ctx: CanvasRenderingContext2D, x: number, w: number, base: number
 }
 
 /** Little banana-leaf krathong: folded leaf petals, lotus, marigold and a candle. */
-export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, lotus = "#ffa8c2") {
+/** A krathong on the water. `style` is one of the shop designs: banana, lotus, bread, coconut. */
+export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, flower = "#ffa8c2", style = "banana") {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
   ctx.lineJoin = "round";
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.8;
-  ctx.fillStyle = "#3f9a68";
+  const base = { banana: "#3f9a68", lotus: "#4f9a52", bread: "#d9a25a", coconut: "#8a5a3a" }[style] ?? "#3f9a68";
+  ctx.fillStyle = base;
   ctx.beginPath();
   ctx.ellipse(0, 0, 20, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#5cc08a";
-  ctx.beginPath();
-  for (let i = -3; i <= 3; i++) {
-    ctx.moveTo(i * 5.4 - 4.5, -1);
-    ctx.lineTo(i * 5.4, -11 + Math.abs(i) * 1.2);
-    ctx.lineTo(i * 5.4 + 4.5, -1);
+  if (style === "lotus") {
+    // two rings of pink lotus petals
+    for (const [ring, col] of [[0, "#ffc2d6"], [1, "#ff9ec0"]] as const) {
+      ctx.fillStyle = col;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        const px = i * (ring ? 5 : 7.5);
+        const h = ring ? 15 : 11;
+        ctx.moveTo(px - 4, -1 - ring * 2);
+        ctx.quadraticCurveTo(px - 4, -h, px + i * 0.6, -h - 3);
+        ctx.quadraticCurveTo(px + 4, -h, px + 4, -1 - ring * 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  } else {
+    ctx.fillStyle = style === "bread" ? "#e8b872" : style === "coconut" ? "#4f9a52" : "#5cc08a";
+    ctx.beginPath();
+    for (let i = -3; i <= 3; i++) {
+      ctx.moveTo(i * 5.4 - 4.5, -1);
+      ctx.lineTo(i * 5.4, -11 + Math.abs(i) * 1.2);
+      ctx.lineTo(i * 5.4 + 4.5, -1);
+    }
+    ctx.fill();
+    ctx.stroke();
+    if (style === "bread") {
+      ctx.fillStyle = "rgba(120,70,30,0.5)";
+      for (const dx of [-12, -4, 6, 13]) ctx.fillRect(dx, 1, 1.6, 1.6);
+    }
   }
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = lotus;
+  ctx.fillStyle = flower;
   ctx.beginPath();
   ctx.ellipse(-6, -11, 4.5, 6, -0.4, 0, Math.PI * 2);
   ctx.ellipse(6, -11, 4.5, 6, 0.4, 0, Math.PI * 2);
@@ -699,8 +723,8 @@ function boutique(ctx: CanvasRenderingContext2D, x: number, w: number, base: num
   ctx.fillRect(x + 12, base - h + 26, w - 24, h - 64);
   // tiered display shelf full of krathongs
   outlined(ctx, "#a06a7a", () => ctx.roundRect(x + 24, base - 82, w - 48, 8, 3), 1.8);
-  for (let i = 0; i < 4; i++) drawKrathong(ctx, x + 40 + i * ((w - 80) / 3), base - 84, 0.75, ["#ffa8c2", "#fff2f6", "#c9b6ff", "#ffcf6e"][i]);
-  for (let i = 0; i < 3; i++) drawKrathong(ctx, x + 52 + i * ((w - 104) / 2), base - 42, 0.95, ["#c9b6ff", "#ffa8c2", "#fff2f6"][i]);
+  for (let i = 0; i < 4; i++) drawKrathong(ctx, x + 40 + i * ((w - 80) / 3), base - 84, 0.75, ["#ffcf4a", "#ff9ec0", "#ff8fb0", "#fffaf0"][i], ["banana", "lotus", "bread", "coconut"][i]);
+  for (let i = 0; i < 3; i++) drawKrathong(ctx, x + 52 + i * ((w - 104) / 2), base - 42, 0.95, ["#c9b6ff", "#ffa8c2", "#fff2f6"][i], ["lotus", "banana", "coconut"][i]);
   outlined(ctx, "#b06a80", () => ctx.roundRect(x, base - 40, w, 40, 7));
   // Thai gable roof with curled chofa finials
   outlined(ctx, "#ef6f8e", () => {

@@ -41,6 +41,27 @@ export const loyKrathongConfig: FestivalConfig = {
     "ขอให้คุณยายอายุยืน",
   ],
 
+  // Fortune slips for the siamsi sticks at the temple. Written for fun, all gentle.
+  fortunes: [
+    "ใบที่ ๑ · ดวงดีมาก สิ่งที่ตั้งใจไว้ค่อยๆ เป็นจริง อดทนอีกนิดนะ",
+    "ใบที่ ๗ · การงานรุ่งเรือง จะมีผู้ใหญ่ใจดีคอยช่วยเหลือ",
+    "ใบที่ ๑๒ · ความรักสดใส คนที่อยู่ข้างๆ คือคนที่ห่วงใยคุณจริง",
+    "ใบที่ ๑๘ · การเงินคล่องตัว ใช้จ่ายพอดีแล้วจะมีเก็บ",
+    "ใบที่ ๒๑ · สุขภาพแข็งแรง พักผ่อนให้พอแล้วทุกอย่างจะดีขึ้น",
+    "ใบที่ ๒๕ · การเดินทางราบรื่น จะได้เจอเพื่อนใหม่ที่ดี",
+    "ใบที่ ๒๘ · ครอบครัวอบอุ่น จะมีข่าวดีจากคนไกลบ้าน",
+    "ใบที่ ๓๐ · เรื่องที่กังวลอยู่จะคลี่คลายในเร็ววัน",
+    "ใบที่ ๓๓ · การเรียนก้าวหน้า ตั้งใจอีกนิดจะได้ผลเกินคาด",
+  ],
+
+  // Krathong designs at the krathong shop. Free to pick: nothing is sold in the game.
+  krathongs: [
+    { id: "banana", name: "กระทงใบตอง", text: "แบบดั้งเดิม พับใบตองเป็นกลีบ ปักดอกดาวเรือง", hold: "krathong", color: "#ffcf4a", color2: "#3f9a68" },
+    { id: "lotus", name: "กระทงดอกบัว", text: "กลีบบัวสีชมพูซ้อนกัน สวยหวาน", hold: "krathong", color: "#ff9ec0", color2: "#ffc2d6" },
+    { id: "bread", name: "กระทงขนมปัง", text: "ปลากินได้ ไม่เป็นขยะในทะเล", hold: "krathong", color: "#ff8fb0", color2: "#d9a25a" },
+    { id: "coconut", name: "กระทงกาบมะพร้าว", text: "แข็งแรง ลอยได้ไกล ตกแต่งด้วยดอกมะลิ", hold: "krathong", color: "#fffaf0", color2: "#8a5a3a" },
+  ],
+
   places: [
     {
       id: "entrance",
@@ -49,18 +70,18 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 640, y: 618 },
       anchor: { x: 640, y: 846 },
       hitArea: { x0: 565, y0: 630, x1: 715, y1: 815 },
-      description: "ยินดีต้อนรับสู่งานลอยกระทงริมทะเล มีชิงช้าสวรรค์ รำวง ซุ้มเกม และท่าน้ำให้ลอยกระทงใต้พระจันทร์เต็มดวง",
-      action: { id: "tour", label: "ไปท่าลอยกระทงกัน", doneHint: "กำลังเดินไปท่าลอยกระทง", goTo: "shore" },
+      description: "ยินดีต้อนรับสู่งานวัดริมทะเล ไหว้พระที่วัด ขึ้นชิงช้าสวรรค์ รำวง เล่นเกม เลือกกระทง แล้วไปลอยที่ปลายสะพานใต้พระจันทร์เต็มดวง",
+      action: { id: "tour", label: "ไปเลือกกระทงกัน", doneHint: "กำลังเดินไปร้านกระทง", goTo: "boutique" },
     },
     {
       id: "temple",
       name: "วัดริมทะเล",
       shortName: "วัด",
       marker: { x: 300, y: 420 },
-      anchor: { x: 300, y: 840 },
+      anchor: { x: 300, y: 846 },
       hitArea: { x0: 60, y0: 450, x1: 540, y1: 812 },
-      description: "เจดีย์และพระอุโบสถของวัด เจ้าภาพงานคืนนี้ ไหว้พระขอพรก่อนเที่ยวงาน",
-      action: { id: "merit", label: "ไหว้พระ ทำบุญ", doneHint: "แสงทองลอยขึ้นจากองค์เจดีย์" },
+      description: "วัดเจ้าภาพงานคืนนี้ นั่งลงหน้าโต๊ะหมู่บูชา จุดธูปไหว้พระ ถวายดอกไม้ หรือเขย่าเซียมซีดูดวง",
+      panel: "temple",
     },
     {
       id: "wheel",
@@ -69,8 +90,8 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 860, y: 404 },
       anchor: { x: 860, y: 842 },
       hitArea: { x0: 690, y0: 420, x1: 1030, y1: 812 },
-      description: "ขึ้นไปชมพระจันทร์กับทะเลจากข้างบน เห็นกระทงลอยเต็มน้ำ",
-      action: { id: "ride", label: "ขึ้นชิงช้าสวรรค์", doneHint: "ขึ้นชิงช้าสวรรค์แล้ว หมุนครบรอบจะพากลับลงมา" },
+      description: "นั่งกระเช้าขึ้นไปชมวิว หมุนครบหนึ่งรอบ มองเห็นทะเล พระจันทร์ กระทงเต็มน้ำ และงานวัดข้างล่าง",
+      action: { id: "ride", label: "ขึ้นชิงช้าสวรรค์", doneHint: "นั่งในกระเช้าแล้ว หมุนครบรอบจะพากลับลงมา" },
     },
     {
       id: "stage",
@@ -79,8 +100,8 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 1145, y: 584 },
       anchor: { x: 1145, y: 842 },
       hitArea: { x0: 1030, y0: 600, x1: 1260, y1: 812 },
-      description: "วงดนตรีลูกทุ่งเล่นสด คนรำวงกันสนุกสนาน มาร่วมวงกัน",
-      action: { id: "dance", label: "ร่วมรำวง", doneHint: "รำวงกันเลย!", emote: "dance" },
+      description: "วงดนตรีลูกทุ่งเล่นเพลงรำวง คนบนเวทีรำวนเป็นวงกลม ขึ้นไปรำด้วยกันได้เลย",
+      action: { id: "dance", label: "ขึ้นเวทีไปรำวง", doneHint: "ขึ้นเวทีแล้ว รำตามวงไปเลย!" },
     },
     {
       id: "games",
@@ -89,7 +110,7 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 1445, y: 628 },
       anchor: { x: 1445, y: 842 },
       hitArea: { x0: 1290, y0: 640, x1: 1600, y1: 812 },
-      description: "ปาเป้าลูกโป่งกับโยนห่วง ลองเสี่ยงโชคลุ้นของรางวัล",
+      description: "ปาเป้าลูกโป่งกับโยนห่วง ชนะแล้วได้ของรางวัลถือกลับไปเลย",
       panel: "games",
     },
     {
@@ -99,8 +120,8 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 1740, y: 630 },
       anchor: { x: 1740, y: 842 },
       hitArea: { x0: 1650, y0: 650, x1: 1840, y1: 815 },
-      description: "กระทงใบตองพับมือ ตั้งแต่แบบดั้งเดิมไปจนถึงลายพระจันทร์และดวงดาว",
-      note: "ร้านกำลังจัดของ เลือกและแต่งกระทงได้ในอัปเดตถัดไป",
+      description: "กระทงทำมือหลายแบบ เลือกใบที่ชอบแล้วถือไปลอยที่ปลายสะพานได้เลย",
+      panel: "krathongShop",
     },
     {
       id: "shore",
@@ -109,9 +130,23 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 1900, y: 556 },
       anchor: { x: 1900, y: 646 },
       hitArea: { x0: 1845, y0: 560, x1: 1955, y1: 812 },
-      description: "ตั้งจิตอธิษฐาน แล้วปล่อยกระทงให้ลอยออกไปหาพระจันทร์",
+      description: "เดินออกไปปลายสะพาน ระหว่างทางจะเห็นคำอธิษฐานบนกระทงที่ลอยอยู่ แล้วนั่งลงปล่อยกระทงของคุณ",
       panel: "float",
-      action: { id: "float", label: "ลอยกระทง", doneHint: "กระทงของคุณลอยออกไปแล้ว" },
+      action: { id: "float", label: "ลอยกระทง", doneHint: "กระทงของคุณลอยออกไปหาพระจันทร์แล้ว" },
+    },
+    {
+      id: "candy",
+      name: "ร้านสายไหม",
+      shortName: "สายไหม",
+      marker: { x: 2095, y: 676 },
+      anchor: { x: 2095, y: 842 },
+      hitArea: { x0: 2040, y0: 690, x1: 2150, y1: 812 },
+      description: "สายไหมปั่นสดๆ ฟูๆ หวานละลายในปาก",
+      panel: "food",
+      items: [
+        { id: "candy-pink", name: "สายไหมสีชมพู", text: "รสนม หอมหวาน", hold: "cottonCandy", color: "#ffb3d4" },
+        { id: "candy-blue", name: "สายไหมสีฟ้า", text: "รสโซดา ซ่าๆ", hold: "cottonCandy", color: "#a8d8ff" },
+      ],
     },
     {
       id: "memory",
@@ -120,26 +155,47 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 2300, y: 676 },
       anchor: { x: 2300, y: 852 },
       hitArea: { x0: 2180, y0: 690, x1: 2430, y1: 818 },
-      description: "ซุ้มเงียบๆ ใต้โคมไฟ มีบอร์ดเปลือกหอยไว้เก็บความทรงจำคืนนี้",
-      panel: "wishes",
-      stat: { key: "krathongsFloated", label: "กระทงที่คุณลอยคืนนี้" },
+      description: "รวมทุกอย่างที่คุณทำคืนนี้ไว้ในการ์ดที่ระลึก คำอธิษฐาน เซียมซี ของรางวัล และสมบัติที่เจอบนหาด แล้วบันทึกเป็นรูปเก็บไว้ได้",
+      panel: "memory",
     },
     {
       id: "flowers",
       name: "ร้านดอกไม้",
       shortName: "ร้านดอกไม้",
       marker: { x: 2610, y: 676 },
-      anchor: { x: 2610, y: 840 },
-      hitArea: { x0: 2520, y0: 690, x1: 2700, y1: 812 },
-      description: "พวงมาลัย ดอกดาวเรือง มะลิ และดอกบัว สำหรับแต่งกระทงคืนนี้",
-      note: "เลือกดอกไม้แต่งกระทงได้ในอัปเดตถัดไป",
-      action: { id: "jasmine", label: "ดมกลิ่นมะลิ", doneHint: "กลีบดอกไม้ปลิวขึ้นจากร้าน" },
+      anchor: { x: 2600, y: 840 },
+      hitArea: { x0: 2520, y0: 690, x1: 2676, y1: 812 },
+      description: "ดอกไม้สดสำหรับไหว้พระ และดอกลีลาวดีไว้ทัดหู",
+      panel: "flowers",
+      items: [
+        { id: "garland", name: "พวงมาลัยมะลิ", text: "เอาไปถวายพระที่วัด", hold: "garland", offering: true },
+        { id: "lotus", name: "ดอกบัว", text: "ถือไปไหว้พระที่วัด", hold: "lotus", offering: true },
+        { id: "plumeria", name: "ดอกลีลาวดีทัดหู", text: "ทัดหูให้สวยรับลมทะเล", wear: "flower" },
+      ],
+    },
+    {
+      id: "ice",
+      name: "ร้านน้ำแข็งไส",
+      shortName: "น้ำแข็งไส",
+      marker: { x: 2722, y: 690 },
+      anchor: { x: 2715, y: 846 },
+      hitArea: { x0: 2680, y0: 700, x1: 2766, y1: 812 },
+      description: "น้ำแข็งไสเย็นชื่นใจ ราดน้ำหวานได้ตามชอบ",
+      panel: "food",
+      items: [
+        { id: "ice-red", name: "น้ำแข็งไสน้ำแดง", text: "หวานหอมกลิ่นสละ", hold: "shavedIce", color: "#e8454f" },
+        { id: "ice-green", name: "น้ำแข็งไสครีมโซดา", text: "เขียวใส ซ่าเย็น", hold: "shavedIce", color: "#6fd08a" },
+        { id: "ice-pink", name: "น้ำแข็งไสนมชมพู", text: "นมเย็นหวานมัน", hold: "shavedIce", color: "#ffb0c8" },
+      ],
     },
   ],
 
+  // Beach treasures: tap them to find something. Found ones are kept on your souvenir card.
   curios: [
-    { id: "shell", label: "หอยขี้เซา", at: { x: 2120, y: 912 }, radius: 34 },
-    { id: "starfish", label: "ปลาดาวน้อย", at: { x: 1330, y: 945 }, radius: 34 },
+    { id: "shell", label: "หอยขี้เซา", at: { x: 2120, y: 912 }, radius: 34, found: "หอยตื่นมาอ้าปาก ข้างในมีไข่มุกเม็ดเล็กๆ" },
+    { id: "starfish", label: "ปลาดาวน้อย", at: { x: 1330, y: 945 }, radius: 34, found: "ปลาดาวน้อยกระโดดทักทาย ได้เพื่อนใหม่หนึ่งตัว" },
+    { id: "conch", label: "หอยสังข์", at: { x: 520, y: 962 }, radius: 30, found: "ยกหอยสังข์ขึ้นแนบหู ได้ยินเสียงคลื่นอยู่ข้างใน" },
+    { id: "bottle", label: "ขวดข้อความ", at: { x: 2470, y: 958 }, radius: 30, found: "ในขวดมีโน้ตเขียนว่า “ใครเจอขวดนี้ ขอให้มีความสุขมากๆ นะ”" },
   ],
 
   layout: {

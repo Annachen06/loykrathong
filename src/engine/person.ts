@@ -2,17 +2,27 @@
 // Feet at (x, y). An adult is about 72 world units tall at scale 1, a child about 50.
 // The figure faces right (facing = 1) in a three-quarter view; facing = -1 mirrors it.
 // What someone wears is plain data (VisitorLook), so a new outfit is a new object, not new code.
-import type { VisitorLook } from "../festivals/types";
+import type { HeldThing, VisitorLook } from "../festivals/types";
 import { lerp } from "./math";
 
 /** Something carried in the front hand. */
-export type Hold = "balloon" | "krathong" | "cottonCandy" | "cane";
+export type Hold = HeldThing;
 export type Pose = {
   /** 0..1: arms raised in a ram wong pose. */
   dance?: number;
+  /** 0..1: kneeling, sitting back on the heels (praying, floating a krathong). */
+  kneel?: number;
+  /** 0..1: sitting on a seat (the Ferris wheel cabin). */
+  sit?: number;
+  /** 0..1: palms pressed together in a wai. */
+  wai?: number;
+  /** 0..1: bowing forward from the hips (a krap at the temple). */
+  bow?: number;
   hold?: Hold;
-  /** Balloon colour. */
+  /** Main colour of the held thing (balloon, syrup, krathong flowers...). */
   holdColor?: string;
+  /** Second colour (the krathong's base). */
+  holdColor2?: string;
 };
 
 type P = [number, number];
@@ -49,7 +59,10 @@ export function drawPerson(
   const b = BODY[age];
   const woman = c.figure === "woman";
   const dance = pose.dance ?? 0;
-  const hold = dance > 0.5 ? undefined : pose.hold;
+  const wai = pose.wai ?? 0;
+  const sit = pose.sit ?? 0;
+  const lower = Math.max(pose.kneel ?? 0, sit); // how far the body has dropped from standing
+  const hold = dance > 0.5 || wai > 0.5 ? undefined : pose.hold;
   const O = c.outline;
   const shoes = c.shoes ?? "#3b2c3a";
   const swing = Math.sin(phase) * stride;
@@ -58,7 +71,9 @@ export function drawPerson(
 
   // key heights (negative is up)
   const ankleY = -2.5;
-  const hipY = ankleY - b.leg;
+  const standHipY = ankleY - b.leg;
+  const lowHipY = sit ? ankleY - b.leg * 0.56 : ankleY - b.leg * 0.4;
+  const hipY = lerp(standHipY, lowHipY, lower);
   const waistY = hipY - (age === "kid" ? 3 : 5);
   const sY = hipY - b.torso; // top of the shoulders
   const sw = b.shoulder * (woman ? 0.88 : 1);
@@ -68,7 +83,7 @@ export function drawPerson(
   const r = b.head;
   const hx = 1 + stoop;
   const hy = sY - b.neck - r + 1;
-  const kneeY = (hipY + ankleY) / 2;
+  const kneeY = lerp((standHipY + ankleY) / 2, sit ? lowHipY : ankleY, lower);
 
   ctx.save();
   ctx.translate(x, y);
@@ -102,9 +117,16 @@ export function drawPerson(
     const hipX = side * hw * 0.5;
     const footX = hipX + s * b.step;
     const lift = Math.max(0, Math.cos(phase) * side) * 2.4 * stride;
-    const ankle: P = [footX, ankleY - lift];
-    const knee: P = [(hipX + footX) / 2 + 0.8 + Math.abs(s) * 1.2, kneeY - lift * 0.4];
+    let ankle: P = [footX, ankleY - lift];
+    let knee: P = [(hipX + footX) / 2 + 0.8 + Math.abs(s) * 1.2, (standHipY + ankleY) / 2 - lift * 0.4];
     const hip: P = [hipX, hipY + 1];
+    if (lower) {
+      // kneeling: knees forward on the ground, feet tucked under; sitting: thighs level, shins down
+      const lowKnee: P = sit ? [hipX + b.leg * 0.48, lowHipY + 1] : [hipX + b.leg * 0.42, ankleY];
+      const lowAnkle: P = sit ? [hipX + b.leg * 0.5, ankleY] : [hipX - 3, ankleY + 0.5];
+      knee = mix(knee, lowKnee, lower);
+      ankle = mix(ankle, lowAnkle, lower);
+    }
     const o = c.outfit;
     if (o === "shirt-pants" || o === "blouse-pants") {
       limb(ctx, [hip, knee, ankle], b.limb + (o === "blouse-pants" ? 1.2 : 0.5), c.bottom, O);
@@ -114,10 +136,18 @@ export function drawPerson(
     } else {
       limb(ctx, [hip, knee, ankle], b.limb - 1.4, c.skin, O);
     }
-    shape(shoes, () => ctx.ellipse(footX + 1.3, ankleY + 1 - lift, b.limb * 0.72, 1.9, 0, 0, Math.PI * 2), 1.1);
+    shape(shoes, () => ctx.ellipse(ankle[0] + 1.3 - lower * (sit ? 0 : 3), ankle[1] + 1, b.limb * 0.72, 1.9, 0, 0, Math.PI * 2), 1.1);
   };
   leg(-1);
   leg(1);
+
+  // bowing tips everything above the hips forward
+  const bow = pose.bow ?? 0;
+  if (bow) {
+    ctx.translate(0, hipY);
+    ctx.rotate(bow * 0.85);
+    ctx.translate(0, -hipY);
+  }
 
   // ------------------------------------------------------------ arms
   const arm = (side: -1 | 1) => {
@@ -126,9 +156,16 @@ export function drawPerson(
     let el: P = [sh[0] + s * 3, sh[1] + b.upper];
     let hand: P = [el[0] + s * 4 + 0.6, el[1] + b.fore];
     if (side === 1 && hold) {
-      if (hold === "krathong") { el = [sh[0] + 2, sh[1] + b.upper * 0.85]; hand = [sh[0] + 7, sh[1] + b.upper * 0.95]; }
+      if (hold === "krathong" || hold === "siamsi") { el = [sh[0] + 2, sh[1] + b.upper * 0.85]; hand = [sh[0] + 7, sh[1] + b.upper * 0.95]; }
       else if (hold === "cane") { el = [sh[0] + 2.5, sh[1] + b.upper]; hand = [sh[0] + 6, el[1] + b.fore * 0.75]; }
       else { el = [sh[0] + 3, sh[1] + b.upper * 0.75]; hand = [sh[0] + 6, sh[1] + b.upper * 0.2]; }
+    }
+    if (wai) {
+      // palms together in front of the chest
+      const wEl: P = [sh[0] + 3.5 + side * 0.8, sh[1] + b.upper * 0.75];
+      const wHand: P = [sw * 0.25 + 4.5, sY - 1 - (pose.bow ? 2 : 0)];
+      el = mix(el, wEl, wai);
+      hand = mix(hand, wHand, wai);
     }
     if (dance) {
       // ram wong: elbows out, hands lifted, gently trading heights
@@ -265,6 +302,26 @@ export function drawPerson(
     ctx.stroke();
   };
 
+  /** Skirts when kneeling or sitting: the cloth drapes over the lap down to the knees. */
+  const lap = () => {
+    const kx = hw * 0.5 + b.leg * (sit ? 0.48 : 0.42) + 2;
+    const bottomY = sit ? lowHipY + 7 : ankleY + 0.5;
+    shape(c.bottom, () => {
+      ctx.moveTo(-ww - 0.2, waistY);
+      ctx.lineTo(ww + 0.2, waistY);
+      ctx.quadraticCurveTo(kx * 0.7, hipY - 1, kx + 1, sit ? lowHipY : ankleY - 3.5);
+      ctx.lineTo(kx + 1.5, bottomY);
+      ctx.lineTo(-hw - 3, bottomY);
+      ctx.quadraticCurveTo(-hw - 2.6, hipY, -ww - 0.2, waistY);
+      ctx.closePath();
+    });
+    if (c.outfit === "pha-sin") {
+      ctx.fillStyle = c.accent;
+      ctx.fillRect(-hw - 2.6, bottomY - 3.2, kx + hw + 4, 2.4);
+    }
+  };
+  const seated = lower > 0.5;
+
   arm(-1);
   const hemShirt = hipY + 1.5;
   switch (c.outfit) {
@@ -276,14 +333,17 @@ export function drawPerson(
       break;
     case "blouse-skirt":
       top(waistY + 1.5, ww + 0.3);
-      skirt(kneeY + (age === "kid" ? 1 : 3), age === "kid" ? 2.6 : 3.4);
+      if (seated) lap();
+      else skirt(kneeY + (age === "kid" ? 1 : 3), age === "kid" ? 2.6 : 3.4);
       break;
     case "pha-sin":
       top(waistY + 1.5, ww + 0.3);
-      phaSin();
+      if (seated) lap();
+      else phaSin();
       break;
     case "dress":
-      top(kneeY + 2, hw + 4 + Math.abs(swing) * 1.6);
+      if (seated) { top(waistY + 1.5, ww + 0.3); lap(); }
+      else top(kneeY + 2, hw + 4 + Math.abs(swing) * 1.6);
       ctx.strokeStyle = c.accent;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
@@ -438,12 +498,23 @@ export function drawPerson(
 
   // front arm last, so it sits over the body
   const hand = arm(1);
-  if (hold) drawHeld(ctx, hold, hand, pose.holdColor ?? "#ef5a5a", t, sY, O);
+  if (hold) drawHeld(ctx, hold, hand, pose.holdColor ?? "#ef5a5a", pose.holdColor2 ?? "#4f9a52", t, sY, O);
 
   ctx.restore();
 }
 
-function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: string, t: number, sY: number, O: string) {
+/** Draw just a held thing on its own (for the little pictures on stall cards). */
+export function drawHeldThing(ctx: CanvasRenderingContext2D, hold: Hold, x: number, y: number, scale: number, color = "#ef5a5a", color2 = "#4f9a52") {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  drawHeld(ctx, hold, [0, 0], color, color2, 0, -30, "#2a1d4a");
+  ctx.restore();
+}
+
+function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: string, color2: string, t: number, sY: number, O: string) {
   const [x, y] = hand;
   ctx.lineWidth = 1.2;
   ctx.strokeStyle = O;
@@ -473,7 +544,7 @@ function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: str
     ctx.moveTo(x, y + 1);
     ctx.lineTo(x + 1, y - 7);
     ctx.stroke();
-    ctx.fillStyle = "#ffb3d4";
+    ctx.fillStyle = color === "#ef5a5a" ? "#ffb3d4" : color;
     ctx.strokeStyle = O;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -492,15 +563,149 @@ function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: str
     ctx.strokeStyle = "#8a5a3a";
     ctx.lineWidth = 1.4;
     ctx.stroke();
+  } else if (hold === "siamsi") {
+    // the fortune-stick cylinder, shaken until one stick jumps out
+    const shake = Math.sin(t * 30) * 0.8;
+    ctx.save();
+    ctx.translate(x + 2, y - 2);
+    ctx.rotate(-0.5 + shake * 0.1);
+    ctx.strokeStyle = "#e8c47a";
+    ctx.lineWidth = 0.8;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 1, -4);
+      ctx.lineTo(i * 1.1, -10 - Math.abs(i));
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#c8323c";
+    ctx.strokeStyle = O;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(-3, -5, 6, 10, 1.5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffcf6e";
+    ctx.fillRect(-3, -1, 6, 1.4);
+    ctx.restore();
+  } else if (hold === "shavedIce") {
+    // a paper cup of shaved ice with syrup on top
+    ctx.fillStyle = "#fff4e2";
+    ctx.beginPath();
+    ctx.moveTo(x - 3, y - 4);
+    ctx.lineTo(x + 5, y - 4);
+    ctx.lineTo(x + 4, y + 3);
+    ctx.lineTo(x - 2, y + 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#f2f6ff";
+    ctx.beginPath();
+    ctx.arc(x + 1, y - 5, 4.2, Math.PI, 0);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x + 1, y - 5.4, 3, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.fill();
+    ctx.strokeStyle = "#ff8fb0";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x + 2.5, y - 6);
+    ctx.lineTo(x + 4.5, y - 11);
+    ctx.stroke();
+  } else if (hold === "garland") {
+    // a jasmine garland (phuang malai) hanging from the hand
+    ctx.strokeStyle = O;
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 8) * Math.PI;
+      const gx = x + 1 + Math.cos(a) * 3.2, gy = y + 1 + Math.sin(a) * 5.5;
+      ctx.fillStyle = i % 4 === 0 ? "#ff6f8e" : "#fffaf0";
+      ctx.beginPath();
+      ctx.arc(gx, gy, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#e8a020";
+    ctx.beginPath();
+    ctx.arc(x + 1, y + 8.5, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hold === "lotus") {
+    // a lotus bud held upright for the Buddha
+    ctx.strokeStyle = "#4f9a52";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 2);
+    ctx.lineTo(x + 1, y - 6);
+    ctx.stroke();
+    ctx.fillStyle = "#ff9ec0";
+    ctx.strokeStyle = O;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x + 1, y - 15);
+    ctx.quadraticCurveTo(x + 5, y - 10, x + 1, y - 6);
+    ctx.quadraticCurveTo(x - 3, y - 10, x + 1, y - 15);
+    ctx.fill();
+    ctx.stroke();
+  } else if (hold === "plushStar" || hold === "plushRabbit" || hold === "plushJelly") {
+    // a soft toy prize hugged against the body
+    const px = x + 1, py = y - 3;
+    ctx.strokeStyle = O;
+    ctx.lineWidth = 1;
+    if (hold === "plushStar") {
+      ctx.fillStyle = "#ffb08a";
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rr = i % 2 ? 3 : 6.5;
+        ctx.lineTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (hold === "plushRabbit") {
+      ctx.fillStyle = "#fff4e2";
+      ctx.beginPath();
+      ctx.ellipse(px - 1.8, py - 7, 1.4, 3.8, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(px + 1.8, py - 7, 1.4, 3.8, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px, py, 4.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#c9b6ff";
+      ctx.beginPath();
+      ctx.arc(px, py, 4.8, Math.PI, 0);
+      ctx.lineTo(px + 4.8, py + 1);
+      ctx.lineTo(px - 4.8, py + 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "#c9b6ff";
+      ctx.lineWidth = 1.2;
+      for (const dx of [-3, 0, 3]) {
+        ctx.beginPath();
+        ctx.moveTo(px + dx, py + 1);
+        ctx.quadraticCurveTo(px + dx + 1.5, py + 4, px + dx, py + 7);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = O;
+    ctx.beginPath();
+    ctx.arc(px - 1.5, py - 0.5, 0.6, 0, Math.PI * 2);
+    ctx.arc(px + 1.5, py - 0.5, 0.6, 0, Math.PI * 2);
+    ctx.fill();
   } else {
-    // a little banana-leaf krathong with flowers and a candle
+    // a little krathong with flowers and a candle
     const kx = x + 2.5, ky = y - 1;
-    ctx.fillStyle = "#4f9a52";
+    ctx.fillStyle = color2;
     ctx.beginPath();
     ctx.ellipse(kx, ky, 6, 2.6, 0, 0, Math.PI);
     ctx.fill();
     ctx.stroke();
-    for (const [dx, col] of [[-3, "#ffcf4a"], [0, "#ff8fb0"], [3, "#ffcf4a"]] as const) {
+    for (const [dx, col] of [[-3, "#ffcf4a"], [0, color], [3, "#ffcf4a"]] as const) {
       ctx.fillStyle = col;
       ctx.beginPath();
       ctx.arc(kx + dx, ky - 1, 1.7, 0, Math.PI * 2);

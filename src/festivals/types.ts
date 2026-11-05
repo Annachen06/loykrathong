@@ -3,6 +3,27 @@
 // and reuses everything in src/engine and src/components.
 
 export type Point = { x: number; y: number };
+
+/** Something a person can carry in their hand. */
+export type HeldThing =
+  | "balloon" | "krathong" | "cottonCandy" | "cane" | "shavedIce" | "siamsi"
+  | "garland" | "lotus" | "plushStar" | "plushRabbit" | "plushJelly";
+
+/** An item the visitor picks up at the fair (free, nothing is sold). */
+export type FairItem = {
+  id: string;
+  name: string;
+  /** One line about it, shown on the stall's card. */
+  text: string;
+  /** How it looks in the character's hand. Leave out for things kept in the bag (sweets, a keyring). */
+  hold?: HeldThing;
+  color?: string;
+  color2?: string;
+  /** Worn instead of carried (a flower behind the ear). */
+  wear?: "flower";
+  /** Can be offered at the temple. */
+  offering?: boolean;
+};
 export type Rect = { x0: number; y0: number; x1: number; y1: number };
 
 /** One place the visitor can walk to and interact with. */
@@ -24,8 +45,10 @@ export type Place = {
   note?: string;
   /** Optional live number from Scene.stats() shown in the panel, e.g. krathongs floated this visit. */
   stat?: { key: string; label: string };
-  /** A richer card body: the krathong-floating form, the fair games, or the wish board. */
-  panel?: "float" | "games" | "wishes";
+  /** A richer card body for this place (see App.tsx for which component each one opens). */
+  panel?: "float" | "games" | "memory" | "temple" | "krathongShop" | "flowers" | "food";
+  /** For stalls: what you can pick up here. */
+  items?: FairItem[];
   /** Optional action button. The scene performs it (see Scene.runAction). */
   action?: {
     id: string;
@@ -33,13 +56,18 @@ export type Place = {
     doneHint: string;
     /** If set, the button walks the visitor to this place instead of asking the scene. */
     goTo?: string;
-    /** The visitor joins in on the spot, e.g. dancing at the stage. */
-    emote?: "dance";
   };
 };
 
 /** A small decorative object with its own tap reaction (a shell, a starfish...). */
-export type Curio = { id: string; label: string; at: Point; radius: number };
+export type Curio = {
+  id: string;
+  label: string;
+  at: Point;
+  radius: number;
+  /** What you find the first time you tap it (it's added to your beach treasures). */
+  found: string;
+};
 
 export type WalkArea = { id: string; rect: Rect };
 
@@ -105,6 +133,10 @@ export type FestivalConfig = {
   };
   /** Clearly-labelled example wishes shown on other krathongs until there is a real shared wall. */
   sampleWishes: string[];
+  /** Fortune slips for the temple's siamsi sticks. */
+  fortunes: string[];
+  /** Krathong designs to choose from at the krathong shop. */
+  krathongs: FairItem[];
   welcomeHint: string;
   places: Place[];
   curios: Curio[];
@@ -119,7 +151,11 @@ export type FestivalConfig = {
 export type CameraView = { x: number; y: number; w: number; h: number };
 
 /** What a tap on the world revealed (a wish on a krathong, a creature's reaction...). */
-export type TapResult = { bubble?: { title: string; text: string; tag?: string } };
+export type TapResult = {
+  bubble?: { title: string; text: string; tag?: string };
+  /** A beach treasure was found. */
+  found?: { id: string; label: string; text: string };
+};
 
 /** Something drawn in depth order with the visitor (other festival-goers, creatures on the sand). */
 export type Actor = { y: number; draw: (ctx: CanvasRenderingContext2D, t: number) => void };
@@ -130,7 +166,9 @@ export type Scene = {
   paintBack(ctx: CanvasRenderingContext2D): void;
   /** Static scenery in front of the sea (sand, stalls, pier). Painted once per resize. */
   paintFront(ctx: CanvasRenderingContext2D): void;
-  update(dt: number): void;
+  update(dt: number, visitor: Point): void;
+  /** Optional: take over the camera (centre and zoom), e.g. while riding the Ferris wheel. null = follow the visitor. */
+  camera?(): { x: number; y: number; zoom: number } | null;
   /** Animated layer between back and front (stars, moon, water, things floating on it). */
   drawMiddle(ctx: CanvasRenderingContext2D, t: number, cam: CameraView): void;
   /** Animated layer over the front scenery but behind people (lights, palms, foam). */
@@ -139,7 +177,10 @@ export type Scene = {
   /** Drawn over everyone (sky lanterns, sparkles). */
   drawTop(ctx: CanvasRenderingContext2D, t: number): void;
   /** Runs a place's action. Returns false if the action is unknown. */
-  runAction(placeId: string, actionId: string, visitor: Point & { look: VisitorLook }, input?: { wish?: string }): boolean;
+  runAction(
+    placeId: string, actionId: string, visitor: Point & { look: VisitorLook },
+    input?: { wish?: string; style?: string; flower?: string; hold?: HeldThing },
+  ): boolean;
   /** A tap on the world that isn't a place: krathongs on the water, creatures... null if nothing there. */
   tap(p: Point): TapResult | null;
   /** True while the visitor is away doing something (e.g. riding the Ferris wheel): hide them and ignore walking. */

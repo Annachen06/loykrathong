@@ -17,7 +17,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   const front = document.createElement("canvas");
   const { width: W, height: H, focusY, portraitHeight, viewHeight } = config.layout;
 
-  const view = { vw: 1, vh: 1, scale: 1, dpr: 1, layerK: 1, visW: 1, visH: 1 };
+  const view = { vw: 1, vh: 1, scale: 1, dpr: 1, layerK: 1, visW: 1, visH: 1, zoom: 1 };
   const cam = { x: 0, y: 0 };
   const ripples: { x: number; y: number; life: number }[] = [];
   let following = false;
@@ -28,6 +28,14 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   let onFrame: (() => void) | null = null;
 
   function cameraTarget() {
+    // the scene can take over the camera, e.g. to ride along in a Ferris wheel cabin
+    const over = following ? scene.camera?.() : null;
+    if (over) {
+      return {
+        x: clamp(over.x - view.visW / 2, 0, Math.max(0, W - view.visW)),
+        y: clamp(over.y - view.visH / 2, 0, Math.max(0, H - view.visH)),
+      };
+    }
     const focusX = following ? visitor.x : config.layout.spawn.x + view.visW * 0.35;
     return {
       x: clamp(focusX - view.visW / 2, 0, Math.max(0, W - view.visW)),
@@ -58,8 +66,8 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     // Portrait phones: frame the lower part of the world (beach, stalls, sea) a little closer.
     const portrait = view.vw / view.vh < 0.9;
     view.scale = Math.max(view.vw / W, view.vh / (portrait ? portraitHeight : viewHeight));
-    view.visW = view.vw / view.scale;
-    view.visH = view.vh / view.scale;
+    view.visW = view.vw / (view.scale * view.zoom);
+    view.visH = view.vh / (view.scale * view.zoom);
     canvas.width = Math.round(view.vw * view.dpr);
     canvas.height = Math.round(view.vh * view.dpr);
     paintLayers();
@@ -78,14 +86,20 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     last = now;
     time += dt;
 
-    scene.update(dt);
+    scene.update(dt, visitor);
     visitor.update(dt);
+    let wantZoom = (following && scene.camera?.()?.zoom) || 1;
+    if (view.vw / view.vh < 0.9) wantZoom = 1 + (wantZoom - 1) * 0.6; // phones are already close in
+    view.zoom = lerp(view.zoom, wantZoom, Math.min(1, dt * 1.6));
+    if (Math.abs(view.zoom - wantZoom) < 0.002) view.zoom = wantZoom;
+    view.visW = view.vw / (view.scale * view.zoom);
+    view.visH = view.vh / (view.scale * view.zoom);
     const t = cameraTarget();
     const ease = Math.min(1, dt * (following ? 3.2 : 0.5));
     cam.x = lerp(cam.x, t.x, ease);
     cam.y = lerp(cam.y, t.y, ease);
 
-    const s = view.scale * view.dpr;
+    const s = view.scale * view.zoom * view.dpr;
     const world = () => ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     blit(back);
@@ -136,8 +150,8 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     setHighlight(id: string | null) { highlight = id; },
     ripple(p: Point) { ripples.push({ x: p.x, y: p.y, life: 0 }); },
     setOnFrame(fn: (() => void) | null) { onFrame = fn; },
-    toWorld: (sx: number, sy: number): Point => ({ x: sx / view.scale + cam.x, y: sy / view.scale + cam.y }),
-    toScreen: (wx: number, wy: number): Point => ({ x: (wx - cam.x) * view.scale, y: (wy - cam.y) * view.scale }),
+    toWorld: (sx: number, sy: number): Point => ({ x: sx / (view.scale * view.zoom) + cam.x, y: sy / (view.scale * view.zoom) + cam.y }),
+    toScreen: (wx: number, wy: number): Point => ({ x: (wx - cam.x) * view.scale * view.zoom, y: (wy - cam.y) * view.scale * view.zoom }),
     view,
     cam,
   };

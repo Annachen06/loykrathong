@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activeFestival } from "./festivals";
-import type { Scene } from "./festivals/types";
+import type { FairItem, Scene } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
 import { createVisitor, type Visitor } from "./engine/visitor";
 import { dist } from "./engine/math";
@@ -11,14 +11,44 @@ import { MapMenu } from "./components/MapMenu";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
-import { WishBoard } from "./components/WishBoard";
-import { FairGames } from "./components/FairGames";
+import { FairGames, type Prize } from "./components/FairGames";
+import { ItemPicker } from "./components/ItemPicker";
+import { TemplePanel } from "./components/TemplePanel";
+import { RideView } from "./components/RideView";
+import { MemoryCard, type Memories } from "./components/MemoryCard";
+import { drawHeldThing } from "./engine/person";
+import { drawKrathong } from "./festivals/loy-krathong/scenery";
 
 const festival = activeFestival;
 const { config } = festival;
 const NEAR_DISTANCE = 260; // labels appear when the visitor is this close to a place
 
 type Engine = { renderer: Renderer; visitor: Visitor; scene: Scene };
+
+const EMPTY_MEMORIES: Memories = { wishes: [], fortune: null, prayed: 0, offered: [], prizes: [], treats: [], treasures: [], rode: false, danced: false };
+
+/** Little pictures of stall items: krathongs are drawn as on the water, everything else as held in the hand. */
+const previewItem = (ctx: CanvasRenderingContext2D, item: FairItem) => {
+  if (item.hold === "krathong") return drawKrathong(ctx, 32, 46, 1.35, item.color, item.id);
+  if (item.wear === "flower") {
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.fillStyle = "#fff6f0";
+      ctx.strokeStyle = "#2a1d4a";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(32 + Math.cos(a) * 8, 28 + Math.sin(a) * 8, 7, 4.6, a, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#f6c56b";
+    ctx.beginPath();
+    ctx.arc(32, 28, 4, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  if (item.hold) drawHeldThing(ctx, item.hold, 30, item.hold === "garland" ? 12 : 42, 2.8, item.color, item.color2);
+};
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,7 +64,15 @@ export default function App() {
   const [reveal, setReveal] = useState(false); // briefly show every label after entering
   const [hint, setHint] = useState<{ text: string; key: number } | null>(null);
   const [bubble, setBubble] = useState<Bubble | null>(null);
-  const [myWishes, setMyWishes] = useState<string[]>([]); // this visit only; never sent anywhere
+  // Everything below is for this visit only and stays on this device.
+  const [memories, setMemories] = useState<Memories>(EMPTY_MEMORIES);
+  const [bag, setBag] = useState<FairItem[]>([]); // things you're carrying
+  const [hand, setHand] = useState<FairItem | null>(null); // the one shown in your hand
+  const [ritual, setRitual] = useState<FairItem | null>(null); // briefly held during an activity (the siamsi cup)
+  const [look, setLook] = useState(config.visitors[0].look);
+  const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
+  const remember = useCallback((m: Partial<Memories> | ((prev: Memories) => Partial<Memories>)) =>
+    setMemories((prev) => ({ ...prev, ...(typeof m === "function" ? m(prev) : m) })), []);
 
   const say = useCallback((text: string) => setHint({ text, key: Date.now() }), []);
 
@@ -67,6 +105,9 @@ export default function App() {
         nearRef.current = best;
         setNear(best);
       }
+      const st = scene.stats();
+      const view = st.rideView === 1, progress = Math.round((st.rideProgress ?? 0) * 20) / 20, focus = st.focus === 1;
+      setRide((r) => (r.view === view && r.progress === progress && r.focus === focus ? r : { view, progress, focus }));
     });
     renderer.start();
 
@@ -77,7 +118,7 @@ export default function App() {
       places: config.places.map((p) => ({ id: p.id, name: p.name, anchor: p.anchor, marker: p.marker, hitArea: p.hitArea })),
       curios: config.curios,
       scene,
-      state: () => ({ look: visitor.look.figure, x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
+      state: () => ({ look: visitor.look.figure, hold: visitor.hold ?? null, act: visitor.act?.kind ?? null, x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
     };
     return () => renderer.stop();
   }, []);
@@ -85,6 +126,33 @@ export default function App() {
   useEffect(() => {
     engineRef.current?.renderer.setHighlight(hovered ?? target);
   }, [hovered, target]);
+
+  useEffect(() => {
+    const v = engineRef.current?.visitor;
+    if (!v) return;
+    const shown = ritual ?? hand;
+    v.hold = shown?.hold;
+    v.holdColor = shown?.color;
+    v.holdColor2 = shown?.color2;
+    v.look = look;
+  }, [hand, ritual, look]);
+
+  /** Pick something up: it goes in your bag and into your hand. */
+  const pickUp = useCallback((item: FairItem) => {
+    setBag((b) => [...b.filter((i) => i.id !== item.id && !(item.hold === "krathong" && i.hold === "krathong")), item]);
+    if (item.hold) setHand(item);
+  }, []);
+  /** Use something up (a krathong floated, a garland offered). Your hand moves to the next thing you carry. */
+  const consume = useCallback((item: FairItem) => {
+    setBag((b) => {
+      const rest = b.filter((i) => i.id !== item.id);
+      setHand((h) => (h?.id === item.id ? [...rest].reverse().find((i) => i.hold) ?? null : h));
+      return rest;
+    });
+  }, []);
+
+  const awayMessage = () =>
+    engineRef.current?.scene.stats().riding ? "กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ" : "กำลังรำวงอยู่บนเวที รอเพลงจบก่อนนะ";
 
   const closePanel = useCallback(() => {
     setOpenId(null);
@@ -95,7 +163,7 @@ export default function App() {
     const e = engineRef.current;
     const place = config.places.find((p) => p.id === id);
     if (!e || !place) return;
-    if (e.scene.visitorAway()) return say("กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ");
+    if (e.scene.visitorAway()) return say(awayMessage());
     setOpenId(null);
     setTarget(id);
     e.visitor.walkTo(place.anchor, () => setOpenId(id));
@@ -104,7 +172,7 @@ export default function App() {
   const enter = useCallback((visitorId?: string) => {
     if (entered) return;
     const chosen = config.visitors.find((v) => v.id === visitorId);
-    if (chosen && engineRef.current) engineRef.current.visitor.look = chosen.look;
+    if (chosen) setLook(chosen.look);
     setEntered(true);
     engineRef.current?.renderer.follow(true);
     setReveal(true);
@@ -121,9 +189,15 @@ export default function App() {
     const tapped = e.scene.tap(w);
     if (tapped) {
       if (tapped.bubble) setBubble({ ...tapped.bubble, key: Date.now() });
+      if (tapped.found) {
+        const f = tapped.found;
+        remember((m) => ({ treasures: [...m.treasures, f.label] }));
+        const n = e.scene.stats().treasures ?? 0;
+        setBubble({ title: `เจอ${f.label}!`, text: f.text, tag: `สมบัติริมหาด ${n}/${config.curios.length}`, key: Date.now() });
+      }
       return;
     }
-    if (e.scene.visitorAway()) return say("กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ");
+    if (e.scene.visitorAway()) return say(awayMessage());
     const place = config.places.find((p) => w.x >= p.hitArea.x0 && w.x <= p.hitArea.x1 && w.y >= p.hitArea.y0 && w.y <= p.hitArea.y1);
     if (place) return visit(place.id);
     closePanel();
@@ -191,22 +265,92 @@ export default function App() {
       return visit(action.goTo);
     }
     if (e.scene.runAction(openPlace.id, action.id, e.visitor)) {
-      if (action.emote === "dance") e.visitor.dance(7);
+      if (action.id === "ride") remember({ rode: true });
+      if (action.id === "dance") remember({ danced: true });
       // close the card so the visitor can watch what happens in the world
       say(action.doneHint);
       setOpenId(null);
     }
   };
 
+  // ---- the temple: kneel, light incense, offer flowers, bow three times
+  const offering = bag.find((i) => i.offering) ?? null;
+  const pray = () => {
+    const e = engineRef.current;
+    if (!e) return;
+    setOpenId(null);
+    e.scene.runAction("temple", "incense", e.visitor);
+    const gift = offering;
+    if (gift) {
+      e.scene.runAction("temple", "offer", e.visitor, { hold: gift.hold });
+      consume(gift);
+    }
+    say(gift ? `ถวาย${gift.name} จุดธูป แล้วพนมมือกราบสามครั้ง` : "จุดธูป แล้วพนมมือกราบสามครั้ง");
+    e.visitor.perform("pray", 7.5, -1, () => {
+      e.scene.runAction("temple", "blessing", e.visitor);
+      say("ไหว้พระเสร็จแล้ว ขอให้สมหวังทุกประการ");
+    });
+    remember((m) => ({ prayed: m.prayed + 1, offered: gift ? [...m.offered, gift.name] : m.offered }));
+  };
+  const shakeFortune = () => {
+    const e = engineRef.current;
+    if (!e) return;
+    setOpenId(null);
+    setRitual({ id: "siamsi", name: "เซียมซี", text: "", hold: "siamsi" });
+    say("ตั้งจิตอธิษฐาน แล้วเขย่าเซียมซีเบาๆ…");
+    e.visitor.perform("fortune", 4.2, -1, () => {
+      setRitual(null);
+      const f = config.fortunes[Math.floor(Math.random() * config.fortunes.length)];
+      remember({ fortune: f });
+      setBubble({ title: "เซียมซีหล่นออกมาหนึ่งไม้", text: f, tag: "เสี่ยงเซียมซีเพื่อความสนุก", key: Date.now() });
+    });
+  };
+
+  // ---- the pier: kneel at the end and set your krathong on the water
+  const krathong = bag.find((i) => i.hold === "krathong") ?? null;
   const floatKrathong = (wish: string) => {
     const e = engineRef.current;
     if (!e || !openPlace?.action) return;
-    if (e.scene.runAction(openPlace.id, openPlace.action.id, e.visitor, { wish })) {
-      setMyWishes((w) => [...w, wish]);
-      say(openPlace.action.doneHint);
-      setOpenId(null);
+    const k = krathong ?? config.krathongs[0];
+    const doneHint = openPlace.action.doneHint;
+    setOpenId(null);
+    setRitual(k);
+    say("นั่งลงที่ปลายสะพาน แล้วค่อยๆ วางกระทงลงน้ำ…");
+    e.visitor.perform("float", 3.4, 1, () => {});
+    window.setTimeout(() => {
+      if (e.visitor.act?.kind !== "float") { setRitual(null); return; } // walked away: keep the krathong
+      e.scene.runAction("shore", "float", e.visitor, { wish, style: k.id, flower: k.color });
+      setRitual(null);
+      if (krathong) consume(krathong);
+      remember((m) => ({ wishes: [...m.wishes, wish] }));
+      say(doneHint);
+    }, 1500);
+  };
+
+  // ---- stalls: everything is free to pick up
+  const pick = (item: FairItem) => {
+    const e = engineRef.current;
+    if (!e) return;
+    if (item.wear === "flower") {
+      setLook((l) => ({ ...l, flower: true }));
+      e.scene.runAction("flowers", "petals", e.visitor);
+      return say(`ทัด${item.name.replace("ทัดหู", "")}ไว้ที่หูแล้ว สวยมาก`);
+    }
+    pickUp(item);
+    if (item.hold === "cottonCandy" || item.hold === "shavedIce") {
+      remember((m) => ({ treats: [...m.treats, item.name] }));
+      say(`ได้${item.name}แล้ว อร่อยชื่นใจ`);
+    } else if (item.hold === "krathong") {
+      say(`ได้${item.name}แล้ว ถือไปลอยที่ปลายสะพานได้เลย`);
+    } else if (item.offering) {
+      e.scene.runAction("flowers", "petals", e.visitor);
+      say(`ได้${item.name}แล้ว เอาไปถวายพระที่วัดได้นะ`);
     }
   };
+  const onPrize = useCallback((p: Prize) => {
+    remember((m) => ({ prizes: [...m.prizes, p.name] }));
+    if (p.hold) pickUp({ id: `prize-${p.name}`, name: p.name, text: "", hold: p.hold });
+  }, [remember, pickUp]);
 
   return (
     <main className={`app ${entered ? "entered" : ""}`}>
@@ -232,11 +376,11 @@ export default function App() {
         active={target}
         onVisit={visit}
         onHover={setHovered}
-        hidden={!entered}
+        hidden={!entered || ride.focus}
         ui={config.ui}
       />
 
-      <MapMenu places={config.places} active={target} onVisit={visit} hidden={!entered} ui={config.ui} />
+      <MapMenu places={config.places} active={target} onVisit={visit} hidden={!entered || ride.view} ui={config.ui} />
 
       {openPlace && (
         <PlacePanel
@@ -246,12 +390,39 @@ export default function App() {
           onAction={runAction}
           onClose={closePanel}
         >
-          {openPlace.panel === "float" && openPlace.action && <FloatForm label={openPlace.action.label} onFloat={floatKrathong} />}
-          {openPlace.panel === "games" && <FairGames />}
-          {openPlace.panel === "wishes" && <WishBoard mine={myWishes} samples={config.sampleWishes} sampleTag={config.ui.sampleTag} />}
+          {openPlace.panel === "float" && openPlace.action && (
+            <FloatForm label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} />
+          )}
+          {openPlace.panel === "games" && <FairGames onPrize={onPrize} />}
+          {openPlace.panel === "temple" && <TemplePanel offering={offering} fortune={memories.fortune} onPray={pray} onFortune={shakeFortune} />}
+          {openPlace.panel === "krathongShop" && (
+            <>
+              <ItemPicker items={config.krathongs} owned={krathong ? [krathong.id] : []} pickLabel="เลือก" onPick={pick} preview={previewItem} />
+              {krathong && <button type="button" className="panel-action" onClick={() => visit("shore")}>ถือ{krathong.name}ไปลอยเลย</button>}
+            </>
+          )}
+          {(openPlace.panel === "flowers" || openPlace.panel === "food") && openPlace.items && (
+            <ItemPicker
+              items={openPlace.items}
+              owned={[...bag.map((i) => i.id), ...(look.flower ? ["plumeria"] : [])]}
+              pickLabel={openPlace.panel === "food" ? "รับ" : "เลือก"}
+              onPick={pick}
+              preview={previewItem}
+            />
+          )}
+          {openPlace.panel === "memory" && (
+            <MemoryCard
+              memories={memories}
+              look={look}
+              hand={hand?.hold ? { hold: hand.hold, color: hand.color, color2: hand.color2 } : undefined}
+              brand={config.brand}
+              treasureTotal={config.curios.length}
+            />
+          )}
         </PlacePanel>
       )}
 
+      <RideView show={ride.view} progress={ride.progress} look={look} />
       <Hint hint={hint} />
       <WishBubble bubble={bubble} onClose={() => setBubble(null)} />
 

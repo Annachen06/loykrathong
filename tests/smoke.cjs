@@ -132,12 +132,15 @@ async function desktopSuite(browser) {
     await p.screenshot({ path: path.join(SHOTS, `desktop-${pl.id}.png`) });
   }
 
+  // Krathong shop: pick a design, it's in your hand, and the card offers to take you to the pier.
+  await viaMap(p, "ร้านกระทง");
+  await p.waitForSelector('.item-pick[data-item="lotus"]', { timeout: 15000 });
+  await p.click('.item-pick[data-item="lotus"]');
+  check("krathong shop: picking a krathong puts it in your hand", (await state(p)).hold === "krathong");
+  await p.screenshot({ path: path.join(SHOTS, "desktop-krathong-shop.png") });
+
   // Walking out onto the pier never crosses the water.
-  await viaMap(p, "ซุ้มประตูงาน");
-  await p.waitForSelector(".panel h2");
-  await p.click(".panel-close");
-  const pier = (await places(p)).find((x) => x.id === "shore");
-  await viaMap(p, "ท่าลอยกระทง");
+  await p.click('.panel .panel-action:has-text("ไปลอย")');
   const samples = [];
   for (let i = 0; i < 80; i++) {
     samples.push(await state(p));
@@ -149,11 +152,16 @@ async function desktopSuite(browser) {
   await p.waitForSelector(".panel h2");
 
   // Float a krathong with a private wish at the shore.
+  check("on the pier: the camera comes in close", (await p.evaluate(() => window.__fair.renderer.view.zoom)) > 1.3);
+  check("float card knows which krathong you carry", (await p.textContent(".float-krathong")).includes("กระทงดอกบัว"));
   await p.fill("#wish-input", "ขอให้ทดสอบผ่านทุกข้อ");
   await p.click(".float-form .panel-action");
-  await p.waitForTimeout(300);
+  await p.waitForTimeout(400);
   let st = await state(p);
-  check("floating a krathong with a wish works and closes the card", st.stats.krathongsFloated === 1 && !(await p.$(".panel")));
+  check("floating: the visitor kneels at the end of the pier", st.act === "float" && !(await p.$(".panel")));
+  await p.waitForTimeout(1700);
+  st = await state(p);
+  check("floating: the krathong goes on the water and leaves your hand", st.stats.krathongsFloated === 1 && st.hold === null);
   await p.waitForTimeout(1500);
   await p.screenshot({ path: path.join(SHOTS, "desktop-floating.png") });
 
@@ -161,7 +169,7 @@ async function desktopSuite(browser) {
   const floaters = await p.evaluate(() => window.__fair.scene.debug().floaters);
   const cam = await p.evaluate(() => window.__fair.renderer.cam);
   const vis = await p.evaluate(() => window.__fair.renderer.view);
-  const wishy = floaters.filter((k) => k.wish && !k.mine && k.x > cam.x + 40 && k.x < cam.x + vis.visW - 420 && k.y > 690);
+  const wishy = floaters.filter((k) => k.wish && !k.mine && k.x > cam.x + 40 && k.x < cam.x + vis.visW * 0.65 && k.y > Math.max(cam.y + 60, 600) && k.y < cam.y + vis.visH - 60);
   if (wishy.length) {
     const k = wishy[0];
     const q = await toScreen(p, k.x, k.y - 12);
@@ -174,12 +182,15 @@ async function desktopSuite(browser) {
     check("tapping another krathong shows its wish, tagged as an example", false, "no sample krathong near the shore to tap");
   }
 
-  // Memory Corner shows the real count and the visitor's own wish.
+  // Memory Corner lists tonight's wish and makes a souvenir card picture.
   await viaMap(p, "มุมความทรงจำ");
-  await p.waitForSelector(".panel-stat");
-  const stat = await p.textContent(".panel-stat strong");
-  const mine = await p.textContent(".wish-list.mine");
-  check("Memory Corner shows the krathong and private wish from this visit", stat === "1" && mine.includes("ขอให้ทดสอบผ่านทุกข้อ"), `count ${stat}`);
+  await p.waitForSelector(".memory-list", { timeout: 15000 });
+  const mine = await p.textContent(".memory-list");
+  check("Memory Corner lists the private wish from this visit", mine.includes("ขอให้ทดสอบผ่านทุกข้อ"), mine);
+  await p.click('.memory .panel-action:has-text("สร้างการ์ด")');
+  await p.waitForSelector(".memory-card img");
+  const card = await p.getAttribute(".memory-card img", "src");
+  check("Memory Corner makes a souvenir card you can save", card.startsWith("data:image/png") && (await p.getAttribute(".memory-card a", "download")).endsWith(".png"));
   await p.screenshot({ path: path.join(SHOTS, "desktop-memory.png") });
 
   // Escape closes the card.
@@ -203,8 +214,31 @@ async function desktopSuite(browser) {
   await p.click('.marker[aria-label="เดินไปร้านดอกไม้"]');
   await p.waitForSelector(".panel h2", { timeout: 15000 });
   check("clicking a glowing marker walks there", (await panelTitle(p)) === "ร้านดอกไม้");
-  await p.click(".panel-action");
-  check("flower stall action runs", !(await p.$(".panel")));
+  await p.click('.item-pick[data-item="garland"]');
+  check("flower stall: the garland is in your hand", (await state(p)).hold === "garland");
+
+  // Temple: kneel, light incense, offer the garland, bow; then shake the fortune sticks.
+  await viaMap(p, "วัดริมทะเล");
+  await p.waitForSelector('[data-act="pray"]', { timeout: 20000 });
+  check("temple: the card offers to give the garland", (await p.textContent('[data-act="pray"]')).includes("พวงมาลัย"));
+  await p.click('[data-act="pray"]');
+  await p.waitForTimeout(1500);
+  st = await state(p);
+  check("temple: the visitor kneels and prays, and the garland is offered", st.act === "pray" && st.hold === null);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-pray.png") });
+  await p.waitForFunction(() => window.__fair.state().act === null, null, { timeout: 12000 });
+  await viaMap(p, "วัดริมทะเล");
+  await p.waitForSelector('[data-act="fortune"]', { timeout: 20000 });
+  await p.click('[data-act="fortune"]');
+  await p.waitForSelector(".wish-bubble.show", { timeout: 8000 });
+  check("temple: shaking the siamsi gives a fortune slip", (await p.textContent(".wish-bubble")).includes("ใบที่"));
+  await p.screenshot({ path: path.join(SHOTS, "desktop-fortune.png") });
+
+  // Shaved ice: pick one, it's in your hand.
+  await viaMap(p, "ร้านน้ำแข็งไส");
+  await p.waitForSelector('.item-pick[data-item="ice-red"]', { timeout: 20000 });
+  await p.click('.item-pick[data-item="ice-red"]');
+  check("shaved ice stall: the cup is in your hand", (await state(p)).hold === "shavedIce");
 
   // Balloon darts: three throws, then a result.
   await viaMap(p, "ซุ้มเกม");
@@ -215,6 +249,7 @@ async function desktopSuite(browser) {
   }
   const darts = await p.textContent(".game-status");
   check("balloon darts: throw 3 darts and get a result", darts.includes("แตก") && darts.includes("เล่นอีกครั้ง"), darts);
+  if (darts.includes("แตก 3")) check("balloon darts: the big prize is carried by your character", (await state(p)).hold === "plushStar");
   await p.screenshot({ path: path.join(SHOTS, "desktop-darts.png") });
 
   // Ring toss: three throws, then a result.
@@ -224,22 +259,23 @@ async function desktopSuite(browser) {
   check("ring toss: throw 3 rings and get a result", rings.includes("คล้องได้") && rings.includes("เล่นอีกครั้ง"), rings);
   await p.click(".panel-close");
 
-  // Ram wong: the visitor dances.
+  // Ram wong: the visitor goes up on stage and dances in the ring.
   await viaMap(p, "เวทีรำวง");
   await p.waitForSelector(".panel-action", { timeout: 15000 });
   await p.click(".panel-action");
-  await p.waitForTimeout(300);
-  check("ram wong: the visitor dances at the stage", await p.evaluate(() => window.__fair.visitor.dancing));
+  await p.waitForTimeout(2500);
+  check("ram wong: the visitor joins the dancers on stage", (await state(p)).stats.dancing === 1);
   await p.screenshot({ path: path.join(SHOTS, "desktop-dance.png") });
+  await p.waitForFunction(() => window.__fair.state().stats.dancing === 0, null, { timeout: 20000 });
 
   // Ferris wheel: ride a full turn, hidden from the ground, then back down.
   await viaMap(p, "ชิงช้าสวรรค์");
   await p.waitForSelector(".panel-action", { timeout: 15000 });
   await p.click(".panel-action");
-  await p.waitForTimeout(3000);
-  check("Ferris wheel: the visitor is riding", (await state(p)).stats.riding === 1);
+  await p.waitForTimeout(4000);
+  check("Ferris wheel: the visitor is riding, seen from inside the cabin", (await state(p)).stats.riding === 1 && (await p.isVisible(".ride-view.on")));
   await p.screenshot({ path: path.join(SHOTS, "desktop-ride.png") });
-  await p.waitForFunction(() => window.__fair.state().stats.riding === 0, null, { timeout: 15000 });
+  await p.waitForFunction(() => window.__fair.state().stats.riding === 0, null, { timeout: 30000 });
   check("Ferris wheel: the ride ends after one turn", true);
 
   // Tapping a curio reacts without walking away.
@@ -254,6 +290,7 @@ async function desktopSuite(browser) {
   await p.waitForTimeout(500);
   const after = await state(p);
   check("tapping the shell reacts and doesn't move the visitor", after.stats.curioTaps === before.stats.curioTaps + 1 && !after.moving);
+  check("the shell holds a pearl: a beach treasure is found", after.stats.treasures === 1 && (await p.textContent(".wish-bubble")).includes("ไข่มุก"));
   await p.screenshot({ path: path.join(SHOTS, "desktop-shell.png") });
 
   // Keyboard walking.
