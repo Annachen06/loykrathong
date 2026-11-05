@@ -156,7 +156,8 @@ export type CameraView = { x: number; y: number; w: number; h: number };
 export type TapResult = {
   bubble?: { title: string; text: string; tag?: string };
   /** A beach treasure was found. */
-  found?: { id: string; label: string; text: string };
+  /** Something picked up off the sand. `again` when it was already in your collection. */
+  found?: { id: string; label: string; text: string; again?: boolean };
 };
 
 /** Something drawn in depth order with the visitor (other festival-goers, creatures on the sand). */

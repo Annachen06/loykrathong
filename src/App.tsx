@@ -203,10 +203,23 @@ export default function App() {
       if (tapped.bubble) setBubble({ ...tapped.bubble, key: Date.now() });
       if (tapped.found) {
         const f = tapped.found;
-        remember((m) => ({ treasures: [...m.treasures, f.label] }));
-        sfx("chime");
+        if (!f.again) {
+          remember((m) => ({ treasures: [...m.treasures, f.label] }));
+          sfx("chime");
+        }
         const n = e.scene.stats().treasures ?? 0;
-        setBubble({ title: `เจอ${f.label}!`, text: f.text, tag: `สมบัติริมหาด ${n}/${config.curios.length}`, key: Date.now() });
+        const total = config.curios.length;
+        setBubble({
+          title: f.again ? f.label : `เจอ${f.label}!`,
+          text: f.text,
+          tag: `ของสะสม ${n}/${total}`,
+          note: f.again
+            ? "ชิ้นนี้เก็บไว้แล้ว ดูของที่สะสมได้ที่มุมความทรงจำ"
+            : n < total
+              ? `เป็นของสะสมริมหาด เก็บใส่กระเป๋าแล้ว ยังมีซ่อนอยู่บนหาดอีก ${total - n} ชิ้น`
+              : "เก็บของสะสมริมหาดครบทุกชิ้นแล้ว! ไปดูที่มุมความทรงจำได้เลย",
+          key: Date.now(),
+        });
       }
       return;
     }

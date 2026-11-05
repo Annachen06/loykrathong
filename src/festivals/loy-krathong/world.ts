@@ -1,6 +1,7 @@
-// Fixed positions in the Loy Krathong scene, in world units (2800 × 1000).
+// Fixed positions in the Loy Krathong scene, in world units (2600 × 1000).
 // Left to right: the temple grounds, the fair (Ferris wheel, ram wong stage, game booths),
-// the krathong shop, the pier under the moon, the Memory Corner and the flower stall.
+// the krathong shop, the pier under the moon, the sweet stalls and the Memory Corner.
+// The flower cart stands by the temple gate.
 import { loyKrathongConfig } from "./config";
 
 export const W = loyKrathongConfig.layout.width;
@@ -21,7 +22,7 @@ export const PALMS = [
   { x: 1010, base: 814, h: 250, lean: -20 },
   { x: 1612, base: 812, h: 270, lean: 26 },
   { x: 2010, base: 814, h: 250, lean: -28 },
-  { x: 2470, base: 816, h: 270, lean: 30 },
-  { x: 2780, base: 820, h: 260, lean: -40 },
+  { x: 2262, base: 816, h: 270, lean: 24 },
+  { x: 2572, base: 820, h: 260, lean: -36 },
 ];
 export const LIGHT_STRINGS: [number, number, number][] = [[0, 1, 60], [2, 3, 50], [3, 4, 44]];

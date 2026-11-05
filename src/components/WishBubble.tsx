@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
-export type Bubble = { title: string; text: string; tag?: string; key: number };
+export type Bubble = { title: string; text: string; tag?: string; note?: string; key: number };
 
-/** A paper note that opens when you tap a krathong on the water. Fades away on its own. */
+/** A paper note that opens when you tap a krathong on the water or something on the sand. Fades away on its own. */
 export function WishBubble({ bubble, onClose }: { bubble: Bubble | null; onClose: () => void }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -19,6 +19,7 @@ export function WishBubble({ bubble, onClose }: { bubble: Bubble | null; onClose
         {bubble.tag && <span className="wish-tag">{bubble.tag}</span>}
       </div>
       <p>“{bubble.text}”</p>
+      {bubble.note && <p className="wish-note">{bubble.note}</p>}
     </div>
   );
 }

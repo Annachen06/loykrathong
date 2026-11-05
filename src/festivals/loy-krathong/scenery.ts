@@ -436,7 +436,6 @@ function gameBooths(ctx: CanvasRenderingContext2D) {
       ctx.fillRect(bx - 3, by - 5, 2, 3);
     }
   }
-  boothSign(ctx, 1365, GROUND - 150, "ปาเป้า");
 
   // ring toss (โยนห่วง): tiered table of bottles, with prizes hanging above
   stall(ctx, 1465, 135, GROUND, ["#4fc08a", "#fff4e2"], { h: 128 });
@@ -451,7 +450,6 @@ function gameBooths(ctx: CanvasRenderingContext2D) {
       }, 1.2);
     }
   }
-  boothSign(ctx, 1532, GROUND - 150, "โยนห่วง");
 
   // plush prizes hanging along both booths
   for (let i = 0; i < 7; i++) {
@@ -460,9 +458,11 @@ function gameBooths(ctx: CanvasRenderingContext2D) {
     outlined(ctx, c, () => ctx.arc(px, py, 7, 0, Math.PI * 2), 1.4);
     outlined(ctx, c, () => ctx.arc(px, py - 9, 5, 0, Math.PI * 2), 1.4);
   }
+  boothSign(ctx, 1365, GROUND - 150, "ปาเป้า");
+  boothSign(ctx, 1532, GROUND - 150, "โยนห่วง");
 }
 
-function boothSign(ctx: CanvasRenderingContext2D, x: number, y: number, text: string) {
+export function boothSign(ctx: CanvasRenderingContext2D, x: number, y: number, text: string) {
   outlined(ctx, "#fff4e2", () => ctx.roundRect(x - 40, y - 15, 80, 28, 10), 2);
   ctx.fillStyle = "#a0284a";
   ctx.font = "500 16px Mitr, sans-serif";
@@ -907,16 +907,14 @@ export function paintFront(ctx: CanvasRenderingContext2D) {
   gate(ctx, 640, GROUND + 6);
   boutique(ctx, 1650, 180, GROUND + 2);
   foodStall(ctx, 2040, 110, "#ff8fc0", "สายไหม", "candy");
-  memoryCorner(ctx, 2190, GROUND + 6);
-  stall(ctx, 2530, 150, GROUND, ["#ffa8c2", "#fff4e2"], { goods: "flowers" });
-  boothSign(ctx, 2605, GROUND - 112, "ดอกไม้");
-  foodStall(ctx, 2680, 84, "#5aa0ef", "น้ำแข็งไส", "ice");
+  foodStall(ctx, 2158, 84, "#5aa0ef", "น้ำแข็งไส", "ice");
+  memoryCorner(ctx, 2296, GROUND + 6);
 
   bunting(ctx, { x: 704, y: 664 }, { x: 1036, y: 604 }, 34);
   bunting(ctx, { x: 1254, y: 604 }, { x: 1278, y: 574 }, 2);
   bunting(ctx, { x: 1278, y: 574 }, { x: 1648, y: 650 }, 40);
-  bunting(ctx, { x: 2040, y: 690 }, { x: 2330, y: 660 }, 30);
-  bunting(ctx, { x: 2420, y: 660 }, { x: 2760, y: 690 }, 30);
+  bunting(ctx, { x: 2040, y: 690 }, { x: 2242, y: 692 }, 20);
+  bunting(ctx, { x: 2290, y: 670 }, { x: 2530, y: 670 }, 24);
   foregroundFlowers(ctx);
 
   const v = ctx.createLinearGradient(0, H - 110, 0, H);

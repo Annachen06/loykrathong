@@ -6,8 +6,9 @@ const OUTLINE = "#2a1d4a";
 const PINK = "#ef6f8e";
 
 /**
- * Riding the Ferris wheel: your cabin hangs close by in the foreground, with you sitting in it,
- * while the fair, the sea and the sky spread out far below and around (the world camera pulls back for that).
+ * Riding the Ferris wheel, from inside the cabin: you sit on the bench by the big window, and through the glass
+ * the fair, the sea and the sky spread out far below (the world camera pulls back for that).
+ * The cabin is about as big as a small room, so you look big and the fair looks small and far away.
  */
 export function RideView({ show, progress, look }: { show: boolean; progress: number; look: VisitorLook }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -29,13 +30,7 @@ export function RideView({ show, progress, look }: { show: boolean; progress: nu
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, vw, vh);
-      // The cabin is drawn 220 units wide, then sized to the screen: about a quarter of a laptop screen,
-      // a little under half a phone's width.
-      const portrait = vw < vh;
-      const k = Math.min(portrait ? vw * 0.46 : vw * 0.2, vh * 0.34, 300) / 220;
-      const hx = portrait ? vw * 0.3 : vw * 0.18;
-      const hy = portrait ? vh * 0.46 : vh * 0.36;
-      drawCabin(ctx, hx, hy, k, calm ? 0 : Math.sin(t * 1.1) * 0.035, t, look);
+      drawCabin(ctx, vw, vh, t, look, calm);
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
@@ -52,107 +47,73 @@ export function RideView({ show, progress, look }: { show: boolean; progress: nu
   );
 }
 
-/** One cabin seen from the side, hanging from its arm at (hx, hy), gently swinging. */
-function drawCabin(ctx: CanvasRenderingContext2D, hx: number, hy: number, k: number, swing: number, t: number, look: VisitorLook) {
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  // the arm it hangs from, reaching up out of view towards the hub
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 10 * k;
-  ctx.beginPath();
-  ctx.moveTo(hx, hy);
-  ctx.lineTo(hx, -10);
-  ctx.stroke();
-  ctx.strokeStyle = "#cfc6ef";
-  ctx.lineWidth = 5 * k;
-  ctx.stroke();
+/** The inside of the cabin around the window, and you on the bench. */
+function drawCabin(ctx: CanvasRenderingContext2D, vw: number, vh: number, t: number, look: VisitorLook, calm: boolean) {
+  const portrait = vw < vh;
+  const sway = calm ? 0 : Math.sin(t * 1.1) * 2;
+  const roof = Math.max(26, vh * 0.065);
+  const post = Math.max(14, vw * 0.022);
+  const railY = vh * (portrait ? 0.7 : 0.66);
+  const floor = vh - Math.max(18, vh * 0.045);
 
-  ctx.save();
-  ctx.translate(hx, hy);
-  ctx.rotate(swing);
-  ctx.scale(k, k);
+  // the glass: a faint tint below the rail and two soft reflections
+  ctx.fillStyle = "rgba(30, 30, 90, 0.16)";
+  ctx.fillRect(post, railY, vw - post * 2, floor - railY);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+  for (const [x0, w] of [[0.55, 0.06], [0.64, 0.02]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(vw * x0, roof);
+    ctx.lineTo(vw * (x0 + w), roof);
+    ctx.lineTo(vw * (x0 + w - 0.12), railY);
+    ctx.lineTo(vw * (x0 - 0.12), railY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.lineJoin = "round";
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 4;
-
-  // hanger
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, 22);
-  ctx.stroke();
-  ctx.fillStyle = "#ffcf6e";
-  ctx.beginPath();
-  ctx.arc(0, 0, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // posts, behind you
-  ctx.fillStyle = "#c9506e";
-  for (const x of [-100, 88]) {
+  const block = (fill: string, path: () => void) => {
+    ctx.fillStyle = fill;
     ctx.beginPath();
-    ctx.rect(x, 44, 12, 110);
+    path();
     ctx.fill();
     ctx.stroke();
-  }
-
-  // a little lantern hanging under the roof, and its warm light on you
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2;
+  };
+  // the rail across the window, at the height of your chest when sitting
+  block(PINK, () => ctx.roundRect(post - 4, railY + sway * 0.3, vw - post * 2 + 8, Math.max(10, vh * 0.016), 5));
+  // floor
+  block("#b8506e", () => ctx.rect(-4, floor, vw + 8, vh - floor + 4));
+  // posts at the corners of the window
+  block(PINK, () => ctx.rect(-4, 0, post + 4, vh));
+  block(PINK, () => ctx.rect(vw - post, 0, post + 4, vh));
+  // roof, curving down at the corners
+  block(PINK, () => {
+    ctx.moveTo(-4, -4);
+    ctx.lineTo(vw + 4, -4);
+    ctx.lineTo(vw + 4, roof * 1.5);
+    ctx.quadraticCurveTo(vw / 2, roof * 0.55, -4, roof * 1.5);
+    ctx.closePath();
+  });
+  // a little lantern hanging from the roof, with its light
+  const lx = vw * (portrait ? 0.86 : 0.3), ly = roof * 1.05 + vh * (portrait ? 0.11 : 0.05);
   ctx.beginPath();
-  ctx.moveTo(52, 44);
-  ctx.lineTo(52, 60);
+  ctx.moveTo(lx, roof);
+  ctx.lineTo(lx, ly - 10);
+  ctx.lineWidth = 2;
   ctx.stroke();
-  const g = ctx.createRadialGradient(52, 72, 2, 52, 72, 90);
-  g.addColorStop(0, "rgba(255,214,140,0.5)");
+  const g = ctx.createRadialGradient(lx, ly, 2, lx, ly, vh * 0.3);
+  g.addColorStop(0, "rgba(255,214,140,0.32)");
   g.addColorStop(1, "rgba(255,214,140,0)");
   ctx.fillStyle = g;
-  ctx.fillRect(-60, -20, 220, 190);
-  ctx.fillStyle = "#ffcf6e";
-  ctx.beginPath();
-  ctx.ellipse(52, 70, 9, 11, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  ctx.fillRect(lx - vh * 0.3, ly - vh * 0.3, vh * 0.6, vh * 0.6);
+  ctx.lineWidth = 3;
+  block("#ffcf6e", () => ctx.ellipse(lx, ly, 9, 12, 0, 0, Math.PI * 2));
 
-  // you, sitting on the bench and looking out over the fair
-  drawPerson(ctx, -26, 172, 1.9, 1, 0, 0, t, look, { sit: 1 });
-
-  // roof
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = OUTLINE;
-  ctx.fillStyle = PINK;
-  ctx.beginPath();
-  ctx.moveTo(-112, 46);
-  ctx.quadraticCurveTo(0, 6, 112, 46);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(-114, 40, 228, 12, 5);
-  ctx.fill();
-  ctx.stroke();
-  // little lights along the roof edge
-  for (let i = 0; i < 9; i++) {
-    const on = (Math.floor(t * 3) + i) % 3 === 0 ? 1 : 0.45;
-    ctx.fillStyle = `rgba(255,${i % 2 ? 214 : 190},${i % 2 ? 140 : 200},${on})`;
-    ctx.beginPath();
-    ctx.arc(-96 + i * 24, 46, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // the basket in front of your legs
-  ctx.fillStyle = PINK;
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.roundRect(-106, 140, 212, 58, [6, 6, 26, 26]);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.beginPath();
-  ctx.roundRect(-96, 148, 192, 8, 4);
-  ctx.fill();
-  ctx.fillStyle = "#ffcf6e";
-  ctx.beginPath();
-  ctx.roundRect(-106, 170, 212, 7, 3);
-  ctx.fill();
-  ctx.restore();
+  // you, on the bench by the window, looking out
+  const s = (portrait ? vh * 0.22 : vh * 0.33) / 58;
+  const bx = post + (portrait ? vw * 0.02 : vw * 0.05);
+  const seatY = floor - s * 16;
+  block("#c9506e", () => ctx.roundRect(post - 4, seatY, s * 34 + bx - post, floor - seatY + 4, [8, 8, 0, 0]));
+  drawPerson(ctx, bx + s * 12, floor, s, 1, 0, 0, t, look, { sit: 1 });
 }

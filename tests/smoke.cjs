@@ -212,8 +212,8 @@ async function desktopSuite(browser) {
 
   // Clicking the glowing marker visits too.
   await p.click(".panel-close");
-  // stroll over until the flower stall is on screen, then click its glowing marker
-  await p.evaluate(() => window.__fair.visitor.walkTo({ x: 2450, y: 900 }));
+  // stroll over to the temple gate until the flower cart is on screen, then click its glowing marker
+  await p.evaluate(() => window.__fair.visitor.walkTo({ x: 700, y: 900 }));
   await waitStopped(p);
   await p.waitForTimeout(1200);
   await p.click('.marker[aria-label="เดินไปร้านดอกไม้"]');

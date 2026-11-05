@@ -4,7 +4,7 @@ import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../
 import { drawPerson, type Hold, type Pose } from "../../engine/person";
 import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
-import { drawKrathong, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
+import { boothSign, drawKrathong, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
 import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
 
 type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string };
@@ -61,14 +61,14 @@ export function createLoyKrathongScene(): Scene {
   const spawnLantern = (x: number, y: number, s = rand(0.35, 0.9)) =>
     lanterns.push({ x, y, vy: -rand(10, 18), sway: rand(8, 22), p: rand(0, 6.28), s });
 
-  for (let i = 0; i < 24; i++) spawnFloater(rand(860, 2760), rand(HORIZON + 30, SHORE - 16), false);
+  for (let i = 0; i < 24; i++) spawnFloater(rand(860, W - 40), rand(HORIZON + 30, SHORE - 16), false);
   // a cluster around the pier, so walking out you pass other people's wishes
   for (let i = 0; i < 10; i++) spawnFloater(rand(1700, 2110), rand(HORIZON + 50, SHORE - 20), false);
-  for (let i = 0; i < 18; i++) spawnLantern(rand(700, 2780), rand(40, 500));
+  for (let i = 0; i < 18; i++) spawnLantern(rand(700, W - 20), rand(40, 500));
 
   const events: { name: string; x: number; y: number }[] = [];
   function firework() {
-    const x = rand(900, 2700), y = rand(110, 320);
+    const x = rand(900, W - 100), y = rand(110, 320);
     events.push({ name: "firework", x, y });
     const rgb = ["255,207,110", "255,168,194", "201,182,255", "143,216,200"][(Math.random() * 4) | 0];
     for (let i = 0; i < 44; i++) {
@@ -306,6 +306,110 @@ export function createLoyKrathongScene(): Scene {
   // ---------------------------------------------------- the temple altar (โต๊ะหมู่บูชา)
   const ALTAR = { x: 246, y: 834 };
   const altar = { lit: -99, offered: [] as Hold[], glow: 0 };
+  // ---------------------------------------------------- flower cart by the temple gate
+  // Flowers for the temple are sold right outside it, as at a real temple fair: jasmine garlands, lotus buds, marigolds.
+  const CART = { x: 522, y: 852 };
+  const vendor = crowdLooks[4];
+  const cartActor: Actor = {
+    y: CART.y,
+    draw(ctx, t) {
+      const { x, y } = CART;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = OUTLINE;
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(x, y + 2, 62, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // the seller stands behind the cart
+      drawPerson(ctx, x + 22, y - 14, depthScale(y - 14) * 0.95, -1, 0, 0, t, vendor, {});
+      ctx.lineWidth = 2;
+      // umbrella
+      ctx.fillStyle = "#8a6a4a";
+      ctx.fillRect(x - 2, y - 176, 4, 126);
+      const dome = () => {
+        ctx.beginPath();
+        ctx.moveTo(x - 72, y - 136);
+        ctx.quadraticCurveTo(x - 60, y - 178, x, y - 182);
+        ctx.quadraticCurveTo(x + 60, y - 178, x + 72, y - 136);
+        for (let i = 0; i < 6; i++) ctx.quadraticCurveTo(x + 72 - i * 24 - 12, y - 128, x + 72 - (i + 1) * 24, y - 136);
+        ctx.closePath();
+      };
+      ctx.fillStyle = "#ef6f8e";
+      dome();
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = "#fff4e2";
+      for (const k of [-2, 0, 2]) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 184);
+        ctx.lineTo(x + k * 24 - 12, y - 120);
+        ctx.lineTo(x + k * 24 + 12, y - 120);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.strokeStyle = OUTLINE;
+      dome();
+      ctx.stroke();
+      // jasmine garlands hanging from the umbrella's edge
+      for (let i = 0; i < 3; i++) {
+        const gx = x - 52 + i * 15, top = y - 124 + i * 3, sw = Math.sin(t * 1.4 + i) * 1.5;
+        ctx.strokeStyle = "rgba(42,29,74,0.6)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gx, top - 6);
+        ctx.lineTo(gx + sw, top);
+        ctx.stroke();
+        for (let k = 0; k < 12; k++) {
+          const a = (k / 12) * Math.PI * 2;
+          ctx.fillStyle = k % 4 === 0 ? "#ffe9a8" : "#fffaf0";
+          ctx.beginPath();
+          ctx.arc(gx + sw + Math.sin(a) * 5, top + 9 - Math.cos(a) * 9, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = i === 1 ? "#ef5a5a" : "#ffb347";
+        ctx.beginPath();
+        ctx.ellipse(gx + sw, top + 22, 2.4, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // wheels
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2;
+      for (const dx of [-34, 34]) {
+        ctx.fillStyle = "#5a3a2a";
+        ctx.beginPath();
+        ctx.arc(x + dx, y - 11, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // the cart, with buckets of lotus buds and marigolds on top
+      ctx.fillStyle = "#c08a5a";
+      ctx.beginPath();
+      ctx.roundRect(x - 56, y - 52, 112, 34, 4);
+      ctx.fill();
+      ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const bx = x - 30 + i * 30;
+        for (let f = 0; f < 3; f++) {
+          ctx.fillStyle = i === 1 ? ["#ffb347", "#ff9a2a", "#ffcf3a"][f] : "#ff9ec0";
+          ctx.beginPath();
+          if (i === 1) ctx.arc(bx - 6 + f * 6, y - 66 - (f % 2) * 4, 4.4, 0, Math.PI * 2);
+          else ctx.ellipse(bx - 6 + f * 6, y - 68 - (f % 2) * 4, 3.6, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = "#7a9ad0";
+        ctx.beginPath();
+        ctx.roundRect(bx - 10, y - 64, 20, 13, 3);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+      boothSign(ctx, x, y - 34, "ดอกไม้");
+    },
+  };
+
   const altarActor: Actor = {
     y: ALTAR.y,
     draw(ctx, t) {
@@ -445,17 +549,17 @@ export function createLoyKrathongScene(): Scene {
     stand(1330, 830, 1), stand(1400, 836, -1, { kid: true }), stand(1500, 832, 1), stand(1575, 840, -1),
     // carrying krathongs from the shop out to the pier
     stand(1690, 834, 1), stand(1795, 840, 1, { hold: "krathong" }), stand(1835, 836, 1, { hold: "krathong" }), stand(1975, 842, -1, { hold: "krathong" }),
-    // the cotton candy stall, the memory corner, the flower stall
+    // the sweet stalls and the memory corner
     stand(2070, 836, 1, balloon("#ff8fc0")), stand(2130, 840, -1, { hold: "cottonCandy" }),
-    stand(2240, 846, 1), stand(2560, 834, 1), stand(2660, 838, -1),
+    stand(2205, 846, 1), stand(2470, 838, 1), stand(2540, 842, -1),
   ];
   folks.push(
     stroll(700, 1600, 925),
     stroll(800, 1400, 955, balloon("#4fc08a")),
     stroll(1500, 2300, 945, { hold: "krathong" }),
-    stroll(1960, 2700, 915),
+    stroll(1960, 2520, 915),
     stroll(300, 900, 950),
-    stroll(2200, 2720, 960, { kid: true, hold: "cottonCandy" }),
+    stroll(2100, 2520, 960, { kid: true, hold: "cottonCandy" }),
   );
 
   const folkActors: Actor[] = folks.map((p) => ({
@@ -603,13 +707,13 @@ export function createLoyKrathongScene(): Scene {
     nextFloater -= dt;
     if (nextFloater <= 0 && floaters.length < 40) {
       // people keep floating krathongs, many of them from around the pier
-      const x = Math.random() < 0.5 ? rand(1820, 1990) : rand(880, 2760);
+      const x = Math.random() < 0.5 ? rand(1820, 1990) : rand(880, W - 40);
       spawnFloater(x, SHORE - rand(4, 14), false);
       nextFloater = rand(1, 2.4);
     }
     nextLantern -= dt;
     if (nextLantern <= 0 && lanterns.length < 34) {
-      spawnLantern(rand(800, 2780), rand(430, 560));
+      spawnLantern(rand(800, W - 20), rand(430, 560));
       nextLantern = rand(1.2, 2.8);
     }
     if (!calm) {
@@ -1126,8 +1230,45 @@ export function createLoyKrathongScene(): Scene {
     ctx.restore();
   }
 
+  /** When you walk near something on the sand that you haven't picked up yet, a small tag says what it is and to tap it. */
+  function drawCurioHints(ctx: CanvasRenderingContext2D, t: number) {
+    if (ride.active || stageGuest.active) return;
+    for (const c of config.curios) {
+      if (found.has(c.id)) continue;
+      const d = dist(you.x, you.y, c.at.x, c.at.y);
+      if (d > 220) continue;
+      const a = clamp((220 - d) / 60, 0, 1);
+      const text = `แตะเก็บ${c.label}`;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = "500 13px Mitr, sans-serif";
+      const w = ctx.measureText(text).width + 34;
+      const x = clamp(c.at.x, lastCam.x + w / 2 + 8, lastCam.x + lastCam.w - w / 2 - 8);
+      const y = c.at.y - 52 + Math.sin(t * 2.4) * 2;
+      ctx.fillStyle = "rgba(255,248,232,0.96)";
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - 13, w, 26, 13);
+      const px = clamp(c.at.x, x - w / 2 + 12, x + w / 2 - 12);
+      ctx.moveTo(px - 5, y + 13);
+      ctx.lineTo(px, y + 19);
+      ctx.lineTo(px + 5, y + 13);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#e0a020";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("✦", x - w / 2 + 14, y + 1);
+      ctx.fillStyle = "#2a1d4a";
+      ctx.fillText(text, x + 8, y + 1);
+      ctx.restore();
+    }
+  }
+
   function drawTop(ctx: CanvasRenderingContext2D, t: number) {
     drawPierWishes(ctx);
+    drawCurioHints(ctx, t);
     for (const l of lanterns) {
       const s = l.s;
       const flick = 0.85 + 0.15 * Math.sin(t * 8 + l.p * 5);
@@ -1176,7 +1317,7 @@ export function createLoyKrathongScene(): Scene {
     drawMiddle,
     drawGround,
     events,
-    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, ringActor],
+    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, cartActor, ringActor],
     camera() {
       if (ride.active) {
         const c = cabinPos(ride.cabin);
@@ -1255,7 +1396,7 @@ export function createLoyKrathongScene(): Scene {
           bottle.open = 0.01;
           burst(bottle.x, bottle.y - 14, "170,230,210", 8);
         }
-        if (found.has(c.id)) return {};
+        if (found.has(c.id)) return { found: { id: c.id, label: c.label, text: c.found, again: true } };
         found.add(c.id);
         return { found: { id: c.id, label: c.label, text: c.found } };
       }
