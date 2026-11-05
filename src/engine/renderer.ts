@@ -15,7 +15,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   const ctx = canvas.getContext("2d")!;
   const back = document.createElement("canvas");
   const front = document.createElement("canvas");
-  const { width: W, height: H, focusY, portraitHeight } = config.layout;
+  const { width: W, height: H, focusY, portraitHeight, viewHeight } = config.layout;
 
   const view = { vw: 1, vh: 1, scale: 1, dpr: 1, layerK: 1, visW: 1, visH: 1 };
   const cam = { x: 0, y: 0 };
@@ -57,7 +57,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     view.dpr = Math.min(window.devicePixelRatio || 1, 2);
     // Portrait phones: frame the lower part of the world (beach, stalls, sea) a little closer.
     const portrait = view.vw / view.vh < 0.9;
-    view.scale = Math.max(view.vw / W, view.vh / (portrait ? portraitHeight : H));
+    view.scale = Math.max(view.vw / W, view.vh / (portrait ? portraitHeight : viewHeight));
     view.visW = view.vw / view.scale;
     view.visH = view.vh / view.scale;
     canvas.width = Math.round(view.vw * view.dpr);
@@ -109,7 +109,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
 
     // Draw people and creatures back-to-front so nearer ones overlap farther ones.
     const order: { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[] = [...scene.actors];
-    order.push({ y: visitor.y, draw: (c, tt) => visitor.draw(c, tt) });
+    if (!scene.visitorAway()) order.push({ y: visitor.y, draw: (c, tt) => visitor.draw(c, tt) });
     order.sort((a, b) => a.y - b.y);
     for (const a of order) a.draw(ctx, time);
 

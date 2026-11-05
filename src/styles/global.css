@@ -24,7 +24,7 @@ html, body, #root {
   overflow: hidden;
   background: var(--night);
   color: var(--moonlight);
-  font-family: var(--font-round);
+  font-family: var(--font-th);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
   -webkit-user-select: none;
@@ -58,7 +58,7 @@ button { font: inherit; color: inherit; }
   text-shadow: 0 1px 6px rgba(8, 10, 40, 0.8);
 }
 .entered .brand { opacity: 1; }
-.brand-name { font-weight: 600; letter-spacing: 0.16em; font-size: 15px; }
+.brand-name { font-family: var(--font-round); font-weight: 600; letter-spacing: 0.16em; font-size: 15px; }
 .brand-tag { font-size: 12px; opacity: 0.75; }
 
 /* ---------------------------------------------------------------- place markers */
@@ -143,8 +143,7 @@ button { font: inherit; color: inherit; }
   opacity: 1;
   transform: translate(-50%, 0) scale(1);
 }
-.marker-th { font-family: var(--font-th); font-size: 12px; color: var(--rose); }
-.marker-en { font-size: 14px; font-weight: 600; }
+.marker-name { font-size: 15px; font-weight: 500; }
 
 /* ---------------------------------------------------------------- dock */
 .dock {
@@ -239,8 +238,7 @@ button { font: inherit; color: inherit; }
 }
 .panel-close:hover { background: rgba(42, 29, 74, 0.08); }
 .panel-close:focus-visible { outline: 2px solid var(--rose); }
-.panel-th { margin: 6px 0 0; font-family: var(--font-th); color: var(--rose); font-size: 14px; }
-.panel h2 { margin: 0 0 8px; font-size: 24px; font-weight: 600; line-height: 1.15; padding-right: 32px; }
+.panel h2 { margin: 8px 0 6px; font-size: 24px; font-weight: 500; line-height: 1.2; padding-right: 32px; }
 .panel-text { margin: 0 0 10px; font-size: 15px; line-height: 1.5; }
 .panel-stat { margin: 0 0 10px; font-size: 14px; }
 .panel-stat strong { display: inline-block; min-width: 28px; padding: 1px 8px; margin-right: 4px; border-radius: 999px; background: var(--gold); text-align: center; }
@@ -332,6 +330,7 @@ button { font: inherit; color: inherit; }
 .intro-eyebrow { margin: 0 0 4px; font-family: var(--font-th); color: var(--gold); font-size: 15px; letter-spacing: 0.06em; }
 .intro h1 {
   margin: 0;
+  font-family: var(--font-round);
   font-size: clamp(46px, 12vw, 96px);
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -363,4 +362,189 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .marker-dot, .intro-enter { animation: none; }
   .panel { animation: none; }
+}
+
+/* ---------------------------------------------------------------- richer cards */
+.panel-games, .panel-wishes, .panel-float { width: min(380px, calc(100% - 32px)); }
+.panel { max-height: calc(100% - 120px); overflow-y: auto; }
+
+.float-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.float-form label { font-size: 14px; font-weight: 500; }
+.float-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #fffaf2;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* 16px stops iOS zooming in */
+  resize: none;
+  user-select: text;
+}
+.float-form textarea:focus { outline: 3px solid var(--rose); outline-offset: 1px; }
+.privacy { margin: 0; font-size: 12.5px; line-height: 1.45; color: #6a3a5a; }
+
+.wish-board h3 { margin: 12px 0 6px; font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.wish-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.wish-list li { padding: 7px 12px; border-radius: 12px; background: rgba(255, 207, 110, 0.22); font-size: 14px; line-height: 1.4; }
+.wish-list.mine li { background: rgba(239, 111, 142, 0.16); }
+.wish-empty, .wish-fine, .game-fine { margin: 6px 0 0; font-size: 12.5px; line-height: 1.45; color: #6a3a5a; }
+.wish-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.wish-bubble {
+  position: absolute;
+  top: calc(var(--safe-top) + 64px);
+  left: 50%;
+  width: min(340px, calc(100% - 32px));
+  transform: translate(-50%, -8px);
+  padding: 12px 16px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 5px 0 rgba(42, 29, 74, 0.45), 0 0 40px rgba(255, 207, 110, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s, transform 0.35s;
+  z-index: 4;
+}
+.wish-bubble.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
+.wish-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--rose); }
+.wish-bubble p { margin: 6px 0 0; font-size: 17px; line-height: 1.45; }
+
+/* ---------------------------------------------------------------- fair games */
+.tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+.tabs button {
+  flex: 1;
+  min-height: 40px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.tabs button.on { background: var(--ink); color: var(--paper); }
+.tabs button:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }
+.game-help { margin: 0 0 8px; font-size: 13px; color: #4a3a6a; }
+.dart-board {
+  position: relative;
+  height: 150px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: repeating-linear-gradient(90deg, #3a5a9a 0 22px, #34528f 22px 44px);
+  overflow: hidden;
+  touch-action: manipulation;
+  cursor: crosshair;
+}
+.balloon {
+  position: absolute;
+  width: 34px;
+  height: 42px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 50% 50% 48% 48%;
+  box-shadow: inset -5px -6px 0 rgba(0, 0, 0, 0.12), inset 5px 5px 0 rgba(255, 255, 255, 0.35);
+  cursor: crosshair;
+  animation: balloon-drift ease-in-out infinite alternate;
+}
+.balloon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 1px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.balloon.popped { animation: pop 0.25s forwards; pointer-events: none; }
+.balloon:focus-visible { outline: 3px solid #fff; }
+@keyframes balloon-drift {
+  from { transform: translate(-10px, 0); }
+  to { transform: translate(18px, 10px); }
+}
+@keyframes pop {
+  0% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+.dart-miss {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #2a1d4a;
+  box-shadow: 0 0 0 2px #fff4e2;
+}
+.ring-table {
+  position: relative;
+  height: 96px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: linear-gradient(#5a3a7a, #3a2a5a 70%, #b07a5a 70%);
+  overflow: hidden;
+}
+.bottle {
+  position: absolute;
+  bottom: 28%;
+  width: 18px;
+  height: 46px;
+  margin-left: -9px;
+  border: 2px solid var(--ink);
+  border-radius: 6px 6px 4px 4px;
+  background: #3f9a68;
+}
+.bottle::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: -14px;
+  width: 8px;
+  height: 14px;
+  border: 2px solid var(--ink);
+  border-bottom: 0;
+  background: #3f9a68;
+}
+.bottle.ringed::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 26px;
+  height: 8px;
+  border: 3px solid #ffcf6e;
+  border-radius: 50%;
+}
+.ring-aim {
+  position: absolute;
+  top: 6px;
+  width: 30px;
+  height: 12px;
+  margin-left: -15px;
+  border: 4px solid #ffcf6e;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(255, 207, 110, 0.8);
+}
+.game-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 14px; flex-wrap: wrap; }
+.game-status strong { font-weight: 500; }
+.game-again, .toss { width: auto !important; min-height: 42px; padding: 8px 18px; }
+.game-again {
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .balloon { animation-duration: 6s !important; }
 }

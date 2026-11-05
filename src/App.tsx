@@ -9,6 +9,10 @@ import { PlaceMarkers } from "./components/PlaceMarkers";
 import { PlacePanel } from "./components/PlacePanel";
 import { PlaceDock } from "./components/PlaceDock";
 import { Hint } from "./components/Hint";
+import { WishBubble, type Bubble } from "./components/WishBubble";
+import { FloatForm } from "./components/FloatForm";
+import { WishBoard } from "./components/WishBoard";
+import { FairGames } from "./components/FairGames";
 
 const festival = activeFestival;
 const { config } = festival;
@@ -29,6 +33,8 @@ export default function App() {
   const [near, setNear] = useState<string | null>(null);
   const [reveal, setReveal] = useState(false); // briefly show every label after entering
   const [hint, setHint] = useState<{ text: string; key: number } | null>(null);
+  const [bubble, setBubble] = useState<Bubble | null>(null);
+  const [myWishes, setMyWishes] = useState<string[]>([]); // this visit only; never sent anywhere
 
   const say = useCallback((text: string) => setHint({ text, key: Date.now() }), []);
 
@@ -68,8 +74,9 @@ export default function App() {
     (window as unknown as { __moonkrade: unknown }).__moonkrade = {
       visitor,
       renderer,
-      places: config.places.map((p) => ({ id: p.id, name: p.nameEn, anchor: p.anchor, marker: p.marker, hitArea: p.hitArea })),
+      places: config.places.map((p) => ({ id: p.id, name: p.name, anchor: p.anchor, marker: p.marker, hitArea: p.hitArea })),
       curios: config.curios,
+      scene,
       state: () => ({ x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
     };
     return () => renderer.stop();
@@ -88,10 +95,11 @@ export default function App() {
     const e = engineRef.current;
     const place = config.places.find((p) => p.id === id);
     if (!e || !place) return;
+    if (e.scene.visitorAway()) return say("กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ");
     setOpenId(null);
     setTarget(id);
     e.visitor.walkTo(place.anchor, () => setOpenId(id));
-  }, []);
+  }, [say]);
 
   const enter = useCallback(() => {
     if (entered) return;
@@ -108,8 +116,12 @@ export default function App() {
     if (!e) return;
     if (!entered) return enter();
     const w = e.renderer.toWorld(ev.clientX, ev.clientY);
-    const curio = config.curios.find((c) => dist(w.x, w.y, c.at.x, c.at.y - 12) < c.radius);
-    if (curio) return e.scene.pokeCurio(curio.id);
+    const tapped = e.scene.tap(w);
+    if (tapped) {
+      if (tapped.bubble) setBubble({ ...tapped.bubble, key: Date.now() });
+      return;
+    }
+    if (e.scene.visitorAway()) return say("กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ");
     const place = config.places.find((p) => w.x >= p.hitArea.x0 && w.x <= p.hitArea.x1 && w.y >= p.hitArea.y0 && w.y <= p.hitArea.y1);
     if (place) return visit(place.id);
     closePanel();
@@ -145,7 +157,7 @@ export default function App() {
     const down = (e: KeyboardEvent) => {
       if (e.key === "Escape") return closePanel();
       const k = key(e);
-      if (!dirs[k] || !entered) return;
+      if (!dirs[k] || !entered || engineRef.current?.scene.visitorAway()) return;
       if ((e.target as HTMLElement).closest?.("input, textarea, button")) {
         if (k.length === 1) return; // let people type letters into fields
       }
@@ -177,8 +189,19 @@ export default function App() {
       return visit(action.goTo);
     }
     if (e.scene.runAction(openPlace.id, action.id, e.visitor)) {
+      if (action.emote === "dance") e.visitor.dance(7);
       // close the card so the visitor can watch what happens in the world
       say(action.doneHint);
+      setOpenId(null);
+    }
+  };
+
+  const floatKrathong = (wish: string) => {
+    const e = engineRef.current;
+    if (!e || !openPlace?.action) return;
+    if (e.scene.runAction(openPlace.id, openPlace.action.id, e.visitor, { wish })) {
+      setMyWishes((w) => [...w, wish]);
+      say(openPlace.action.doneHint);
       setOpenId(null);
     }
   };
@@ -188,7 +211,7 @@ export default function App() {
       <canvas
         ref={canvasRef}
         className="world"
-        aria-label={`${config.brand}: ${config.edition}. An illustrated festival on a moonlit beach.`}
+        aria-label={`${config.brand}: ${config.edition} งานวัดริมทะเลใต้พระจันทร์เต็มดวง`}
         role="img"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -208,20 +231,27 @@ export default function App() {
         onVisit={visit}
         onHover={setHovered}
         hidden={!entered}
+        ui={config.ui}
       />
 
-      <PlaceDock places={config.places} active={target} onVisit={visit} hidden={!entered} />
+      <PlaceDock places={config.places} active={target} onVisit={visit} hidden={!entered} ui={config.ui} />
 
       {openPlace && (
         <PlacePanel
           place={openPlace}
+          ui={config.ui}
           stat={openPlace.stat ? engineRef.current?.scene.stats()[openPlace.stat.key] ?? 0 : undefined}
           onAction={runAction}
           onClose={closePanel}
-        />
+        >
+          {openPlace.panel === "float" && openPlace.action && <FloatForm label={openPlace.action.label} onFloat={floatKrathong} />}
+          {openPlace.panel === "games" && <FairGames />}
+          {openPlace.panel === "wishes" && <WishBoard mine={myWishes} samples={config.sampleWishes} sampleTag={config.ui.sampleTag} />}
+        </PlacePanel>
       )}
 
       <Hint hint={hint} />
+      <WishBubble bubble={bubble} onClose={() => setBubble(null)} />
 
       <Intro config={config} onEnter={enter} hidden={entered} />
     </main>

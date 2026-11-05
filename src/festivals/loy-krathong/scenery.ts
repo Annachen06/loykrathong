@@ -2,12 +2,13 @@
 // Style rules: rounded shapes, one dark-indigo outline colour on near objects,
 // soft pastel fills, warm lantern light against a deep-blue night.
 import { glow, lerp, seeded } from "../../engine/math";
-import { W, H, HORIZON, SHORE, PIER, OUTLINE } from "./world";
+import { W, H, HORIZON, SHORE, GROUND, PIER, OUTLINE, WHEEL, STAGE, TEMPLE } from "./world";
 
 /** Light sources that the animated layer makes flicker. Filled while painting. */
 export const lights = {
   lamps: [] as { x: number; y: number; r: number; kind: "lamp" | "lantern" | "window" }[],
   torches: [] as { x: number; y: number }[],
+  bulbs: [] as { x: number; y: number; hue: number }[],
 };
 
 function outlined(ctx: CanvasRenderingContext2D, fill: string | CanvasGradient, path: () => void, width = 2.5) {
@@ -94,122 +95,399 @@ function seaBase(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(0, HORIZON, W, SHORE - HORIZON + 30);
 }
 
-/** Outline of the temple headland. Also used to keep the moon and water behind it. */
-export function cliffPath(ctx: CanvasRenderingContext2D) {
-  ctx.moveTo(0, SHORE + 10);
-  ctx.lineTo(0, 300);
-  ctx.bezierCurveTo(120, 280, 230, 330, 330, 360);
-  ctx.bezierCurveTo(420, 390, 470, 460, 520, 540);
-  ctx.bezierCurveTo(560, 610, 600, 700, 640, SHORE + 10);
+/** The land behind the temple: soft hills that reach down to the beach (no overhanging cliff).
+ *  Also used to keep the moon and the water behind it. */
+export function landPath(ctx: CanvasRenderingContext2D) {
+  ctx.moveTo(0, SHORE + 12);
+  ctx.lineTo(0, 470);
+  ctx.bezierCurveTo(140, 430, 300, 440, 430, 478);
+  ctx.bezierCurveTo(560, 515, 660, 545, 760, 560);
+  ctx.bezierCurveTo(800, 600, 820, 700, 830, SHORE + 12);
   ctx.closePath();
 }
 
-function headland(ctx: CanvasRenderingContext2D) {
-  const cliff = () => cliffPath(ctx);
-  const g = ctx.createLinearGradient(0, 300, 0, SHORE);
-  g.addColorStop(0, "#232a74");
-  g.addColorStop(1, "#151a52");
+function land(ctx: CanvasRenderingContext2D) {
+  // a far ridge, then the near hill the temple stands in front of
+  ctx.fillStyle = "#1c2466";
+  ctx.beginPath();
+  ctx.moveTo(0, 520);
+  ctx.bezierCurveTo(120, 380, 260, 360, 420, 420);
+  ctx.bezierCurveTo(520, 460, 600, 500, 700, 545);
+  ctx.lineTo(0, 545);
+  ctx.fill();
+
+  const g = ctx.createLinearGradient(0, 430, 0, SHORE);
+  g.addColorStop(0, "#1f3470");
+  g.addColorStop(1, "#16245a");
   ctx.fillStyle = g;
   ctx.beginPath();
-  cliff();
+  landPath(ctx);
   ctx.fill();
-  ctx.strokeStyle = "rgba(190,200,255,0.25)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, 300);
-  ctx.bezierCurveTo(120, 280, 230, 330, 330, 360);
-  ctx.bezierCurveTo(420, 390, 470, 460, 520, 540);
-  ctx.stroke();
 
-  // round, bushy trees
+  // round trees on the hill
   const r = seeded(21);
-  for (let i = 0; i < 24; i++) {
-    const x = 10 + r() * 480;
-    const top = x < 330 ? 300 + (x / 330) * 60 : 360 + ((x - 330) / 190) * 180;
-    const s = 18 + r() * 22;
-    ctx.fillStyle = i % 3 ? "#1b2266" : "#202a72";
+  for (let i = 0; i < 30; i++) {
+    const x = r() * 800;
+    const top = x < 430 ? 470 - (x / 430) * 10 + 20 : 480 + ((x - 430) / 370) * 90;
+    const s = 22 + r() * 26;
+    ctx.fillStyle = i % 3 ? "#1a2c62" : "#203a70";
     ctx.beginPath();
-    ctx.arc(x, top + 8, s, Math.PI, 0);
+    ctx.arc(x, top + 14, s, Math.PI, 0);
     ctx.fill();
   }
-
-  temple(ctx, 215, 318);
-
-  // lit stairway down to the beach
-  const steps: [number, number][] = [[300, 352], [380, 420], [330, 480], [470, 560], [420, 640], [540, 720], [500, 800]];
-  ctx.strokeStyle = "rgba(255,207,110,0.4)";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([6, 5]);
-  ctx.beginPath();
-  steps.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  for (const [x, y] of steps) lights.torches.push({ x, y: y - 6 });
 }
 
-function temple(ctx: CanvasRenderingContext2D, x: number, base: number) {
-  const gold = ctx.createLinearGradient(x - 60, 0, x + 60, 0);
-  gold.addColorStop(0, "#7a6aa8");
-  gold.addColorStop(0.55, "#f0d9a0");
-  gold.addColorStop(1, "#9a80b0");
-  ctx.fillStyle = "#3a3a8a";
+/** A Thai bell-shaped chedi standing on its stepped base, feet on the ground at `base`. */
+function chedi(ctx: CanvasRenderingContext2D, x: number, base: number) {
+  const white = ctx.createLinearGradient(x - 70, 0, x + 70, 0);
+  white.addColorStop(0, "#c9bfdc");
+  white.addColorStop(0.45, "#fbf6ea");
+  white.addColorStop(1, "#d8cde2");
+  const gold = ctx.createLinearGradient(x - 20, 0, x + 20, 0);
+  gold.addColorStop(0, "#c8963e");
+  gold.addColorStop(0.5, "#ffe08a");
+  gold.addColorStop(1, "#c8963e");
+
+  glow(ctx, x, base - 150, 230, "255,214,150", 0.18);
+
+  // three square base tiers (ฐานเขียง)
+  let y = base;
+  for (const w of [170, 146, 122]) {
+    outlined(ctx, white, () => ctx.rect(x - w / 2, y - 16, w, 16), 2);
+    y -= 16;
+  }
+  // lotus base (ฐานบัว) with a gold band
+  outlined(ctx, white, () => ctx.roundRect(x - 52, y - 18, 104, 18, 8), 2);
+  outlined(ctx, gold, () => ctx.rect(x - 54, y - 10, 108, 4), 1.2);
+  y -= 18;
+  // the bell (องค์ระฆัง)
+  outlined(ctx, white, () => {
+    ctx.moveTo(x - 50, y);
+    ctx.bezierCurveTo(x - 52, y - 58, x - 30, y - 92, x - 16, y - 100);
+    ctx.lineTo(x + 16, y - 100);
+    ctx.bezierCurveTo(x + 30, y - 92, x + 52, y - 58, x + 50, y);
+    ctx.closePath();
+  });
+  outlined(ctx, gold, () => ctx.rect(x - 51, y - 8, 102, 5), 1.2);
+  y -= 100;
+  // square throne (บัลลังก์)
+  outlined(ctx, white, () => ctx.rect(x - 20, y - 16, 40, 16), 2);
+  outlined(ctx, gold, () => ctx.rect(x - 22, y - 18, 44, 4), 1.2);
+  y -= 18;
+  // stacked rings (ปล้องไฉน) and the golden spire (ปลียอด)
+  for (let i = 0; i < 8; i++) {
+    const w = 15 - i * 1.4;
+    outlined(ctx, gold, () => ctx.roundRect(x - w, y - 9, w * 2, 9, 4), 1.4);
+    y -= 9;
+  }
+  outlined(ctx, gold, () => {
+    ctx.moveTo(x - 4, y);
+    ctx.lineTo(x, y - 46);
+    ctx.lineTo(x + 4, y);
+    ctx.closePath();
+  }, 1.4);
+  ctx.fillStyle = "#fff2b0";
   ctx.beginPath();
-  ctx.roundRect(x - 72, base - 22, 144, 22, 6);
-  ctx.roundRect(x - 54, base - 40, 108, 20, 6);
+  ctx.arc(x, y - 48, 3.5, 0, Math.PI * 2);
   ctx.fill();
-  // chedi with soft round bell and stacked rings
-  ctx.fillStyle = gold;
-  ctx.beginPath();
-  ctx.moveTo(x - 52, base - 40);
-  ctx.bezierCurveTo(x - 54, base - 118, x - 14, base - 134, x - 8, base - 150);
-  ctx.lineTo(x + 8, base - 150);
-  ctx.bezierCurveTo(x + 14, base - 134, x + 54, base - 118, x + 52, base - 40);
-  ctx.closePath();
-  ctx.fill();
-  for (let i = 0; i < 6; i++) {
-    const w = 10 - i * 1.3;
+  lights.lamps.push({ x, y: base - 140, r: 150, kind: "window" });
+}
+
+/** The ordination hall (อุโบสถ): stepped platform, cream walls, tiered red roof with chofa. */
+function ubosot(ctx: CanvasRenderingContext2D, x: number, base: number) {
+  const w = 170;
+  outlined(ctx, "#e9dfef", () => ctx.rect(x - w / 2 - 14, base - 16, w + 28, 16), 2);
+  outlined(ctx, "#fbf3e4", () => ctx.rect(x - w / 2, base - 86, w, 70), 2);
+  // columns
+  for (let i = 0; i <= 4; i++) outlined(ctx, "#f3e6cf", () => ctx.rect(x - w / 2 + 4 + i * ((w - 14) / 4), base - 86, 8, 70), 1.4);
+  // red door with gold frame, lit windows
+  outlined(ctx, "#c0392b", () => ctx.roundRect(x - 13, base - 62, 26, 46, [10, 10, 0, 0]), 2);
+  ctx.strokeStyle = "#ffcf6e";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - 10, base - 58, 20, 42);
+  ctx.fillStyle = "rgba(255,200,120,0.95)";
+  for (const dx of [-55, 47]) {
     ctx.beginPath();
-    ctx.roundRect(x - w, base - 158 - i * 10, w * 2, 7, 3);
+    ctx.roundRect(x + dx, base - 64, 10, 22, [5, 5, 0, 0]);
     ctx.fill();
   }
-  ctx.beginPath();
-  ctx.moveTo(x - 3, base - 216);
-  ctx.lineTo(x, base - 250);
-  ctx.lineTo(x + 3, base - 216);
-  ctx.fill();
+  lights.lamps.push({ x: x - 50, y: base - 52, r: 40, kind: "window" });
+  lights.lamps.push({ x: x + 52, y: base - 52, r: 40, kind: "window" });
+  lights.lamps.push({ x, y: base - 40, r: 60, kind: "window" });
 
-  // small hall with tiered roof
-  const hx = x + 112;
-  ctx.fillStyle = "#30307a";
-  ctx.fillRect(hx - 46, base - 46, 92, 46);
-  ctx.fillStyle = "#c0506e";
-  for (let t = 0; t < 3; t++) {
-    const w = 70 - t * 16;
-    const y = base - 46 - t * 18;
+  // three overlapping roof tiers, red with green trim
+  const tiers = [
+    { w: 120, y: base - 86, h: 70 },
+    { w: 96, y: base - 112, h: 66 },
+    { w: 70, y: base - 138, h: 60 },
+  ];
+  for (const t of tiers) {
+    outlined(ctx, "#d2453a", () => {
+      ctx.moveTo(x - t.w, t.y);
+      ctx.lineTo(x - t.w * 0.55, t.y - t.h * 0.55);
+      ctx.lineTo(x, t.y - t.h);
+      ctx.lineTo(x + t.w * 0.55, t.y - t.h * 0.55);
+      ctx.lineTo(x + t.w, t.y);
+      ctx.closePath();
+    }, 2);
+    ctx.strokeStyle = "#3f9a68";
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(hx - w, y);
-    ctx.quadraticCurveTo(hx - w * 0.4, y - 10, hx, y - 30);
-    ctx.quadraticCurveTo(hx + w * 0.4, y - 10, hx + w, y);
+    ctx.moveTo(x - t.w + 4, t.y - 2);
+    ctx.lineTo(x - t.w * 0.55, t.y - t.h * 0.55 - 2);
+    ctx.moveTo(x + t.w - 4, t.y - 2);
+    ctx.lineTo(x + t.w * 0.55, t.y - t.h * 0.55 - 2);
+    ctx.stroke();
+  }
+  // gold gable (หน้าบัน) and chofa finials curling up at the ridge and eaves
+  const top = tiers[2];
+  outlined(ctx, "#f2c46a", () => {
+    ctx.moveTo(x - 26, top.y - 8);
+    ctx.lineTo(x, top.y - top.h + 8);
+    ctx.lineTo(x + 26, top.y - 8);
+    ctx.closePath();
+  }, 1.6);
+  ctx.strokeStyle = "#f2c46a";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x, top.y - top.h);
+  ctx.quadraticCurveTo(x + 6, top.y - top.h - 18, x + 14, top.y - top.h - 12);
+  for (const t of tiers) {
+    ctx.moveTo(x - t.w, t.y);
+    ctx.quadraticCurveTo(x - t.w - 8, t.y - 8, x - t.w - 4, t.y - 16);
+    ctx.moveTo(x + t.w, t.y);
+    ctx.quadraticCurveTo(x + t.w + 8, t.y - 8, x + t.w + 4, t.y - 16);
+  }
+  ctx.stroke();
+}
+
+function templeGrounds(ctx: CanvasRenderingContext2D) {
+  // paved courtyard the buildings stand on
+  outlined(ctx, "#8f86b8", () => ctx.rect(30, GROUND - 22, 590, 22), 2);
+  ctx.fillStyle = "rgba(255,240,220,0.12)";
+  for (let x = 40; x < 610; x += 26) ctx.fillRect(x, GROUND - 20, 1.5, 18);
+
+  // big old trees inside the grounds
+  for (const [tx, s] of [[40, 1.2], [585, 1]] as const) {
+    outlined(ctx, "#4a3a5a", () => ctx.roundRect(tx - 7 * s, GROUND - 120 * s, 14 * s, 120 * s - 20, 5), 2);
+    for (const [dx, dy, rr] of [[-34, -150, 46], [26, -160, 50], [-4, -200, 52], [0, -120, 40]]) {
+      outlined(ctx, "#2f6a5e", () => ctx.arc(tx + dx * s, GROUND + dy * s, rr * s, 0, Math.PI * 2), 2);
+    }
+  }
+
+  chedi(ctx, TEMPLE.chediX, GROUND - 22);
+  ubosot(ctx, TEMPLE.hallX, GROUND - 22);
+
+  // yellow-and-white temple flags on tall poles
+  for (const px of [290, 540]) {
+    outlined(ctx, "#d8c8a8", () => ctx.rect(px - 2, GROUND - 230, 4, 210), 1.2);
+    outlined(ctx, "#ffd84a", () => {
+      ctx.moveTo(px + 2, GROUND - 226);
+      ctx.lineTo(px + 26, GROUND - 226);
+      ctx.lineTo(px + 26, GROUND - 120);
+      ctx.lineTo(px + 14, GROUND - 106);
+      ctx.lineTo(px + 2, GROUND - 120);
+      ctx.closePath();
+    }, 1.6);
+    ctx.fillStyle = "#fff4e2";
+    for (let i = 0; i < 4; i++) ctx.fillRect(px + 4, GROUND - 210 + i * 24, 20, 4);
+  }
+
+  // low whitewashed wall (กำแพงแก้ว) with lotus-bud posts and an opening at the gate
+  const wallY = GROUND - 2;
+  for (const [x0, x1] of [[30, 270], [330, 620]]) {
+    outlined(ctx, "#f3ecf6", () => ctx.rect(x0, wallY - 20, x1 - x0, 20), 2);
+    for (let px = x0; px <= x1; px += 48) {
+      outlined(ctx, "#fbf6ff", () => ctx.rect(px - 5, wallY - 28, 10, 28), 1.6);
+      outlined(ctx, "#ffcf6e", () => ctx.ellipse(px, wallY - 32, 5, 6, 0, 0, Math.PI * 2), 1.4);
+    }
+  }
+  for (const gx of [270, 330]) lights.lamps.push({ x: gx, y: wallY - 40, r: 30, kind: "lamp" });
+}
+
+/** Triangle flag bunting (ธงราว) across the fair. */
+function bunting(ctx: CanvasRenderingContext2D, a: { x: number; y: number }, b: { x: number; y: number }, sag: number) {
+  const cols = ["#ef5a5a", "#ffd84a", "#4fc08a", "#5aa0ef", "#ff8fc0", "#fff4e2"];
+  const n = Math.max(6, Math.round(Math.abs(b.x - a.x) / 22));
+  ctx.strokeStyle = "rgba(20,14,40,0.8)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const p = { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) + Math.sin(t * Math.PI) * sag };
+    pts.push(p);
+    i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y);
+  }
+  ctx.stroke();
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], q = pts[i + 1];
+    ctx.fillStyle = cols[i % cols.length];
+    ctx.beginPath();
+    ctx.moveTo(p.x + 1, p.y);
+    ctx.lineTo(q.x - 1, q.y);
+    ctx.lineTo((p.x + q.x) / 2, (p.y + q.y) / 2 + 14);
     ctx.closePath();
     ctx.fill();
   }
-  ctx.strokeStyle = "#f0d9a0";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(hx, base - 112);
-  ctx.quadraticCurveTo(hx + 6, base - 128, hx + 13, base - 121);
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255,200,120,0.9)";
-  for (let i = -1; i <= 1; i++) {
-    ctx.beginPath();
-    ctx.roundRect(hx + i * 24 - 5, base - 34, 10, 20, [5, 5, 0, 0]);
-    ctx.fill();
-  }
-  lights.lamps.push({ x: hx, y: base - 24, r: 70, kind: "window" });
-  lights.lamps.push({ x, y: base - 90, r: 120, kind: "window" });
 }
 
-// ---------------------------------------------------------------- front layer
+function pole(ctx: CanvasRenderingContext2D, x: number, top: number, horns = false) {
+  outlined(ctx, "#6a5a7a", () => ctx.rect(x - 3, top, 6, GROUND - top), 1.4);
+  if (!horns) return;
+  // the loudspeaker horns every Thai temple fair has
+  for (const dir of [-1, 1]) {
+    outlined(ctx, "#cfd6e0", () => {
+      ctx.moveTo(x, top + 14);
+      ctx.lineTo(x + dir * 30, top + 2);
+      ctx.lineTo(x + dir * 30, top + 30);
+      ctx.closePath();
+    }, 1.6);
+  }
+}
+
+function wheelStand(ctx: CanvasRenderingContext2D) {
+  const { x, hubY } = WHEEL;
+  for (const dx of [-80, 80]) {
+    outlined(ctx, "#7a6a9a", () => {
+      ctx.moveTo(x + dx - 6, GROUND);
+      ctx.lineTo(x - 4, hubY);
+      ctx.lineTo(x + 4, hubY);
+      ctx.lineTo(x + dx + 6, GROUND);
+      ctx.closePath();
+    }, 2);
+  }
+  // boarding platform
+  outlined(ctx, "#b06a80", () => ctx.roundRect(x - 50, GROUND - 26, 100, 26, 5), 2);
+}
+
+function stage(ctx: CanvasRenderingContext2D) {
+  const { x0, x1, floor } = STAGE;
+  const cx = (x0 + x1) / 2;
+  // backdrop with shimmering tinsel curtain
+  const bg = ctx.createLinearGradient(0, 600, 0, floor);
+  bg.addColorStop(0, "#5a2a8a");
+  bg.addColorStop(1, "#a03a8a");
+  outlined(ctx, bg, () => ctx.rect(x0 + 10, 610, x1 - x0 - 20, floor - 610), 2);
+  const r = seeded(5);
+  for (let x = x0 + 16; x < x1 - 14; x += 5) {
+    ctx.strokeStyle = `rgba(${r() > 0.5 ? "255,220,150" : "220,220,255"},${0.25 + r() * 0.35})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, 616);
+    ctx.lineTo(x + (r() - 0.5) * 3, floor - 4);
+    ctx.stroke();
+  }
+  // arched sign
+  outlined(ctx, "#ffcf6e", () => ctx.roundRect(cx - 82, 576, 164, 40, 14), 2.5);
+  ctx.fillStyle = "#a0284a";
+  ctx.font = "500 22px Mitr, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("รำวงย้อนยุค", cx, 597);
+  // frame posts
+  outlined(ctx, "#6a4a7a", () => {
+    ctx.rect(x0 + 2, 600, 10, floor - 600);
+    ctx.rect(x1 - 12, 600, 10, floor - 600);
+  }, 2);
+  // stage platform with a pleated skirt
+  outlined(ctx, "#c58a5a", () => ctx.rect(x0 - 6, floor, x1 - x0 + 12, 10), 2);
+  for (let i = 0, x = x0 - 6; x < x1 + 6; i++, x += 16) {
+    outlined(ctx, i % 2 ? "#ffcf6e" : "#ef6f8e", () => ctx.rect(x, floor + 10, Math.min(16, x1 + 6 - x), GROUND - floor - 10), 1.2);
+  }
+  // speaker stacks at the sides
+  for (const sx of [x0 - 34, x1 + 4]) {
+    for (let k = 0; k < 2; k++) {
+      outlined(ctx, "#2a2440", () => ctx.roundRect(sx, GROUND - 46 - k * 44, 30, 42, 4), 2);
+      ctx.fillStyle = "#4a4470";
+      ctx.beginPath();
+      ctx.arc(sx + 15, GROUND - 30 - k * 44, 9, 0, Math.PI * 2);
+      ctx.arc(sx + 15, GROUND - 40 - k * 44 - 4, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // colourful bulbs around the stage frame
+  const n = 14;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    lights.bulbs.push({ x: lerp(x0 + 8, x1 - 8, t), y: 612 - Math.sin(t * Math.PI) * 10, hue: i % 4 });
+  }
+  for (let y = 630; y < floor; y += 22) {
+    lights.bulbs.push({ x: x0 + 7, y, hue: (y / 22) % 4 | 0 });
+    lights.bulbs.push({ x: x1 - 7, y, hue: ((y / 22) + 2) % 4 | 0 });
+  }
+}
+
+function gameBooths(ctx: CanvasRenderingContext2D) {
+  // balloon darts (ปาเป้าลูกโป่ง)
+  stall(ctx, 1295, 140, GROUND, ["#ef5a5a", "#fff4e2"], { h: 128 });
+  outlined(ctx, "#3a5a9a", () => ctx.rect(1305, GROUND - 118, 120, 76), 2);
+  const cols = ["#ef5a5a", "#ffd84a", "#4fc08a", "#5aa0ef", "#ff8fc0"];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 6; col++) {
+      const bx = 1316 + col * 19, by = GROUND - 104 + row * 22;
+      ctx.fillStyle = cols[(row * 6 + col) % cols.length];
+      ctx.beginPath();
+      ctx.ellipse(bx, by, 7, 8.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fillRect(bx - 3, by - 5, 2, 3);
+    }
+  }
+  boothSign(ctx, 1365, GROUND - 150, "ปาเป้า");
+
+  // ring toss (โยนห่วง): tiered table of bottles, with prizes hanging above
+  stall(ctx, 1465, 135, GROUND, ["#4fc08a", "#fff4e2"], { h: 128 });
+  for (let tier = 0; tier < 3; tier++) {
+    const ty = GROUND - 44 - tier * 20;
+    outlined(ctx, "#b07a5a", () => ctx.rect(1480 + tier * 12, ty, 105 - tier * 24, 6), 1.4);
+    for (let i = 0; i < 6 - tier * 2; i++) {
+      const bx = 1488 + tier * 12 + i * 16;
+      outlined(ctx, i % 2 ? "#3f9a68" : "#7a4a2a", () => {
+        ctx.roundRect(bx - 4, ty - 16, 8, 16, 2);
+        ctx.rect(bx - 1.5, ty - 22, 3, 6);
+      }, 1.2);
+    }
+  }
+  boothSign(ctx, 1532, GROUND - 150, "โยนห่วง");
+
+  // plush prizes hanging along both booths
+  for (let i = 0; i < 7; i++) {
+    const px = 1305 + i * 42, py = GROUND - 132 + (i % 2) * 4;
+    const c = ["#ffb08a", "#c9b6ff", "#ffa8c2", "#8fd8c8"][i % 4];
+    outlined(ctx, c, () => ctx.arc(px, py, 7, 0, Math.PI * 2), 1.4);
+    outlined(ctx, c, () => ctx.arc(px, py - 9, 5, 0, Math.PI * 2), 1.4);
+  }
+}
+
+function boothSign(ctx: CanvasRenderingContext2D, x: number, y: number, text: string) {
+  outlined(ctx, "#fff4e2", () => ctx.roundRect(x - 40, y - 15, 80, 28, 10), 2);
+  ctx.fillStyle = "#a0284a";
+  ctx.font = "500 16px Mitr, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+}
+
+function foodStall(ctx: CanvasRenderingContext2D, x: number, w: number, stripe: string, text: string, kind: "candy" | "ice") {
+  stall(ctx, x, w, GROUND, [stripe, "#fff4e2"], { h: 108 });
+  if (kind === "candy") {
+    for (let i = 0; i < 4; i++) {
+      const cx = x + 20 + i * ((w - 40) / 3);
+      ctx.fillStyle = "#c8a080";
+      ctx.fillRect(cx - 1, GROUND - 60, 2, 22);
+      outlined(ctx, i % 2 ? "#ffc2e0" : "#c9e8ff", () => ctx.arc(cx, GROUND - 66, 11, 0, Math.PI * 2), 1.6);
+    }
+  } else {
+    for (let i = 0; i < 3; i++) {
+      const cx = x + 18 + i * ((w - 36) / 2);
+      outlined(ctx, "#fff4e2", () => ctx.rect(cx - 7, GROUND - 52, 14, 14), 1.4);
+      outlined(ctx, ["#ef5a5a", "#4fc08a", "#ffd84a"][i], () => ctx.arc(cx, GROUND - 54, 8, Math.PI, 0), 1.4);
+    }
+  }
+  boothSign(ctx, x + w / 2, GROUND - 126, text);
+}
 
 function sand(ctx: CanvasRenderingContext2D) {
   const g = ctx.createLinearGradient(0, SHORE - 10, 0, H);
@@ -574,28 +852,41 @@ function foregroundFlowers(ctx: CanvasRenderingContext2D) {
     }
   };
   bush(30, H + 4, 1.5);
-  bush(1140, H + 10, 1.1);
-  bush(2330, H + 6, 1.6);
+  bush(1160, H + 10, 1.1);
+  bush(2560, H + 6, 1.4);
 }
 
 export function paintBack(ctx: CanvasRenderingContext2D) {
   lights.lamps.length = 0;
   lights.torches.length = 0;
+  lights.bulbs.length = 0;
   sky(ctx);
   islands(ctx);
   seaBase(ctx);
-  headland(ctx);
+  land(ctx);
 }
 
 export function paintFront(ctx: CanvasRenderingContext2D) {
   sand(ctx);
   pier(ctx);
-  gate(ctx, 430, 812);
-  stall(ctx, 650, 120, 806, ["#ffa8c2", "#fff4e2"], { goods: "flowers" });
-  stall(ctx, 800, 110, 802, ["#8fd8c8", "#fff4e2"], { goods: "garlands" });
-  stall(ctx, 940, 120, 806, ["#c9b6ff", "#fff4e2"], { goods: "buds" });
-  boutique(ctx, 1190, 180, 808);
-  memoryCorner(ctx, 2050, 812);
+  templeGrounds(ctx);
+  wheelStand(ctx);
+  pole(ctx, 1278, 560, true);
+  stage(ctx);
+  gameBooths(ctx);
+  gate(ctx, 640, GROUND + 6);
+  boutique(ctx, 1650, 180, GROUND + 2);
+  foodStall(ctx, 2040, 110, "#ff8fc0", "สายไหม", "candy");
+  memoryCorner(ctx, 2190, GROUND + 6);
+  stall(ctx, 2530, 150, GROUND, ["#ffa8c2", "#fff4e2"], { goods: "flowers" });
+  boothSign(ctx, 2605, GROUND - 112, "ดอกไม้");
+  foodStall(ctx, 2680, 84, "#5aa0ef", "น้ำแข็งไส", "ice");
+
+  bunting(ctx, { x: 704, y: 664 }, { x: 1036, y: 604 }, 34);
+  bunting(ctx, { x: 1254, y: 604 }, { x: 1278, y: 574 }, 2);
+  bunting(ctx, { x: 1278, y: 574 }, { x: 1648, y: 650 }, 40);
+  bunting(ctx, { x: 2040, y: 690 }, { x: 2330, y: 660 }, 30);
+  bunting(ctx, { x: 2420, y: 660 }, { x: 2760, y: 690 }, 30);
   foregroundFlowers(ctx);
 
   const v = ctx.createLinearGradient(0, H - 110, 0, H);

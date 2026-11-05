@@ -110,7 +110,7 @@ async function desktopSuite(browser) {
 
   // Every place via the dock: walk there, stop at the anchor, the right card opens.
   for (const pl of await places(p)) {
-    await p.click(`.dock button[aria-label="Walk to ${pl.name}"]`);
+    await p.click(`.dock button[aria-label="เดินไป${pl.name}"]`);
     await p.waitForSelector(".panel h2", { timeout: 15000 });
     const st = await state(p);
     const title = await panelTitle(p);
@@ -119,34 +119,54 @@ async function desktopSuite(browser) {
   }
 
   // Walking out onto the pier never crosses the water.
-  await p.click('.dock button[aria-label="Walk to Festival Entrance"]');
+  await p.click('.dock button[aria-label="เดินไปซุ้มประตูงาน"]');
   await p.waitForSelector(".panel h2");
   await p.click(".panel-close");
   const pier = (await places(p)).find((x) => x.id === "shore");
-  await p.click('.dock button[aria-label="Walk to Moonlit Shore"]');
+  await p.click('.dock button[aria-label="เดินไปท่าลอยกระทง"]');
   const samples = [];
   for (let i = 0; i < 80; i++) {
     samples.push(await state(p));
     if (!samples[samples.length - 1].moving && i > 3) break;
     await p.waitForTimeout(60);
   }
-  const offGround = samples.filter((s) => s.y < 805 && (s.x < 1614 || s.x > 1666));
+  const offGround = samples.filter((s) => s.y < 805 && (s.x < 1876 || s.x > 1924));
   check("route to the pier stays on sand and planks", offGround.length === 0, `${samples.length} samples, ${offGround.length} in the water`);
   await p.waitForSelector(".panel h2");
 
-  // Float a krathong at the Moonlit Shore.
-  await p.click(".panel-action");
+  // Float a krathong with a private wish at the shore.
+  await p.fill("#wish-input", "ขอให้ทดสอบผ่านทุกข้อ");
+  await p.click(".float-form .panel-action");
   await p.waitForTimeout(300);
   let st = await state(p);
-  check("floating a krathong works and closes the card", st.stats.krathongsFloated === 1 && !(await p.$(".panel")));
+  check("floating a krathong with a wish works and closes the card", st.stats.krathongsFloated === 1 && !(await p.$(".panel")));
   await p.waitForTimeout(1500);
   await p.screenshot({ path: path.join(SHOTS, "desktop-floating.png") });
 
-  // Memory Corner shows the real count from this visit.
-  await p.click('.dock button[aria-label="Walk to Memory Corner"]');
+  // Tap another krathong on the water to read its (sample) wish.
+  const floaters = await p.evaluate(() => window.__moonkrade.scene.debug().floaters);
+  const cam = await p.evaluate(() => window.__moonkrade.renderer.cam);
+  const vis = await p.evaluate(() => window.__moonkrade.renderer.view);
+  const wishy = floaters.filter((k) => k.wish && !k.mine && k.x > cam.x + 40 && k.x < cam.x + vis.visW - 420 && k.y > 690);
+  if (wishy.length) {
+    const k = wishy[0];
+    const q = await toScreen(p, k.x, k.y - 12);
+    await p.mouse.click(q.x, q.y);
+    await p.waitForSelector(".wish-bubble.show", { timeout: 3000 }).catch(() => {});
+    const bubble = (await p.$(".wish-bubble.show")) ? await p.textContent(".wish-bubble") : "";
+    check("tapping another krathong shows its wish, tagged as an example", bubble.includes("ตัวอย่าง") && bubble.length > 12, bubble);
+    await p.screenshot({ path: path.join(SHOTS, "desktop-wish-bubble.png") });
+  } else {
+    check("tapping another krathong shows its wish, tagged as an example", false, "no sample krathong near the shore to tap");
+  }
+
+  // Memory Corner shows the real count and the visitor's own wish.
+  await p.click('.dock button[aria-label="เดินไปมุมความทรงจำ"]');
   await p.waitForSelector(".panel-stat");
   const stat = await p.textContent(".panel-stat strong");
-  check("Memory Corner shows krathongs floated this visit", stat === "1", `shows ${stat}`);
+  const mine = await p.textContent(".wish-list.mine");
+  check("Memory Corner shows the krathong and private wish from this visit", stat === "1" && mine.includes("ขอให้ทดสอบผ่านทุกข้อ"), `count ${stat}`);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-memory.png") });
 
   // Escape closes the card.
   await p.keyboard.press("Escape");
@@ -158,19 +178,60 @@ async function desktopSuite(browser) {
   sp = await toScreen(p, (boutique.hitArea.x0 + boutique.hitArea.x1) / 2, boutique.hitArea.y1 - 30);
   await p.mouse.click(sp.x, sp.y);
   await p.waitForSelector(".panel h2", { timeout: 15000 });
-  check("clicking the boutique artwork walks there and opens it", (await panelTitle(p)) === "Krathong Boutique");
+  check("clicking the boutique artwork walks there and opens it", (await panelTitle(p)) === "ร้านกระทง");
 
   // Clicking the glowing marker visits too.
   await p.click(".panel-close");
-  await p.click('.marker[aria-label="Walk to Flower & Decoration Stall"]');
+  // stroll over until the flower stall is on screen, then click its glowing marker
+  await p.evaluate(() => window.__moonkrade.visitor.walkTo({ x: 2450, y: 900 }));
+  await waitStopped(p);
+  await p.waitForTimeout(1200);
+  await p.click('.marker[aria-label="เดินไปร้านดอกไม้"]');
   await p.waitForSelector(".panel h2", { timeout: 15000 });
-  check("clicking a glowing marker walks there", (await panelTitle(p)) === "Flower & Decoration Stall");
+  check("clicking a glowing marker walks there", (await panelTitle(p)) === "ร้านดอกไม้");
   await p.click(".panel-action");
   check("flower stall action runs", !(await p.$(".panel")));
+
+  // Balloon darts: three throws, then a result.
+  await p.click('.dock button[aria-label="เดินไปซุ้มเกม"]');
+  await p.waitForSelector(".dart-board", { timeout: 15000 });
+  for (let i = 0; i < 3; i++) {
+    await p.locator(".balloon:not(.popped)").first().click({ force: true });
+    await p.waitForTimeout(120);
+  }
+  const darts = await p.textContent(".game-status");
+  check("balloon darts: throw 3 darts and get a result", darts.includes("แตก") && darts.includes("เล่นอีกครั้ง"), darts);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-darts.png") });
+
+  // Ring toss: three throws, then a result.
+  await p.click('.tabs button:has-text("โยนห่วง")');
+  for (let i = 0; i < 3; i++) { await p.click(".toss"); await p.waitForTimeout(200); }
+  const rings = await p.textContent(".game-status");
+  check("ring toss: throw 3 rings and get a result", rings.includes("คล้องได้") && rings.includes("เล่นอีกครั้ง"), rings);
+  await p.click(".panel-close");
+
+  // Ram wong: the visitor dances.
+  await p.click('.dock button[aria-label="เดินไปเวทีรำวง"]');
+  await p.waitForSelector(".panel-action", { timeout: 15000 });
+  await p.click(".panel-action");
+  await p.waitForTimeout(300);
+  check("ram wong: the visitor dances at the stage", await p.evaluate(() => window.__moonkrade.visitor.dancing));
+  await p.screenshot({ path: path.join(SHOTS, "desktop-dance.png") });
+
+  // Ferris wheel: ride a full turn, hidden from the ground, then back down.
+  await p.click('.dock button[aria-label="เดินไปชิงช้าสวรรค์"]');
+  await p.waitForSelector(".panel-action", { timeout: 15000 });
+  await p.click(".panel-action");
+  await p.waitForTimeout(3000);
+  check("Ferris wheel: the visitor is riding", (await state(p)).stats.riding === 1);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-ride.png") });
+  await p.waitForFunction(() => window.__moonkrade.state().stats.riding === 0, null, { timeout: 15000 });
+  check("Ferris wheel: the ride ends after one turn", true);
 
   // Tapping a curio reacts without walking away.
   const before = await state(p);
   const shell = await p.evaluate(() => window.__moonkrade.curios.find((c) => c.id === "shell"));
+  await p.keyboard.press("Escape");
   // walk close so it is on screen
   await p.evaluate(([x]) => window.__moonkrade.visitor.walkTo({ x, y: 960 }), [shell.at.x - 80]);
   await waitStopped(p);
@@ -227,7 +288,7 @@ async function phoneSuite(browser) {
   check("phone: tap the sand to walk", Math.abs(s1.x - (s0.x + 120)) < 3, `${s0.x} → ${s1.x}`);
 
   for (const pl of await places(p)) {
-    await p.tap(`.dock button[aria-label="Walk to ${pl.name}"]`);
+    await p.tap(`.dock button[aria-label="เดินไป${pl.name}"]`);
     await p.waitForSelector(".panel h2", { timeout: 20000 });
     const st = await state(p);
     const onScreen = await toScreen(p, st.x, st.y);
@@ -242,6 +303,13 @@ async function phoneSuite(browser) {
       .map((b) => b.getBoundingClientRect())
       .filter((r) => r.width > 0 && r.height < 40).length);
   check("phone: touch targets are at least 40px tall", small === 0, `${small} too small`);
+
+  // phone: play darts by tapping balloons
+  await p.tap('.dock button[aria-label="เดินไปซุ้มเกม"]');
+  await p.waitForSelector(".dart-board", { timeout: 20000 });
+  for (let i = 0; i < 3; i++) { await p.locator(".balloon:not(.popped)").first().tap({ force: true }); await p.waitForTimeout(120); }
+  check("phone: balloon darts playable by tapping", (await p.textContent(".game-status")).includes("เล่นอีกครั้ง"));
+  await p.screenshot({ path: path.join(SHOTS, "phone-darts.png") });
   check("no console errors on phone", errors.length === 0, errors.join(" | "));
   await ctx.close();
 }
@@ -254,7 +322,7 @@ async function reducedMotionSuite(browser) {
   await p.goto(BASE);
   await p.waitForFunction(() => !!window.__moonkrade);
   await p.click(".intro-enter");
-  await p.click('.dock button[aria-label="Walk to Krathong Boutique"]');
+  await p.click('.dock button[aria-label="เดินไปร้านกระทง"]');
   await p.waitForSelector(".panel h2", { timeout: 15000 });
   check("reduced motion: world still works", errors.length === 0, errors.join(" | "));
   await ctx.close();

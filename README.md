@@ -1,9 +1,10 @@
 # MOONKRADE
 
-**A Little Festival by the Sea.** First edition: *Loy Krathong by the Moonlit Sea.*
+**งานวัดเล็กๆ ริมทะเล** First edition: *ลอยกระทงใต้แสงจันทร์* (Loy Krathong by the Moonlit Sea).
 
-An illustrated festival world that runs in the browser. You step onto a moonlit beach,
-tap the sand to walk, and tap glowing places to visit them.
+An illustrated Thai temple fair on a moonlit beach that runs in the browser, in Thai.
+Tap the sand to walk, tap glowing lights to visit places, ride the Ferris wheel, join the
+ram wong, play the fair games, read wishes on the krathongs and float your own.
 
 ## Run it
 
@@ -34,6 +35,10 @@ src/
     PlaceMarkers.tsx      glowing lights on each place; names appear when useful
     PlaceDock.tsx         row of places at the bottom (always-available way to navigate)
     PlacePanel.tsx        the card that opens when you arrive
+    FloatForm.tsx         write a private wish and float your krathong
+    WishBubble.tsx        the note that opens when you tap a krathong on the water
+    WishBoard.tsx         Memory Corner: your wishes + example wishes
+    FairGames.tsx         balloon darts and ring toss
     Intro.tsx, Hint.tsx
   festivals/
     types.ts              the contract between the engine and a festival

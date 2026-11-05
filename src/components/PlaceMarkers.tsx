@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { Place } from "../festivals/types";
+import type { FestivalConfig, Place } from "../festivals/types";
 
 type Props = {
   places: Place[];
@@ -9,6 +9,7 @@ type Props = {
   onVisit: (id: string) => void;
   onHover: (id: string | null) => void;
   hidden: boolean;
+  ui: FestivalConfig["ui"];
 };
 
 /**
@@ -16,7 +17,7 @@ type Props = {
  * on hover or keyboard focus, when selected, or when the visitor is nearby.
  * The renderer moves these every frame (see App.tsx) so they stay pinned to the world.
  */
-export function PlaceMarkers({ places, refs, labelled, active, onVisit, onHover, hidden }: Props) {
+export function PlaceMarkers({ places, refs, labelled, active, onVisit, onHover, hidden, ui }: Props) {
   return (
     <div className={`markers ${hidden ? "is-hidden" : ""}`}>
       {places.map((p) => (
@@ -25,7 +26,7 @@ export function PlaceMarkers({ places, refs, labelled, active, onVisit, onHover,
           ref={(el) => { refs.current[p.id] = el; }}
           type="button"
           className={`marker ${labelled(p.id) ? "labelled" : ""} ${active === p.id ? "active" : ""}`}
-          aria-label={`Walk to ${p.nameEn}`}
+          aria-label={`${ui.walkTo}${p.name}`}
           tabIndex={hidden ? -1 : 0}
           onClick={() => onVisit(p.id)}
           onPointerEnter={(e) => e.pointerType === "mouse" && onHover(p.id)}
@@ -34,8 +35,7 @@ export function PlaceMarkers({ places, refs, labelled, active, onVisit, onHover,
           onBlur={() => onHover(null)}
         >
           <span className="marker-label" aria-hidden="true">
-            <span className="marker-th">{p.nameTh}</span>
-            <span className="marker-en">{p.nameEn}</span>
+            <span className="marker-name">{p.name}</span>
           </span>
           <span className="marker-dot" aria-hidden="true" />
         </button>

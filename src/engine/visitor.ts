@@ -19,10 +19,14 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
     path: [] as Point[],
     onArrive: null as null | (() => void),
     steer: { x: 0, y: 0 }, // keyboard direction
+    clock: 0,
+    danceUntil: 0, // ram wong! set by dance()
+    danceAmount: 0,
     get moving() { return v.path.length > 0 || v.steer.x !== 0 || v.steer.y !== 0; },
 
     /** Walk to a point. A new call simply replaces the old trip. */
     walkTo(target: Point, onArrive?: () => void): Point {
+      v.danceUntil = 0;
       v.path = planPath(layout, v, target);
       v.onArrive = onArrive ?? null;
       return v.path[v.path.length - 1];
@@ -30,7 +34,12 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
 
     stop() { v.path = []; v.onArrive = null; },
 
+    /** Dance on the spot for a few seconds (walking stops it). */
+    dance(seconds: number) { v.stop(); v.danceUntil = v.clock + seconds; },
+    get dancing() { return v.clock < v.danceUntil; },
+
     update(dt: number) {
+      v.clock += dt;
       let moved = false;
       if (v.steer.x || v.steer.y) {
         v.stop();
@@ -67,6 +76,8 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       }
       v.stride = lerp(v.stride, moved ? 1 : 0, Math.min(1, dt * 10));
       if (moved) v.phase += dt * 12;
+      if (moved) v.danceUntil = 0;
+      v.danceAmount = lerp(v.danceAmount, v.dancing ? 1 : 0, Math.min(1, dt * 6));
     },
 
     draw(ctx: CanvasRenderingContext2D, t: number) {
@@ -82,7 +93,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       ctx.ellipse(v.x, v.y, (21 + pulse * 3) * s, (6.5 + pulse) * s, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-      drawKawaiiVisitor(ctx, v.x, v.y, s * 1.08, v.facing, v.phase, v.stride, t, look);
+      drawKawaiiVisitor(ctx, v.x, v.y, s * 1.08, v.facing, v.phase, v.stride, t, look, v.danceAmount);
     },
   };
   return v;
@@ -93,6 +104,7 @@ export function drawKawaiiVisitor(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, scale: number, facing: number,
   phase: number, stride: number, t: number, c: VisitorLook,
+  dance = 0, // 0..1: arms raised in a ram wong pose
 ) {
   const swing = Math.sin(phase) * stride;
   const bob = Math.abs(Math.cos(phase)) * 2.5 * stride + Math.sin(t * 2.2) * 0.7 * (1 - stride);
@@ -108,7 +120,8 @@ export function drawKawaiiVisitor(
   ctx.fill();
 
   ctx.scale(facing, 1);
-  ctx.translate(0, -bob);
+  ctx.translate(0, -bob - Math.abs(Math.sin(t * 4)) * 3 * dance);
+  if (dance) ctx.rotate(Math.sin(t * 3) * 0.07 * dance);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = c.outline;
@@ -144,14 +157,15 @@ export function drawKawaiiVisitor(
   ctx.lineWidth = 2.2;
 
   // arms swinging behind/in front of the top
-  shape(c.skin, () => ctx.ellipse(-10, -24 + swing * 2, 3.2, 5.5, 0.3 + swing * 0.4, 0, Math.PI * 2));
+  const wave = Math.sin(t * 5) * dance;
+  shape(c.skin, () => ctx.ellipse(-10 - dance * 4, -24 + swing * 2 - dance * (18 + wave * 4), 3.2, 5.5, 0.3 + swing * 0.4 - dance * 0.9, 0, Math.PI * 2));
   shape(c.top, () => {
     ctx.moveTo(-9, -24);
     ctx.quadraticCurveTo(-10, -34, 0, -35);
     ctx.quadraticCurveTo(10, -34, 9, -24);
     ctx.closePath();
   });
-  shape(c.skin, () => ctx.ellipse(10, -24 - swing * 2, 3.2, 5.5, -0.3 - swing * 0.4, 0, Math.PI * 2));
+  shape(c.skin, () => ctx.ellipse(10 + dance * 4, -24 - swing * 2 - dance * (18 - wave * 4), 3.2, 5.5, -0.3 - swing * 0.4 + dance * 0.9, 0, Math.PI * 2));
 
   // big round head
   shape(c.skin, () => ctx.arc(0, -48, 14, 0, Math.PI * 2));
