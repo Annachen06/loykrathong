@@ -30,7 +30,7 @@ function usePrize(done: boolean, score: number, game: "darts" | "rings", onPrize
 }
 
 /** Balloon darts: balloons drift on the board; tap one to throw a dart at it. Three darts. */
-function BalloonDarts({ onPrize }: { onPrize: OnPrize }) {
+function BalloonDarts({ onPrize, onPop }: { onPrize: OnPrize; onPop?: () => void }) {
   const [darts, setDarts] = useState(3);
   const [popped, setPopped] = useState<number[]>([]);
   const [misses, setMisses] = useState<{ x: number; y: number }[]>([]);
@@ -41,7 +41,7 @@ function BalloonDarts({ onPrize }: { onPrize: OnPrize }) {
   const hit = (i: number | null, miss?: { x: number; y: number }) => {
     if (done) return;
     setDarts((d) => d - 1);
-    if (i !== null && !popped.includes(i)) setPopped((p) => [...p, i]);
+    if (i !== null && !popped.includes(i)) { setPopped((p) => [...p, i]); onPop?.(); }
     else if (miss) setMisses((m) => [...m, miss]);
   };
   const throwAt = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -151,7 +151,7 @@ function RingToss({ onPrize }: { onPrize: OnPrize }) {
   );
 }
 
-export function FairGames({ onPrize }: { onPrize: OnPrize }) {
+export function FairGames({ onPrize, onPop }: { onPrize: OnPrize; onPop?: () => void }) {
   const [tab, setTab] = useState<"darts" | "rings">("darts");
   return (
     <div className="fair-games">
@@ -159,7 +159,7 @@ export function FairGames({ onPrize }: { onPrize: OnPrize }) {
         <button type="button" role="tab" aria-selected={tab === "darts"} className={tab === "darts" ? "on" : ""} onClick={() => setTab("darts")}>ปาเป้าลูกโป่ง</button>
         <button type="button" role="tab" aria-selected={tab === "rings"} className={tab === "rings" ? "on" : ""} onClick={() => setTab("rings")}>โยนห่วง</button>
       </div>
-      {tab === "darts" ? <BalloonDarts onPrize={onPrize} /> : <RingToss onPrize={onPrize} />}
+      {tab === "darts" ? <BalloonDarts onPrize={onPrize} onPop={onPop} /> : <RingToss onPrize={onPrize} />}
       <p className="game-fine">ตุ๊กตาจะอยู่ในมือตัวละคร ของรางวัลทั้งหมดดูได้ที่มุมความทรงจำ เล่นฟรี</p>
     </div>
   );

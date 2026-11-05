@@ -661,3 +661,26 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
   margin: 0; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--ink);
   background: var(--paper); color: var(--ink); font-size: 13px; white-space: nowrap;
 }
+
+/* sound on/off */
+.sound-toggle {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  right: calc(var(--safe-right) + 14px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px 14px 8px 10px;
+  border: 2px solid rgba(255, 244, 226, 0.5);
+  border-radius: 999px;
+  background: rgba(20, 18, 70, 0.7);
+  color: var(--moonlight);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.8s 0.6s;
+}
+.sound-toggle.is-hidden { opacity: 0; pointer-events: none; }
+.sound-toggle[aria-pressed="false"] { opacity: 0.75; }
+.sound-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

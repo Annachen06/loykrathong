@@ -86,6 +86,11 @@ async function desktopSuite(browser) {
   await p.waitForTimeout(1600);
   check("entering hides the intro", !(await p.isVisible(".intro-char")));
   check("picking a character changes the visitor", (await state(p)).look === "man");
+  check("sound starts when you enter the fair", (await state(p)).sound.running);
+  await p.click(".sound-toggle");
+  check("the sound button mutes", (await state(p)).sound.muted && (await p.getAttribute(".sound-toggle", "aria-label")) === "เปิดเสียง");
+  await p.click(".sound-toggle");
+  check("…and unmutes", !(await state(p)).sound.muted);
   check("only one map button instead of a row of tabs", (await p.locator(".dock button:visible").count()) === 1);
   await p.click(".map-toggle");
   check("map button opens the list of places", (await p.locator(".dock ul button").count()) === (await places(p)).length);

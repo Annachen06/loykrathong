@@ -3,6 +3,7 @@ import { activeFestival } from "./festivals";
 import type { FairItem, Scene } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
 import { createVisitor, type Visitor } from "./engine/visitor";
+import { createSound, type Sound, type SoundName } from "./engine/sound";
 import { dist } from "./engine/math";
 import { Intro } from "./components/Intro";
 import { PlaceMarkers } from "./components/PlaceMarkers";
@@ -23,7 +24,7 @@ const festival = activeFestival;
 const { config } = festival;
 const NEAR_DISTANCE = 260; // labels appear when the visitor is this close to a place
 
-type Engine = { renderer: Renderer; visitor: Visitor; scene: Scene };
+type Engine = { renderer: Renderer; visitor: Visitor; scene: Scene; sound: Sound };
 
 const EMPTY_MEMORIES: Memories = { wishes: [], fortune: null, prayed: 0, offered: [], prizes: [], treats: [], treasures: [], rode: false, danced: false };
 
@@ -71,6 +72,8 @@ export default function App() {
   const [ritual, setRitual] = useState<FairItem | null>(null); // briefly held during an activity (the siamsi cup)
   const [look, setLook] = useState(config.visitors[0].look);
   const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
+  const [muted, setMuted] = useState(false);
+  const sfx = useCallback((name: SoundName) => engineRef.current?.sound.play(name), []);
   const remember = useCallback((m: Partial<Memories> | ((prev: Memories) => Partial<Memories>)) =>
     setMemories((prev) => ({ ...prev, ...(typeof m === "function" ? m(prev) : m) })), []);
 
@@ -82,7 +85,9 @@ export default function App() {
     const scene = festival.createScene();
     const visitor = createVisitor(config.layout, config.visitors[0].look);
     const renderer = createRenderer(canvas, config, scene, visitor);
-    engineRef.current = { renderer, visitor, scene };
+    const stage = config.places.find((p) => p.id === "stage");
+    const sound = createSound(stage?.anchor.x ?? config.layout.width / 2);
+    engineRef.current = { renderer, visitor, scene, sound };
 
     renderer.setOnFrame(() => {
       // keep the DOM markers pinned to their spot in the world
@@ -106,6 +111,11 @@ export default function App() {
         setNear(best);
       }
       const st = scene.stats();
+      // sounds: things that happened in the world, quieter the further away they are
+      for (const ev of scene.events?.splice(0) ?? []) {
+        sound.play(ev.name as SoundName, Math.max(0.15, 1 - Math.abs(ev.x - visitor.x) / 2000));
+      }
+      sound.listen(visitor.x, visitor.y, st.dancing === 1, st.rideView === 1);
       const view = st.rideView === 1, progress = Math.round((st.rideProgress ?? 0) * 20) / 20, focus = st.focus === 1;
       setRide((r) => (r.view === view && r.progress === progress && r.focus === focus ? r : { view, progress, focus }));
     });
@@ -118,9 +128,9 @@ export default function App() {
       places: config.places.map((p) => ({ id: p.id, name: p.name, anchor: p.anchor, marker: p.marker, hitArea: p.hitArea })),
       curios: config.curios,
       scene,
-      state: () => ({ look: visitor.look.figure, hold: visitor.hold ?? null, act: visitor.act?.kind ?? null, x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
+      state: () => ({ sound: { running: sound.running, muted: sound.muted }, look: visitor.look.figure, hold: visitor.hold ?? null, act: visitor.act?.kind ?? null, x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
     };
-    return () => renderer.stop();
+    return () => { renderer.stop(); sound.stop(); };
   }, []);
 
   useEffect(() => {
@@ -173,6 +183,8 @@ export default function App() {
     if (entered) return;
     const chosen = config.visitors.find((v) => v.id === visitorId);
     if (chosen) setLook(chosen.look);
+    engineRef.current?.sound.start();
+    setMuted(engineRef.current?.sound.muted ?? false);
     setEntered(true);
     engineRef.current?.renderer.follow(true);
     setReveal(true);
@@ -192,6 +204,7 @@ export default function App() {
       if (tapped.found) {
         const f = tapped.found;
         remember((m) => ({ treasures: [...m.treasures, f.label] }));
+        sfx("chime");
         const n = e.scene.stats().treasures ?? 0;
         setBubble({ title: `เจอ${f.label}!`, text: f.text, tag: `สมบัติริมหาด ${n}/${config.curios.length}`, key: Date.now() });
       }
@@ -286,8 +299,10 @@ export default function App() {
       consume(gift);
     }
     say(gift ? `ถวาย${gift.name} จุดธูป แล้วพนมมือกราบสามครั้ง` : "จุดธูป แล้วพนมมือกราบสามครั้ง");
+    sfx("bell");
     e.visitor.perform("pray", 7.5, -1, () => {
       e.scene.runAction("temple", "blessing", e.visitor);
+      sfx("bell");
       say("ไหว้พระเสร็จแล้ว ขอให้สมหวังทุกประการ");
     });
     remember((m) => ({ prayed: m.prayed + 1, offered: gift ? [...m.offered, gift.name] : m.offered }));
@@ -302,6 +317,7 @@ export default function App() {
       setRitual(null);
       const f = config.fortunes[Math.floor(Math.random() * config.fortunes.length)];
       remember({ fortune: f });
+      sfx("chime");
       setBubble({ title: "เซียมซีหล่นออกมาหนึ่งไม้", text: f, tag: "เสี่ยงเซียมซีเพื่อความสนุก", key: Date.now() });
     });
   };
@@ -320,6 +336,7 @@ export default function App() {
     window.setTimeout(() => {
       if (e.visitor.act?.kind !== "float") { setRitual(null); return; } // walked away: keep the krathong
       e.scene.runAction("shore", "float", e.visitor, { wish, style: k.id, flower: k.color });
+      sfx("splash");
       setRitual(null);
       if (krathong) consume(krathong);
       remember((m) => ({ wishes: [...m.wishes, wish] }));
@@ -337,6 +354,7 @@ export default function App() {
       return say(`ทัด${item.name.replace("ทัดหู", "")}ไว้ที่หูแล้ว สวยมาก`);
     }
     pickUp(item);
+    sfx("pickup");
     if (item.hold === "cottonCandy" || item.hold === "shavedIce") {
       remember((m) => ({ treats: [...m.treats, item.name] }));
       say(`ได้${item.name}แล้ว อร่อยชื่นใจ`);
@@ -349,8 +367,9 @@ export default function App() {
   };
   const onPrize = useCallback((p: Prize) => {
     remember((m) => ({ prizes: [...m.prizes, p.name] }));
+    sfx("chime");
     if (p.hold) pickUp({ id: `prize-${p.name}`, name: p.name, text: "", hold: p.hold });
-  }, [remember, pickUp]);
+  }, [remember, pickUp, sfx]);
 
   return (
     <main className={`app ${entered ? "entered" : ""}`}>
@@ -368,6 +387,29 @@ export default function App() {
         <span className="brand-name">{config.brand}</span>
         <span className="brand-tag">{config.tagline}</span>
       </header>
+
+      <button
+        type="button"
+        className={`sound-toggle ${entered ? "" : "is-hidden"}`}
+        tabIndex={entered ? 0 : -1}
+        aria-pressed={!muted}
+        aria-label={muted ? "เปิดเสียง" : "ปิดเสียง"}
+        onClick={() => {
+          const s = engineRef.current?.sound;
+          if (!s) return;
+          s.start();
+          s.setMuted(!muted);
+          setMuted(!muted);
+        }}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+          {muted
+            ? <path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            : <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
+        </svg>
+        <span>{muted ? "เปิดเสียง" : "เสียง"}</span>
+      </button>
 
       <PlaceMarkers
         places={config.places}
@@ -393,7 +435,7 @@ export default function App() {
           {openPlace.panel === "float" && openPlace.action && (
             <FloatForm label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} />
           )}
-          {openPlace.panel === "games" && <FairGames onPrize={onPrize} />}
+          {openPlace.panel === "games" && <FairGames onPrize={onPrize} onPop={() => sfx("pop")} />}
           {openPlace.panel === "temple" && <TemplePanel offering={offering} fortune={memories.fortune} onPray={pray} onFortune={shakeFortune} />}
           {openPlace.panel === "krathongShop" && (
             <>

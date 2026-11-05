@@ -185,6 +185,8 @@ export type Scene = {
   tap(p: Point): TapResult | null;
   /** True while the visitor is away doing something (e.g. riding the Ferris wheel): hide them and ignore walking. */
   visitorAway(): boolean;
+  /** Things that just happened and could make a sound (fireworks...). The app empties this list every frame. */
+  events?: { name: string; x: number; y: number }[];
   /** Internal state for automated browser tests only. */
   debug?(): Record<string, unknown>;
   /** Real, local-only numbers for this visit (nothing is invented or sent anywhere). */

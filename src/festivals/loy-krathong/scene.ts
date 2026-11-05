@@ -61,8 +61,10 @@ export function createLoyKrathongScene(): Scene {
   for (let i = 0; i < 10; i++) spawnFloater(rand(1700, 2110), rand(HORIZON + 50, SHORE - 20), false);
   for (let i = 0; i < 18; i++) spawnLantern(rand(700, 2780), rand(40, 500));
 
+  const events: { name: string; x: number; y: number }[] = [];
   function firework() {
     const x = rand(900, 2700), y = rand(110, 320);
+    events.push({ name: "firework", x, y });
     const rgb = ["255,207,110", "255,168,194", "201,182,255", "143,216,200"][(Math.random() * 4) | 0];
     for (let i = 0; i < 44; i++) {
       const a = (i / 44) * Math.PI * 2, v = rand(60, 105);
@@ -1157,6 +1159,7 @@ export function createLoyKrathongScene(): Scene {
     update,
     drawMiddle,
     drawGround,
+    events,
     actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, ringActor],
     camera() {
       if (ride.active) {
