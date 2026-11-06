@@ -272,6 +272,18 @@ async function desktopSuite(browser) {
   st = await state(p);
   check("temple: the visitor kneels and prays, and the garland is offered", st.act === "pray" && st.hold === null);
   await p.screenshot({ path: path.join(SHOTS, "desktop-pray.png") });
+  // count the bows (krap): the body tips forward and comes back up, three times
+  const bows = await p.evaluate(async () => {
+    const v = window.__fair.visitor;
+    let n = 0, down = false;
+    while (v.act) {
+      const b = v.pose.bow;
+      if (!down && b > 0.6) { down = true; n++; } else if (down && b < 0.25) down = false;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    return n;
+  });
+  check("temple: prayer includes exactly three bows", bows === 3, `${bows} bows`);
   await p.waitForFunction(() => window.__fair.state().act === null, null, { timeout: 12000 });
   await viaMap(p, "วัดริมทะเล");
   await p.waitForSelector('[data-act="fortune"]', { timeout: 20000 });

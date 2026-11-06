@@ -27,12 +27,12 @@ export const loyKrathongConfig: FestivalConfig = {
   mapGroups: [
     { id: "merit", label: "ทำบุญ", icon: "🙏" },
     { id: "stroll", label: "เดินเล่นในงาน", icon: "🎡" },
-    { id: "float", label: "ลอยกระทง ปล่อยโคม", icon: "🏮" },
+    { id: "float", label: "ลอยกระทง ปล่อยโคม", icon: "🪷" },
   ],
   startChoices: [
     { id: "merit", icon: "🙏", label: "ไปทำบุญก่อน", text: "ไหว้พระ จุดธูป เสี่ยงเซียมซี", go: "temple", hint: "ถึงวัดแล้ว ไหว้พระและเสี่ยงเซียมซีได้เลย" },
     { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายเพื่อเดิน หรือแตะดวงไฟเพื่อไปเที่ยว" },
-    { id: "float", icon: "🪔", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
+    { id: "float", icon: "🪷", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
   ],
   // Example wishes for the other krathongs on the water. Always shown with a "ตัวอย่าง" tag:
   // there is no shared online wall yet, so these are not real visitors.
@@ -221,7 +221,7 @@ export const loyKrathongConfig: FestivalConfig = {
     {
       id: "lanterns",
       group: "float",
-      icon: "🏮",
+      icon: "🌟",
       name: "ลานปล่อยโคม",
       shortName: "ปล่อยโคม",
       marker: { x: 656, y: 700 },

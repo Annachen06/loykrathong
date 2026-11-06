@@ -473,7 +473,7 @@ export default function App() {
       <MapMenu
         places={config.places}
         groups={config.mapGroups}
-        quick={[{ id: "temple", label: "ไหว้พระ", icon: "🙏" }, { id: "shore", label: "ลอยกระทง", icon: "🏮" }]}
+        quick={[{ id: "temple", label: "ไหว้พระ", icon: "🙏" }, { id: "shore", label: "ลอยกระทง", icon: "🪷" }]}
         active={target}
         onVisit={visit}
         hidden={!entered || asking || ride.view}

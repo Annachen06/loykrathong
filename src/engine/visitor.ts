@@ -116,7 +116,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
           wai = ending ? 0 : 1;
           // three slow bows (krap) in the middle of the prayer
           const k = (el - 1.4) / 4.2;
-          bow = k > 0 && k < 1 ? Math.max(0, Math.sin(k * Math.PI * 3)) * 0.9 : 0;
+          bow = k > 0 && k < 1 ? Math.sin(k * Math.PI * 3) ** 2 * 0.9 : 0; // sin² has exactly three humps: three bows
         } else if (a.kind === "fortune") {
           bow = 0.18 + (el > 0.6 && el < a.until - a.start - 1.2 ? Math.sin(v.clock * 30) * 0.05 : 0);
         } else {

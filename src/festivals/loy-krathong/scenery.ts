@@ -874,8 +874,16 @@ function boutique(ctx: CanvasRenderingContext2D, x: number, w: number, base: num
   for (let i = 0; i < 3; i++) lights.lamps.push({ x: x + 30 + i * ((w - 60) / 2), y: base - h + 44, r: 46, kind: "lantern" });
 }
 
-function gate(ctx: CanvasRenderingContext2D, cx: number, base: number) {
-  const half = 62, h = 150;
+/** The arch over the foot of the pier. It is drawn live, sorted with the people, so you walk behind it rather than onto it. */
+export const GATE = { half: 62, h: 118, base: GROUND + 6 };
+
+/** The glow of the arch: two lamps at the tops of its posts. */
+export function gateLights(cx: number) {
+  for (const px of [cx - GATE.half, cx + GATE.half]) lights.lamps.push({ x: px, y: GATE.base - GATE.h - 6, r: 34, kind: "lamp" });
+}
+
+export function drawGate(ctx: CanvasRenderingContext2D, cx: number) {
+  const { half, h, base } = GATE;
   // bamboo posts wrapped in marigold garlands
   for (const px of [cx - half, cx + half]) {
     outlined(ctx, "#c8a070", () => ctx.roundRect(px - 7, base - h, 14, h, 6));
@@ -922,15 +930,21 @@ function gate(ctx: CanvasRenderingContext2D, cx: number, base: number) {
     ctx.arc(cx + 5, base - h - 42, 8, 1.6 * Math.PI, 0.4 * Math.PI, true);
     ctx.closePath();
   }, 1.8);
-  // hanging lanterns under the arch
-  for (const dx of [-34, 0, 34]) {
-    ctx.strokeStyle = OUTLINE;
+  // strings of marigolds hanging under the arch
+  for (const dx of [-36, 0, 36]) {
+    const top = base - h + 12 - (dx === 0 ? 24 : 14);
+    ctx.strokeStyle = "rgba(42,29,74,0.6)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cx + dx, base - h + 14 - (dx === 0 ? 26 : 16));
-    ctx.lineTo(cx + dx, base - h + 30);
+    ctx.moveTo(cx + dx, top);
+    ctx.lineTo(cx + dx, top + 26);
     ctx.stroke();
-    lights.lamps.push({ x: cx + dx, y: base - h + 36, r: 34, kind: "lantern" });
+    for (let k = 0; k < 5; k++) {
+      ctx.fillStyle = k % 2 ? "#ffcf6e" : "#ff8f3a";
+      ctx.beginPath();
+      ctx.arc(cx + dx, top + 8 + k * 5, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
@@ -1024,7 +1038,7 @@ export function paintFront(ctx: CanvasRenderingContext2D) {
   gameBooths(ctx);
   boutique(ctx, 1650, 180, GROUND + 2);
   // the fair's name on an arch over the way onto the pier, where everyone goes to float their krathong
-  gate(ctx, (PIER.x0 + PIER.x1) / 2, GROUND + 6);
+  gateLights((PIER.x0 + PIER.x1) / 2);
   foodStall(ctx, 2040, 110, "#ff8fc0", "สายไหม", "candy");
   foodStall(ctx, 2158, 84, "#5aa0ef", "น้ำแข็งไส", "ice");
   memoryCorner(ctx, 2296, GROUND + 6);

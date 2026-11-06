@@ -4,7 +4,7 @@ import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../
 import { drawPaperLantern, drawPerson, LANTERN_UP, type Hold, type Pose } from "../../engine/person";
 import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
-import { boothSign, drawKrathongCached, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
+import { boothSign, drawGate, drawKrathongCached, GATE, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
 import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
 
 type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string };
@@ -15,6 +15,8 @@ type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: 
 type Petal = { x: number; y: number; vx: number; vy: number; rot: number; spin: number; life: number; color: string };
 
 const LOTUS = ["#ffa8c2", "#fff2f6", "#c9b6ff", "#ffcf6e"];
+/** Paper colour and pattern colour for the hanging paper lanterns, in the order they are handed out. */
+const LANTERN_PAPERS: [string, string][] = [["#ffe9a8", "#d9803a"], ["#ffb35c", "#fff4e2"], ["#fff4e2", "#c8603a"], ["#ffc2d6", "#a8406a"], ["#ffd95a", "#a8602a"]];
 
 export function createLoyKrathongScene(): Scene {
   const calm = prefersReducedMotion();
@@ -308,6 +310,19 @@ export function createLoyKrathongScene(): Scene {
   const TABLE = { x: 656, y: 858 };
   const helper = crowdLooks[7 % crowdLooks.length];
   const TABLE_COLORS = ["#ffb35c", "#ff9ec0", "#fff4e2", "#ffd95a", "#ffb35c"];
+  // ---------------------------------------------------- the arch over the pier's foot
+  // Drawn live and sorted with the people, so you walk behind it, and it turns see-through while you are under it.
+  const gateX = (PIER.x0 + PIER.x1) / 2;
+  let gateSee = 1;
+  const gateActor: Actor = {
+    y: GATE.base,
+    draw(ctx) {
+      ctx.save();
+      ctx.globalAlpha = gateSee;
+      drawGate(ctx, gateX);
+      ctx.restore();
+    },
+  };
   const tableActor: Actor = {
     y: TABLE.y,
     draw(ctx, t) {
@@ -684,6 +699,10 @@ export function createLoyKrathongScene(): Scene {
     clock += dt;
     you.x = visitor.x;
     you.y = visitor.y;
+    // the arch fades while you walk through it, so it never hides you or looks like you are standing on it
+    const behind = visitor.y < GATE.base - 4 && Math.abs(visitor.x - gateX) < GATE.half + 40;
+    const under = behind ? (visitor.y < GATE.base - 60 ? 0.08 : 0.22) : 1;
+    gateSee += (under - gateSee) * Math.min(1, dt * 6);
     const onPier = you.x > PIER.x0 - 70 && you.x < PIER.x1 + 70 && you.y < GROUND + 30;
     pierFade = lerp(pierFade, onPier ? 1 : 0, Math.min(1, dt * 3));
     // boarding takes a moment, then the wheel turns once at a gentle pace
@@ -1231,16 +1250,33 @@ export function createLoyKrathongScene(): Scene {
       const a = 0.82 + 0.18 * Math.sin(t * 9 + i * 2.1) * Math.sin(t * 4.1 + i);
       glow(ctx, l.x, l.y, l.r, "255,190,110", (l.kind === "window" ? 0.2 : 0.48) * a);
       if (l.kind === "lantern") {
-        ctx.fillStyle = `rgba(239,90,90,${0.95 * a})`;
+        // a Lanna-style paper lantern: warm mulberry paper (never red, which reads as Chinese New Year), a band of tiny flowers, a tassel
+        const [paper, band] = LANTERN_PAPERS[i % LANTERN_PAPERS.length];
+        ctx.fillStyle = paper;
+        ctx.globalAlpha = 0.95 * a;
         ctx.strokeStyle = OUTLINE;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.ellipse(l.x, l.y, 6.5, 8, 0, 0, Math.PI * 2);
+        ctx.moveTo(l.x - 5, l.y - 9);
+        ctx.lineTo(l.x + 5, l.y - 9);
+        ctx.quadraticCurveTo(l.x + 9, l.y, l.x + 4.5, l.y + 9);
+        ctx.lineTo(l.x - 4.5, l.y + 9);
+        ctx.quadraticCurveTo(l.x - 9, l.y, l.x - 5, l.y - 9);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#ffcf6e";
-        ctx.fillRect(l.x - 4, l.y - 9.5, 8, 2.2);
-        ctx.fillRect(l.x - 4, l.y + 7.5, 8, 2.2);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = band;
+        ctx.fillRect(l.x - 7, l.y - 1, 14, 1.8);
+        for (const dx of [-4.5, 0, 4.5]) { ctx.beginPath(); ctx.arc(l.x + dx, l.y - 4.2, 0.9, 0, Math.PI * 2); ctx.arc(l.x + dx, l.y + 5, 0.9, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = "#8a6a4a";
+        ctx.fillRect(l.x - 5, l.y - 10.5, 10, 1.8);
+        ctx.strokeStyle = band;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(l.x, l.y + 9);
+        ctx.lineTo(l.x, l.y + 14);
+        ctx.stroke();
       } else if (l.kind === "lamp") {
         ctx.fillStyle = `rgba(255,236,190,${a})`;
         ctx.beginPath();
@@ -1420,7 +1456,7 @@ export function createLoyKrathongScene(): Scene {
     drawMiddle,
     drawGround,
     events,
-    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, cartActor, tableActor, ringActor],
+    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, cartActor, tableActor, gateActor, ringActor],
     camera() {
       if (ride.active) {
         const c = cabinPos(ride.cabin);
