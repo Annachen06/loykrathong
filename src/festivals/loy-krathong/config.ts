@@ -27,12 +27,12 @@ export const loyKrathongConfig: FestivalConfig = {
   mapGroups: [
     { id: "merit", label: "ทำบุญ", icon: "🙏" },
     { id: "stroll", label: "เดินเล่นในงาน", icon: "🎡" },
-    { id: "float", label: "ลอยกระทง ปล่อยโคม", icon: "🪷" },
+    { id: "float", label: "ลอยกระทง ปล่อยโคม", icon: "🌸" },
   ],
   startChoices: [
     { id: "merit", icon: "🙏", label: "ไปทำบุญก่อน", text: "ไหว้พระ จุดธูป เสี่ยงเซียมซี", go: "temple", hint: "ถึงวัดแล้ว ไหว้พระและเสี่ยงเซียมซีได้เลย" },
-    { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายเพื่อเดิน หรือแตะดวงไฟเพื่อไปเที่ยว" },
-    { id: "float", icon: "🪷", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
+    { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายตรงไหนก็ได้ ตัวละครจะเดินไปที่นั่น หรือกดปุ่มแผนที่เพื่อไปที่ต่างๆ" },
+    { id: "float", icon: "🌸", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
   ],
   // Example wishes for the other krathongs on the water. Always shown with a "ตัวอย่าง" tag:
   // there is no shared online wall yet, so these are not real visitors.
@@ -103,7 +103,7 @@ export const loyKrathongConfig: FestivalConfig = {
     {
       id: "temple",
       group: "merit",
-      icon: "🛕",
+      icon: "🏛️",
       name: "วัดริมทะเล",
       shortName: "วัด",
       marker: { x: 300, y: 420 },
@@ -151,7 +151,7 @@ export const loyKrathongConfig: FestivalConfig = {
     {
       id: "boutique",
       group: "float",
-      icon: "🌸",
+      icon: "🌺",
       name: "ร้านกระทง",
       shortName: "ร้านกระทง",
       marker: { x: 1740, y: 630 },
