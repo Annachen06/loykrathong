@@ -2,6 +2,7 @@
 // The name of the fair (brand) also appears on the arch over the way onto the pier.
 // Text, places, layout and colours are plain data so they're easy to edit.
 import type { FestivalConfig } from "../types";
+import supportQr from "../../assets/support-qr.png?inline";
 
 export const loyKrathongConfig: FestivalConfig = {
   id: "loy-krathong",
@@ -29,6 +30,8 @@ export const loyKrathongConfig: FestivalConfig = {
     title: "ซื้อกาแฟให้กำลังใจคนทำ",
     text: "งานนี้ทำด้วยใจ เล่นฟรีทุกอย่าง ถ้าชอบและอยากเป็นกำลังใจ ร่วมสมทบได้นิดหน่อยตามสะดวกนะคะ ไม่มีผลกับของที่ได้ในงาน",
     linkLabel: "ให้กำลังใจ",
+    // the owner's PromptPay QR: scan with any banking app and type any amount
+    qr: supportQr,
   },
   mapGroups: [
     { id: "merit", label: "ทำบุญ", icon: "🙏" },

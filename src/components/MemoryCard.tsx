@@ -105,7 +105,8 @@ export function MemoryCard({ memories: m, look, hand, brand, treasureTotal, supp
         <aside className="support" aria-label={support.title}>
           <h3>{support.title}</h3>
           <p>{support.text}</p>
-          {support.qr && <img className="support-qr" src={support.qr} alt="QR สำหรับให้กำลังใจ" />}
+          {support.qr && <img className="support-qr" src={support.qr} alt="QR PromptPay สำหรับให้กำลังใจ สแกนด้วยแอปธนาคารแล้วใส่จำนวนเงินเอง" />}
+          {support.qr && <p className="support-fine">สแกนด้วยแอปธนาคาร ใส่จำนวนเท่าไหร่ก็ได้ตามสะดวก</p>}
           {support.url && (
             <a className="panel-action secondary" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
           )}

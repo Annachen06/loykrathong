@@ -484,6 +484,7 @@ export default function App() {
         groups={config.mapGroups}
         active={target}
         onVisit={visit}
+        onOpen={() => setOpenId(null)}
         hidden={!entered || asking || ride.view}
         ui={config.ui}
       />

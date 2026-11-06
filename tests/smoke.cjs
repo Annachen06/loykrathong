@@ -234,6 +234,7 @@ async function desktopSuite(browser) {
   const mine = await p.textContent(".memory-list");
   check("Memory Corner lists the private wish from this visit", mine.includes("ขอให้ทดสอบผ่านทุกข้อ"), mine);
   check("Memory Corner lists the lantern wish too", mine.includes("ขอให้โคมลอยถึงพระจันทร์"), mine);
+  check("Memory Corner has a tip corner with a scannable QR, and it asks for nothing in return", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("ไม่มีผลกับของที่ได้ในงาน") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
   await p.click('.memory .panel-action:has-text("สร้างการ์ด")');
   await p.waitForSelector(".memory-card img");
   const card = await p.getAttribute(".memory-card img", "src");

@@ -6,6 +6,8 @@ type Props = {
   groups: FestivalConfig["mapGroups"];
   active: string | null;
   onVisit: (id: string) => void;
+  /** Called when the map opens, so a place card that is open can get out of its way. */
+  onOpen?: () => void;
   hidden: boolean;
   ui: FestivalConfig["ui"];
 };
@@ -14,7 +16,7 @@ type Props = {
  * The map: a big, always-visible "แผนที่งาน" button.
  * It opens a sheet of everywhere in the fair, in sections (merit, stroll, float), each place a large tile with a picture.
  */
-export function MapMenu({ places, groups, active, onVisit, hidden, ui }: Props) {
+export function MapMenu({ places, groups, active, onVisit, onOpen, hidden, ui }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLElement>(null);
 
@@ -58,7 +60,7 @@ export function MapMenu({ places, groups, active, onVisit, hidden, ui }: Props) 
         </div>
       )}
       <div className="dock-row">
-        <button type="button" className="map-toggle" aria-expanded={open} aria-controls="map-list" tabIndex={tab} onClick={() => setOpen((o) => !o)}>
+        <button type="button" className="map-toggle" aria-expanded={open} aria-controls="map-list" tabIndex={tab} onClick={() => { if (!open) onOpen?.(); setOpen((o) => !o); }}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4Zm0 0v13m6-10.5v13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           </svg>
