@@ -7,7 +7,7 @@ export type Point = { x: number; y: number };
 /** Something a person can carry in their hand. */
 export type HeldThing =
   | "balloon" | "krathong" | "cottonCandy" | "cane" | "shavedIce" | "siamsi"
-  | "garland" | "lotus" | "plushStar" | "plushRabbit" | "plushJelly";
+  | "garland" | "lotus" | "plushStar" | "plushRabbit" | "plushJelly" | "lantern";
 
 /** An item the visitor picks up at the fair (free, nothing is sold). */
 export type FairItem = {
@@ -46,7 +46,7 @@ export type Place = {
   /** Optional live number from Scene.stats() shown in the panel, e.g. krathongs floated this visit. */
   stat?: { key: string; label: string };
   /** A richer card body for this place (see App.tsx for which component each one opens). */
-  panel?: "float" | "games" | "memory" | "temple" | "krathongShop" | "flowers" | "food";
+  panel?: "float" | "games" | "memory" | "temple" | "krathongShop" | "flowers" | "food" | "lantern";
   /** For stalls: what you can pick up here. */
   items?: FairItem[];
   /** Optional action button. The scene performs it (see Scene.runAction). */

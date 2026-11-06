@@ -923,10 +923,12 @@ export function paintFront(ctx: CanvasRenderingContext2D) {
   pier(ctx);
   templeGrounds(ctx);
   pole(ctx, 1278, 560, true);
+  pole(ctx, 704, 650); // carries the bunting over to the stage
   stage(ctx);
   gameBooths(ctx);
-  gate(ctx, 640, GROUND + 6);
   boutique(ctx, 1650, 180, GROUND + 2);
+  // the fair's name on an arch over the way onto the pier, where everyone goes to float their krathong
+  gate(ctx, (PIER.x0 + PIER.x1) / 2, GROUND + 6);
   foodStall(ctx, 2040, 110, "#ff8fc0", "สายไหม", "candy");
   foodStall(ctx, 2158, 84, "#5aa0ef", "น้ำแข็งไส", "ice");
   memoryCorner(ctx, 2296, GROUND + 6);

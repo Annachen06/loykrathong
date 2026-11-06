@@ -16,6 +16,8 @@ export type Pose = {
   sit?: number;
   /** 0..1: palms pressed together in a wai. */
   wai?: number;
+  /** 0..1: both hands raised above the head (letting a sky lantern go). */
+  raise?: number;
   /** 0..1: bowing forward from the hips (a krap at the temple). */
   bow?: number;
   hold?: Hold;
@@ -60,6 +62,7 @@ export function drawPerson(
   const woman = c.figure === "woman";
   const dance = pose.dance ?? 0;
   const wai = pose.wai ?? 0;
+  const raise = pose.raise ?? 0;
   const sit = pose.sit ?? 0;
   const lower = Math.max(pose.kneel ?? 0, sit); // how far the body has dropped from standing
   const hold = dance > 0.5 || wai > 0.5 ? undefined : pose.hold;
@@ -166,6 +169,13 @@ export function drawPerson(
       const wHand: P = [sw * 0.25 + 4.5, sY - 1 - (pose.bow ? 2 : 0)];
       el = mix(el, wEl, wai);
       hand = mix(hand, wHand, wai);
+    }
+    if (raise) {
+      // both hands up over the head, holding the lantern's wire ring
+      const rEl: P = [sh[0] + side * 2.5, sY - 6];
+      const rHand: P = [1 + side * 2.6, sY - 21.5];
+      el = mix(el, rEl, raise);
+      hand = mix(hand, rHand, raise);
     }
     if (dance) {
       // ram wong: elbows out, hands lifted, gently trading heights
@@ -498,7 +508,10 @@ export function drawPerson(
 
   // front arm last, so it sits over the body
   const hand = arm(1);
-  if (hold) drawHeld(ctx, hold, hand, pose.holdColor ?? "#ef5a5a", pose.holdColor2 ?? "#4f9a52", t, sY, O);
+  if (hold === "lantern" && raise > 0.5) {
+    // held high in both hands, full size, about to be let go
+    paperLantern(ctx, 1, hand[1] - 6 * LANTERN_UP, LANTERN_UP, pose.holdColor ?? "#ffb35c", O, t);
+  } else if (hold) drawHeld(ctx, hold, hand, pose.holdColor ?? "#ef5a5a", pose.holdColor2 ?? "#4f9a52", t, sY, O);
 
   ctx.restore();
 }
@@ -512,6 +525,33 @@ export function drawHeldThing(ctx: CanvasRenderingContext2D, hold: Hold, x: numb
   ctx.lineCap = "round";
   drawHeld(ctx, hold, [0, 0], color, color2, 0, -30, "#2a1d4a");
   ctx.restore();
+}
+
+/** How much bigger the lantern is when held up to be let go. The scene's released lantern matches this size. */
+export const LANTERN_UP = 2.1;
+
+/** A paper sky lantern (khom loi) whose wire ring sits at (x, y + 6k). */
+function paperLantern(ctx: CanvasRenderingContext2D, x: number, y: number, k: number, color: string, O: string, t: number) {
+  const g = ctx.createRadialGradient(x, y, k, x, y, 16 * k);
+  g.addColorStop(0, "rgba(255,200,120,0.55)");
+  g.addColorStop(1, "rgba(255,200,120,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 16 * k, y - 16 * k, 32 * k, 32 * k);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = O;
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(x - 4.2 * k, y + 6 * k);
+  ctx.lineTo(x - 5.6 * k, y - 5 * k);
+  ctx.quadraticCurveTo(x, y - 9 * k, x + 5.6 * k, y - 5 * k);
+  ctx.lineTo(x + 4.2 * k, y + 6 * k);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255,240,190,${0.8 + 0.15 * Math.sin(t * 9)})`;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 4 * k, 1.4 * k, 2 * k, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: string, color2: string, t: number, sY: number, O: string) {
@@ -613,6 +653,9 @@ function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: str
     ctx.moveTo(x + 2.5, y - 6);
     ctx.lineTo(x + 4.5, y - 11);
     ctx.stroke();
+  } else if (hold === "lantern") {
+    // a paper sky lantern (khom loi), lit, carried above the hand
+    paperLantern(ctx, x + 1, y - 6 + Math.sin(t * 2) * 0.4, 1, color, O, t);
   } else if (hold === "garland") {
     // a jasmine garland (phuang malai) hanging from the hand
     ctx.strokeStyle = O;

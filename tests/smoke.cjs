@@ -81,11 +81,15 @@ async function desktopSuite(browser) {
   });
   check("environment is animated", changed);
 
-  check("intro is shown first, with a choice of characters", (await p.locator(".intro-char").count()) === 2 && await p.isVisible(".intro-char"));
-  await p.click('.intro-char[data-visitor="man"]');
+  check("intro is shown first, where you make your own character", (await p.locator(".look-chip").count()) > 10 && await p.isVisible(".intro-enter"));
+  // body shape, clothes and hair are separate choices (no man/woman button)
+  await p.click('.look-chip[data-look="man"]');
+  await p.click('.look-chip[data-look="pha-sin"]');
+  await p.click('.look-chip[data-look="bun"]');
+  await p.click(".intro-enter");
   await p.waitForTimeout(1600);
-  check("entering hides the intro", !(await p.isVisible(".intro-char")));
-  check("picking a character changes the visitor", (await state(p)).look === "man");
+  check("entering hides the intro", !(await p.isVisible(".intro-enter")));
+  check("your choices dress the visitor", (await p.evaluate(() => { const l = window.__fair.visitor.look; return l.figure + "/" + l.outfit + "/" + l.hairStyle; })) === "man/pha-sin/bun");
   check("sound starts when you enter the fair", (await state(p)).sound.running);
   await p.click(".sound-toggle");
   check("the sound button mutes", (await state(p)).sound.muted && (await p.getAttribute(".sound-toggle", "aria-label")) === "เปิดเสียง");
@@ -94,9 +98,12 @@ async function desktopSuite(browser) {
   check("only one map button instead of a row of tabs", (await p.locator(".dock button:visible").count()) === 1);
   await p.click(".map-toggle");
   check("map button opens the list of places", (await p.locator(".dock ul button").count()) === (await places(p)).length);
-  await p.mouse.click(700, 300);
+  // tap the sand just beside the visitor (the sky would send them out onto the pier)
+  const beside = await p.evaluate(() => { const v = window.__fair.visitor; return window.__fair.renderer.toScreen(v.x - 80, v.y + 10); });
+  await p.mouse.click(beside.x, beside.y);
   check("tapping elsewhere closes the map list", !(await p.$(".dock.is-open")));
   await waitStopped(p);
+  await p.waitForTimeout(1200); // let the camera finish following
 
   // Tap the sand: the visitor walks there and stops.
   let s0 = await state(p);
@@ -187,11 +194,37 @@ async function desktopSuite(browser) {
     check("tapping another krathong shows its wish, tagged as an example", false, "no sample krathong near the shore to tap");
   }
 
+  // Sky lanterns: pick a colour, write a wish, hold it up and let it go.
+  await viaMap(p, "ลานปล่อยโคม");
+  await p.waitForSelector(".lantern-colors", { timeout: 20000 });
+  check("lantern ground offers lantern colours", (await p.locator(".lantern-color").count()) >= 3);
+  await p.click('[data-lantern="lantern-pink"]');
+  check("lantern button names the chosen colour", (await p.textContent(".float-form .panel-action")).includes("โคมสีชมพู"));
+  await p.fill("#lantern-wish", "ขอให้โคมลอยถึงพระจันทร์");
+  await p.click(".float-form .panel-action");
+  await p.waitForTimeout(800);
+  st = await state(p);
+  check("releasing: the visitor holds the lantern up", st.act === "lantern" && st.hold === "lantern" && !(await p.$(".panel")));
+  await p.waitForTimeout(2600);
+  st = await state(p);
+  check("releasing: the lantern leaves your hands and rises", st.stats.lanternsReleased === 1 && st.hold === null);
+  await p.waitForTimeout(1200);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-lantern.png") });
+  const myLantern = await p.evaluate(() => window.__fair.scene.debug().lanterns.find((l) => l.mine));
+  if (myLantern) {
+    const q = await toScreen(p, myLantern.x, myLantern.y);
+    await p.mouse.click(q.x, q.y);
+    await p.waitForSelector(".wish-bubble.show", { timeout: 3000 }).catch(() => {});
+    const text = (await p.$(".wish-bubble.show")) ? await p.textContent(".wish-bubble") : "";
+    check("tapping your lantern shows your wish", text.includes("ขอให้โคมลอยถึงพระจันทร์"), text);
+  } else check("tapping your lantern shows your wish", false, "own lantern not found");
+
   // Memory Corner lists tonight's wish and makes a souvenir card picture.
   await viaMap(p, "มุมความทรงจำ");
   await p.waitForSelector(".memory-list", { timeout: 15000 });
   const mine = await p.textContent(".memory-list");
   check("Memory Corner lists the private wish from this visit", mine.includes("ขอให้ทดสอบผ่านทุกข้อ"), mine);
+  check("Memory Corner lists the lantern wish too", mine.includes("ขอให้โคมลอยถึงพระจันทร์"), mine);
   await p.click('.memory .panel-action:has-text("สร้างการ์ด")');
   await p.waitForSelector(".memory-card img");
   const card = await p.getAttribute(".memory-card img", "src");
@@ -326,7 +359,7 @@ async function phoneSuite(browser) {
   p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await p.goto(BASE);
   await p.waitForFunction(() => !!window.__fair);
-  await p.tap('.intro-char[data-visitor="woman"]');
+  await p.tap(".intro-enter");
   await p.waitForTimeout(1600);
   await p.screenshot({ path: path.join(SHOTS, "phone-start.png") });
 
@@ -377,7 +410,7 @@ async function reducedMotionSuite(browser) {
   p.on("pageerror", (e) => errors.push(String(e)));
   await p.goto(BASE);
   await p.waitForFunction(() => !!window.__fair);
-  await p.click(".intro-char");
+  await p.click(".intro-enter");
   await viaMap(p, "ร้านกระทง");
   await p.waitForSelector(".panel h2", { timeout: 15000 });
   check("reduced motion: world still works", errors.length === 0, errors.join(" | "));

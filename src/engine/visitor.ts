@@ -4,7 +4,7 @@ import { clamp, dist, lerp } from "./math";
 import { drawPerson, type Hold } from "./person";
 
 /** Things the visitor can stop and do: kneel and pray, shake fortune sticks, kneel to float a krathong. */
-export type Activity = "pray" | "fortune" | "float";
+export type Activity = "pray" | "fortune" | "float" | "lantern";
 import { isWalkable, planPath } from "./walk";
 
 const WALK_SPEED = 250; // world units per second
@@ -21,7 +21,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
     holdColor: undefined as string | undefined,
     holdColor2: undefined as string | undefined,
     act: null as null | { kind: Activity; start: number; until: number; done?: () => void },
-    pose: { kneel: 0, wai: 0, bow: 0 },
+    pose: { kneel: 0, wai: 0, bow: 0, raise: 0 },
     x: layout.spawn.x,
     y: layout.spawn.y,
     facing: 1 as 1 | -1,
@@ -104,11 +104,14 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       // ease into the pose for the current activity
       const a = v.act;
       const el = a ? v.clock - a.start : 0;
-      let kneel = 0, wai = 0, bow = 0;
+      let kneel = 0, wai = 0, bow = 0, raise = 0;
       if (a) {
         const ending = a.until - v.clock < 0.6; // stand up again at the end
-        kneel = ending ? 0 : 1;
-        if (a.kind === "pray") {
+        kneel = ending || a.kind === "lantern" ? 0 : 1;
+        if (a.kind === "lantern") {
+          // stand holding the lantern up in both hands while it fills with warm air, then let go
+          raise = el < a.until - a.start - 0.3 ? 1 : 0;
+        } else if (a.kind === "pray") {
           wai = ending ? 0 : 1;
           // three slow bows (krap) in the middle of the prayer
           const k = (el - 1.4) / 4.2;
@@ -126,6 +129,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       const e = Math.min(1, dt * 5);
       v.pose.kneel = lerp(v.pose.kneel, kneel, e);
       v.pose.wai = lerp(v.pose.wai, wai, e);
+      v.pose.raise = lerp(v.pose.raise, raise, e);
       v.pose.bow = lerp(v.pose.bow, bow, Math.min(1, dt * 4));
     },
 

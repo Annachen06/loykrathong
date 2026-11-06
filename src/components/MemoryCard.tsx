@@ -4,6 +4,8 @@ import { drawPerson, type Hold } from "../engine/person";
 
 export type Memories = {
   wishes: string[];
+  /** wishes sent up with sky lanterns */
+  lanterns: string[];
   fortune: string | null;
   prayed: number;
   offered: string[];
@@ -105,6 +107,7 @@ export function MemoryCard({ memories: m, look, hand, brand, treasureTotal }: Pr
 function memoryRows(m: Memories, treasureTotal: number) {
   const rows: { label: string; text: string }[] = [];
   if (m.wishes.length) rows.push({ label: "คำอธิษฐาน", text: m.wishes.map((w) => w || "ลอยกระทงโดยไม่เขียนคำอธิษฐาน").join(" · ") });
+  if (m.lanterns.length) rows.push({ label: "ปล่อยโคม", text: m.lanterns.map((w) => w || "ปล่อยโคมโดยไม่เขียนคำอธิษฐาน").join(" · ") });
   if (m.prayed) rows.push({ label: "ไหว้พระ", text: m.offered.length ? `${m.prayed} ครั้ง ถวาย${m.offered.join(" ")}` : `${m.prayed} ครั้ง` });
   if (m.fortune) rows.push({ label: "เซียมซี", text: m.fortune });
   if (m.prizes.length) rows.push({ label: "ของรางวัล", text: m.prizes.join(" · ") });

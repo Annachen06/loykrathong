@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activeFestival } from "./festivals";
-import type { FairItem, Scene } from "./festivals/types";
+import type { FairItem, Scene, VisitorLook } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
 import { createVisitor, type Visitor } from "./engine/visitor";
 import { createSound, type Sound, type SoundName } from "./engine/sound";
@@ -12,6 +12,7 @@ import { MapMenu } from "./components/MapMenu";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
+import { LanternForm } from "./components/LanternForm";
 import { FairGames, type Prize } from "./components/FairGames";
 import { ItemPicker } from "./components/ItemPicker";
 import { TemplePanel } from "./components/TemplePanel";
@@ -26,7 +27,7 @@ const NEAR_DISTANCE = 260; // labels appear when the visitor is this close to a 
 
 type Engine = { renderer: Renderer; visitor: Visitor; scene: Scene; sound: Sound };
 
-const EMPTY_MEMORIES: Memories = { wishes: [], fortune: null, prayed: 0, offered: [], prizes: [], treats: [], treasures: [], rode: false, danced: false };
+const EMPTY_MEMORIES: Memories = { wishes: [], lanterns: [], fortune: null, prayed: 0, offered: [], prizes: [], treats: [], treasures: [], rode: false, danced: false };
 
 /** Little pictures of stall items: krathongs are drawn as on the water, everything else as held in the hand. */
 const previewItem = (ctx: CanvasRenderingContext2D, item: FairItem) => {
@@ -186,10 +187,9 @@ export default function App() {
     e.visitor.walkTo(place.anchor, () => setOpenId(id));
   }, [say]);
 
-  const enter = useCallback((visitorId?: string) => {
+  const enter = useCallback((chosen?: VisitorLook) => {
     if (entered) return;
-    const chosen = config.visitors.find((v) => v.id === visitorId);
-    if (chosen) setLook(chosen.look);
+    if (chosen) setLook(chosen);
     engineRef.current?.sound.start();
     setMuted(engineRef.current?.sound.muted ?? false);
     setEntered(true);
@@ -364,6 +364,23 @@ export default function App() {
     }, 1500);
   };
 
+  // ---- the lantern ground: hold your lantern up while it fills with warm air, then let it go
+  const releaseLantern = (lantern: FairItem, wish: string) => {
+    const e = engineRef.current;
+    if (!e) return;
+    setOpenId(null);
+    setRitual(lantern);
+    say("จุดไฟใต้โคม ชูขึ้นสูงๆ รอให้ลมร้อนพยุงโคมขึ้น…");
+    e.visitor.perform("lantern", 3.2, 1, () => {});
+    window.setTimeout(() => {
+      if (e.visitor.act?.kind !== "lantern") { setRitual(null); return; } // walked away before letting go
+      setRitual(null);
+      e.scene.runAction("lanterns", "release", e.visitor, { wish, flower: lantern.color });
+      remember((m) => ({ lanterns: [...m.lanterns, wish] }));
+      say(`ปล่อย${lantern.name}ลอยขึ้นฟ้าแล้ว แตะที่โคมเพื่ออ่านคำอธิษฐานได้นะ`);
+    }, 2700);
+  };
+
   // ---- stalls: everything is free to pick up
   const pick = (item: FairItem) => {
     const e = engineRef.current;
@@ -455,6 +472,7 @@ export default function App() {
           {openPlace.panel === "float" && openPlace.action && (
             <FloatForm label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} />
           )}
+          {openPlace.panel === "lantern" && openPlace.items && <LanternForm lanterns={openPlace.items} onRelease={releaseLantern} />}
           {openPlace.panel === "games" && <FairGames onPrize={onPrize} onPop={() => sfx("pop")} />}
           {openPlace.panel === "temple" && <TemplePanel offering={offering} fortune={memories.fortune} onPray={pray} onFortune={shakeFortune} />}
           {openPlace.panel === "krathongShop" && (

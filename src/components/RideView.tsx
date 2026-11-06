@@ -76,7 +76,7 @@ export function RideView({ show, progress, source }: { show: boolean; progress: 
       last = now;
       const t = (now - t0) / 1000;
       const src = sourceRef.current();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const vw = c.clientWidth, vh = c.clientHeight;
       if (c.width !== Math.round(vw * dpr) || c.height !== Math.round(vh * dpr)) {
         c.width = Math.round(vw * dpr);

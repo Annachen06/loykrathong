@@ -1,5 +1,5 @@
 // Everything specific to the Loy Krathong edition lives in this folder.
-// The name of the fair (brand) also appears on the entrance arch.
+// The name of the fair (brand) also appears on the arch over the way onto the pier.
 // Text, places, layout and colours are plain data so they're easy to edit.
 import type { FestivalConfig } from "../types";
 
@@ -11,7 +11,7 @@ export const loyKrathongConfig: FestivalConfig = {
   intro: {
     eyebrow: "คืนวันเพ็ญ เดือนสิบสอง",
     enterLabel: "เข้างาน",
-    pickLabel: "เลือกตัวละคร แล้วเข้างานได้เลย",
+    pickLabel: "แต่งตัวละครในแบบของคุณ แล้วเข้างานได้เลย",
     help: "แตะพื้นทรายเพื่อเดิน แตะดวงไฟเพื่อไปเที่ยวซุ้มต่างๆ",
   },
   welcomeHint: "แตะพื้นทรายเพื่อเดิน หรือแตะดวงไฟเพื่อไปเที่ยว",
@@ -64,16 +64,6 @@ export const loyKrathongConfig: FestivalConfig = {
 
   places: [
     {
-      id: "entrance",
-      name: "ซุ้มประตูงาน",
-      shortName: "ทางเข้า",
-      marker: { x: 640, y: 618 },
-      anchor: { x: 640, y: 846 },
-      hitArea: { x0: 565, y0: 630, x1: 715, y1: 815 },
-      description: "ยินดีต้อนรับสู่งานวัดริมทะเล ไหว้พระที่วัด ขึ้นชิงช้าสวรรค์ รำวง เล่นเกม เลือกกระทง แล้วไปลอยที่ปลายสะพานใต้พระจันทร์เต็มดวง",
-      action: { id: "tour", label: "ไปเลือกกระทงกัน", doneHint: "กำลังเดินไปร้านกระทง", goTo: "boutique" },
-    },
-    {
       id: "temple",
       name: "วัดริมทะเล",
       shortName: "วัด",
@@ -89,7 +79,7 @@ export const loyKrathongConfig: FestivalConfig = {
       shortName: "ชิงช้าสวรรค์",
       marker: { x: 860, y: 404 },
       anchor: { x: 860, y: 842 },
-      hitArea: { x0: 690, y0: 420, x1: 1030, y1: 812 },
+      hitArea: { x0: 712, y0: 420, x1: 1030, y1: 812 },
       description: "นั่งกระเช้าขึ้นไปชมวิว หมุนครบหนึ่งรอบ มองเห็นทะเล พระจันทร์ กระทงเต็มน้ำ และงานวัดข้างล่าง",
       action: { id: "ride", label: "ขึ้นชิงช้าสวรรค์", doneHint: "นั่งในกระเช้าแล้ว หมุนครบรอบจะพากลับลงมา" },
     },
@@ -174,6 +164,23 @@ export const loyKrathongConfig: FestivalConfig = {
       ],
     },
     {
+      id: "lanterns",
+      name: "ลานปล่อยโคม",
+      shortName: "ปล่อยโคม",
+      marker: { x: 656, y: 700 },
+      anchor: { x: 602, y: 902 },
+      hitArea: { x0: 600, y0: 712, x1: 710, y1: 866 },
+      description: "เลือกโคมลอยสักใบ ตั้งจิตอธิษฐาน แล้วปล่อยให้ลอยขึ้นไปหาพระจันทร์ เหมือนปล่อยเรื่องร้ายๆ ให้ลอยไป",
+      panel: "lantern",
+      stat: { key: "lanternsReleased", label: "โคมที่คุณปล่อย" },
+      items: [
+        { id: "lantern-orange", name: "โคมสีส้ม", text: "สีดั้งเดิม อบอุ่นเหมือนแสงเทียน", hold: "lantern", color: "#ffb35c" },
+        { id: "lantern-pink", name: "โคมสีชมพู", text: "ขอเรื่องความรักให้สดใส", hold: "lantern", color: "#ff9ec0" },
+        { id: "lantern-white", name: "โคมสีขาว", text: "ใจสงบ เริ่มต้นใหม่", hold: "lantern", color: "#fff4e2" },
+        { id: "lantern-gold", name: "โคมสีทอง", text: "ขอให้โชคดี มีเงินมีทอง", hold: "lantern", color: "#ffd95a" },
+      ],
+    },
+    {
       id: "ice",
       name: "ร้านน้ำแข็งไส",
       shortName: "น้ำแข็งไส",
@@ -210,7 +217,7 @@ export const loyKrathongConfig: FestivalConfig = {
       { id: "pier", rect: { x0: 1876, y0: 628, x1: 1924, y1: 812 } },
     ],
     junctions: [{ a: "beach", b: "pier", via: { x: 1900, y: 824 } }],
-    spawn: { x: 640, y: 890 },
+    spawn: { x: 1760, y: 890 },
     depth: { yBack: 630, yFront: 975, scaleBack: 0.8, scaleFront: 1.25 },
   },
 

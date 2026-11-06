@@ -22,9 +22,10 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   // The cached front layer is empty above the tallest building; only the part with something in it is copied each frame.
   let frontTop = 0;
 
-  // Smoothness first: if frames come too slowly, draw at a slightly lower resolution (sharp screens have pixels to spare).
-  // Steps only go down, after two slow stretches in a row, so a single hiccup doesn't blur the picture.
-  const QUALITY = [2, 1.5, 1.25, 1];
+  // A last resort for very slow devices: if frames come well under 40 a second, draw at a slightly lower
+  // resolution, but never below 1.5 pixels per point on a sharp screen, so text and outlines stay crisp.
+  // It only steps down after two slow stretches in a row, so a single hiccup changes nothing.
+  const QUALITY = [2, 1.5];
   let quality = 0;
   let slowRuns = 0;
   let sampleFrom = 0;
@@ -36,11 +37,11 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     const sorted = samples.slice().sort((a, b) => a - b);
     const typical = sorted[Math.floor(sorted.length / 2)];
     samples.length = 0;
-    slowRuns = typical > 0.0185 ? slowRuns + 1 : 0; // under about 55 frames a second
-    if (slowRuns >= 2 && renderDpr() > 1) {
+    slowRuns = typical > 0.026 ? slowRuns + 1 : 0; // under about 38 frames a second
+    if (slowRuns >= 2 && renderDpr() > 1.5) {
       while (quality < QUALITY.length - 1 && QUALITY[quality] >= renderDpr()) quality++;
       slowRuns = 0;
-      resize(false); // repaint the scenery at the new resolution, but keep the camera where it is
+      resize(false); // new canvas size; the camera stays where it is
     }
   }
   const renderDpr = () => Math.min(window.devicePixelRatio || 1, QUALITY[quality]);
@@ -63,7 +64,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
         y: over.wide && view.visH > H ? H - view.visH : clamp(over.y - view.visH / 2, 0, Math.max(0, H - view.visH)),
       };
     }
-    const focusX = following ? visitor.x : config.layout.spawn.x + view.visW * 0.35;
+    const focusX = following ? visitor.x : config.layout.spawn.x + view.visW * 0.12;
     return {
       x: clamp(focusX - view.visW / 2, 0, Math.max(0, W - view.visW)),
       y: view.visH < H * 0.9 && view.vw / view.vh < 0.9
@@ -74,7 +75,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   }
 
   function paintLayers() {
-    let k = view.scale * view.dpr; // same resolution as the screen, so copying it each frame is a plain 1:1 copy
+    let k = view.scale * Math.min(window.devicePixelRatio || 1, 2); // always at the screen's full sharpness
     k = Math.min(k, Math.sqrt(MAX_LAYER_PIXELS / (W * H)));
     view.layerK = k;
     for (const [layer, paint] of [[back, scene.paintBack], [front, scene.paintFront]] as const) {

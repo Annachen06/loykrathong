@@ -1,7 +1,7 @@
 // The living part of the Loy Krathong world: everything that moves or reacts.
 import type { Actor, CameraView, Point, Scene, TapResult, VisitorLook } from "../types";
 import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../../engine/math";
-import { drawPerson, type Hold, type Pose } from "../../engine/person";
+import { drawPerson, LANTERN_UP, type Hold, type Pose } from "../../engine/person";
 import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
 import { boothSign, drawKrathongCached, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
@@ -9,7 +9,8 @@ import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, S
 
 type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string };
 const STYLES = ["banana", "banana", "lotus", "bread", "coconut"];
-type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number };
+/** A sky lantern (khom loi). Yours carry your colour and wish and can be tapped while they are still low enough to reach. */
+type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; wish?: string; age?: number };
 type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; rgb: string; g: number; size: number; front: boolean; flash?: boolean };
 type Petal = { x: number; y: number; vx: number; vy: number; rot: number; spin: number; life: number; color: string };
 
@@ -39,6 +40,7 @@ export function createLoyKrathongScene(): Scene {
     { x: 1150, y: 690, p: 4, hue: "143,216,200" },
   ];
   let mineCount = 0;
+  let lanternCount = 0;
   let pokes = 0;
   let nextFloater = 1, nextLantern = 0.5, nextFirework = 4, nextStar = 6;
 
@@ -301,6 +303,74 @@ export function createLoyKrathongScene(): Scene {
   // ---------------------------------------------------- the temple altar (โต๊ะหมู่บูชา)
   const ALTAR = { x: 246, y: 834 };
   const altar = { lit: -99, offered: [] as Hold[], glow: 0 };
+  // ---------------------------------------------------- the sky-lantern table (ลานปล่อยโคม)
+  // A low table with folded paper lanterns waiting to be opened, a few already lit, and a helper who lights them.
+  const TABLE = { x: 656, y: 858 };
+  const helper = crowdLooks[7 % crowdLooks.length];
+  const TABLE_COLORS = ["#ffb35c", "#ff9ec0", "#fff4e2", "#ffd95a", "#ffb35c"];
+  const tableActor: Actor = {
+    y: TABLE.y,
+    draw(ctx, t) {
+      const { x, y } = TABLE;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(x, y + 2, 50, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      drawPerson(ctx, x + 30, y - 16, depthScale(y - 16) * 0.95, -1, 0, 0, t, helper, {});
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2;
+      // legs and top
+      ctx.fillStyle = "#7a5a4a";
+      for (const dx of [-36, 30]) { ctx.fillRect(x + dx, y - 34, 6, 34); ctx.strokeRect(x + dx, y - 34, 6, 34); }
+      ctx.fillStyle = "#c98a5a";
+      ctx.beginPath();
+      ctx.roundRect(x - 44, y - 42, 88, 10, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#e8c066";
+      ctx.fillRect(x - 44, y - 34, 88, 4);
+      // folded lanterns stacked on the table
+      for (let i = 0; i < 5; i++) {
+        const lx = x - 34 + i * 15, ly = y - 42;
+        ctx.fillStyle = TABLE_COLORS[i];
+        ctx.beginPath();
+        ctx.moveTo(lx - 6, ly);
+        ctx.lineTo(lx - 7, ly - 14);
+        ctx.quadraticCurveTo(lx, ly - 19, lx + 7, ly - 14);
+        ctx.lineTo(lx + 6, ly);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+      // one lit and ready, glowing on a little stand
+      const flick = 0.85 + 0.15 * Math.sin(t * 8);
+      glow(ctx, x - 58, y - 70, 42, "255,190,110", 0.5 * flick);
+      ctx.fillStyle = "#6a4a3a";
+      ctx.fillRect(x - 60, y - 52, 4, 52);
+      ctx.fillStyle = "#ffb35c";
+      ctx.beginPath();
+      ctx.moveTo(x - 66, y - 54);
+      ctx.lineTo(x - 69, y - 76);
+      ctx.quadraticCurveTo(x - 58, y - 86, x - 47, y - 76);
+      ctx.lineTo(x - 50, y - 54);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.globalAlpha = 0.6 * flick;
+      ctx.fillStyle = "#fff2c0";
+      ctx.beginPath();
+      ctx.ellipse(x - 58, y - 62, 4, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      boothSign(ctx, x, y - 112, "ปล่อยโคม");
+      ctx.restore();
+    },
+  };
+
   // ---------------------------------------------------- flower cart by the temple gate
   // Flowers for the temple are sold right outside it, as at a real temple fair: jasmine garlands, lotus buds, marigolds.
   const CART = { x: 522, y: 852 };
@@ -647,6 +717,15 @@ export function createLoyKrathongScene(): Scene {
 
     for (const l of lanterns) {
       l.p += dt;
+      if (l.mine) {
+        // yours lifts off slowly from your hands, then catches the sea breeze
+        l.age = (l.age ?? 0) + dt;
+        const lift = Math.min(1, l.age / 3);
+        l.y += l.vy * dt * (0.35 + lift * 0.9);
+        l.x += (Math.sin(l.p * 0.5) * l.sway * 0.4 + 7) * dt * lift;
+        l.s = Math.max(0.45, l.s - dt * 0.012);
+        continue;
+      }
       l.y += l.vy * dt * (0.5 + l.s * 0.6);
       l.x += Math.sin(l.p * 0.5) * l.sway * dt * 0.4 + 4 * dt;
       l.s = Math.max(0.25, l.s - dt * 0.01);
@@ -1265,10 +1344,51 @@ export function createLoyKrathongScene(): Scene {
     }
   }
 
+  /** Your own lantern: bigger, in the colour you chose, with a flame you can see through the paper. */
+  function drawMyLantern(ctx: CanvasRenderingContext2D, l: Lantern, t: number) {
+    const s = l.s, x = l.x, y = l.y;
+    const flick = 0.88 + 0.12 * Math.sin(t * 9 + l.p * 5);
+    glow(ctx, x, y + 4 * s, 64 * s, "255,190,110", 0.6 * flick);
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.fillStyle = l.color ?? "#ffb35c";
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = Math.max(1, 1.6 * s);
+    ctx.beginPath();
+    ctx.moveTo(x - 10 * s, y + 14 * s);
+    ctx.lineTo(x - 14 * s, y - 12 * s);
+    ctx.quadraticCurveTo(x, y - 24 * s, x + 14 * s, y - 12 * s);
+    ctx.lineTo(x + 10 * s, y + 14 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // the warm light inside the paper
+    ctx.globalAlpha = 0.55 * flick;
+    ctx.fillStyle = "#fff2c0";
+    ctx.beginPath();
+    ctx.ellipse(x, y + 4 * s, 6 * s, 9 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // the wire ring and the little fuel cake burning at the bottom
+    ctx.strokeStyle = "rgba(42,29,74,0.7)";
+    ctx.lineWidth = Math.max(0.8, 1.1 * s);
+    ctx.beginPath();
+    ctx.moveTo(x - 10 * s, y + 14 * s);
+    ctx.lineTo(x, y + 19 * s);
+    ctx.lineTo(x + 10 * s, y + 14 * s);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(255,${Math.round(200 * flick)},90,1)`;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 18 * s, 2.4 * s, 3.4 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawTop(ctx: CanvasRenderingContext2D, t: number) {
     drawPierWishes(ctx);
     drawCurioHints(ctx, t);
     for (const l of lanterns) {
+      if (l.mine) { drawMyLantern(ctx, l, t); continue; }
       const s = l.s;
       const flick = 0.85 + 0.15 * Math.sin(t * 8 + l.p * 5);
       glow(ctx, l.x, l.y, 40 * s, "255,180,100", 0.55 * flick);
@@ -1316,7 +1436,7 @@ export function createLoyKrathongScene(): Scene {
     drawMiddle,
     drawGround,
     events,
-    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, cartActor, ringActor],
+    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, cartActor, tableActor, ringActor],
     camera() {
       if (ride.active) {
         const c = cabinPos(ride.cabin);
@@ -1337,6 +1457,16 @@ export function createLoyKrathongScene(): Scene {
         spawnFloater(PIER.x1 + 8, PIER.y0 - 10, true, input?.wish ?? "", input?.style, input?.flower);
         mineCount++;
         burst(PIER.x1 + 8, PIER.y0 - 24, "255,214,140", 14);
+        return true;
+      }
+      if (placeId === "lanterns" && actionId === "release") {
+        // it leaves your raised hands exactly where you were holding it (see the raised pose in person.ts)
+        const ps = depthScale(visitor.y) * 1.08;
+        const ly = visitor.y + (-50.5 - 21.5 - 6 * LANTERN_UP) * ps;
+        lanterns.push({ x: visitor.x + ps, y: ly, vy: -rand(22, 26), sway: rand(10, 16), p: rand(0, 6.28), s: 0.4 * LANTERN_UP * ps, mine: true, color: input?.flower, wish: input?.wish ?? "", age: 0 });
+        lanternCount++;
+        burst(visitor.x, ly + 10 * ps, "255,214,140", 12);
+        events.push({ name: "chime", x: visitor.x, y: visitor.y });
         return true;
       }
       if (placeId === "temple" && actionId === "incense") {
@@ -1397,6 +1527,12 @@ export function createLoyKrathongScene(): Scene {
         found.add(c.id);
         return { found: { id: c.id, label: c.label, text: c.found } };
       }
+      // your own sky lantern, while it's still low enough to tap
+      for (const l of lanterns) {
+        if (!l.mine || dist(p.x, p.y, l.x, l.y) > 34 * l.s + 14) continue;
+        burst(l.x, l.y, "255,246,225", 6);
+        return { bubble: { title: "คำอธิษฐานบนโคมของคุณ", text: l.wish || "โคมของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag } };
+      }
       // a krathong on the water: read its wish
       let best: Floater | null = null, bestD = Infinity;
       for (const k of floaters) {
@@ -1415,9 +1551,12 @@ export function createLoyKrathongScene(): Scene {
       };
     },
     visitorAway: () => ride.active || stageGuest.active,
-    debug: () => ({ floaters: floaters.map((k) => ({ x: k.x, y: k.y, wish: k.wish, mine: k.mine })) }),
+    debug: () => ({
+      floaters: floaters.map((k) => ({ x: k.x, y: k.y, wish: k.wish, mine: k.mine })),
+      lanterns: lanterns.map((l) => ({ x: l.x, y: l.y, mine: !!l.mine })),
+    }),
     stats: () => ({
-      krathongsFloated: mineCount, curioTaps: pokes, riding: ride.active ? 1 : 0,
+      krathongsFloated: mineCount, lanternsReleased: lanternCount, curioTaps: pokes, riding: ride.active ? 1 : 0,
       rideView: ride.active && ride.t > 1.6 ? 1 : 0, rideProgress: ride.turned / (Math.PI * 2),
       // where your cabin is: 0 at the bottom of the wheel, 1 at the top, and its place along the beach
       rideHigh: ride.active ? clamp((WHEEL.hubY + WHEEL.r - cabinPos(ride.cabin).y) / (WHEEL.r * 2), 0, 1) : 0,
