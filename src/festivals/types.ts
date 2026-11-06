@@ -143,6 +143,8 @@ export type FestivalConfig = {
     sampleTag: string;
     yourWishTag: string;
   };
+  /** An optional "buy me a coffee" corner in the Memory Corner. The fair takes no payments itself: it only links to the owner's own page or shows their QR. Hidden while neither is set. */
+  support?: { title: string; text: string; url?: string; linkLabel?: string; qr?: string };
   /** Sections of the map, in order, e.g. "ทำบุญ", "เดินเล่น", "ลอยกระทง". Each place says which one it belongs to. */
   mapGroups: { id: string; label: string; icon: string }[];
   /** The "where first?" question shown on arrival. `go` is the place to walk to; leave it out to just start strolling. */

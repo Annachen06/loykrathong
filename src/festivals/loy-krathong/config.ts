@@ -24,6 +24,12 @@ export const loyKrathongConfig: FestivalConfig = {
     sampleTag: "ตัวอย่าง",
     yourWishTag: "ของคุณ · เห็นแค่คุณ",
   },
+  // The owner's own tip page or PromptPay QR goes here (nothing is shown until one is set).
+  support: {
+    title: "ซื้อกาแฟให้กำลังใจคนทำ",
+    text: "งานนี้ทำด้วยใจ เล่นฟรีทุกอย่าง ถ้าชอบและอยากเป็นกำลังใจ ร่วมสมทบได้นิดหน่อยตามสะดวกนะคะ ไม่มีผลกับของที่ได้ในงาน",
+    linkLabel: "ให้กำลังใจ",
+  },
   mapGroups: [
     { id: "merit", label: "ทำบุญ", icon: "🙏" },
     { id: "stroll", label: "เดินเล่นในงาน", icon: "🎡" },

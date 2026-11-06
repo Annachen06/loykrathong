@@ -526,6 +526,7 @@ export default function App() {
               hand={hand?.hold ? { hold: hand.hold, color: hand.color, color2: hand.color2, style: hand.style } : undefined}
               brand={config.brand}
               treasureTotal={config.curios.length}
+              support={config.support}
             />
           )}
         </PlacePanel>

@@ -22,10 +22,11 @@ type Props = {
   hand?: { hold: Hold; color?: string; color2?: string; style?: string };
   brand: string;
   treasureTotal: number;
+  support?: { title: string; text: string; url?: string; linkLabel?: string; qr?: string };
 };
 
 /** What you did tonight, gathered into a souvenir card you can save as a picture. Nothing leaves this device. */
-export function MemoryCard({ memories: m, look, hand, brand, treasureTotal }: Props) {
+export function MemoryCard({ memories: m, look, hand, brand, treasureTotal, support }: Props) {
   const [image, setImage] = useState<string | null>(null);
   const rows = memoryRows(m, treasureTotal);
 
@@ -100,6 +101,16 @@ export function MemoryCard({ memories: m, look, hand, brand, treasureTotal }: Pr
         </div>
       )}
       <p className="wish-fine">การ์ดสร้างในเครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นที่ไหน</p>
+      {support && (support.url || support.qr) && (
+        <aside className="support" aria-label={support.title}>
+          <h3>{support.title}</h3>
+          <p>{support.text}</p>
+          {support.qr && <img className="support-qr" src={support.qr} alt="QR สำหรับให้กำลังใจ" />}
+          {support.url && (
+            <a className="panel-action secondary" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
+          )}
+        </aside>
+      )}
     </div>
   );
 }
