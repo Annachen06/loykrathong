@@ -62,6 +62,7 @@ export function drawPerson(
   const age = c.age ?? "adult";
   const b = BODY[age];
   const woman = c.figure === "woman";
+  const neutral = c.figure === "neutral";
   const dance = pose.dance ?? 0;
   const wai = pose.wai ?? 0;
   const raise = pose.raise ?? 0;
@@ -81,9 +82,9 @@ export function drawPerson(
   const hipY = lerp(standHipY, lowHipY, lower);
   const waistY = hipY - (age === "kid" ? 3 : 5);
   const sY = hipY - b.torso; // top of the shoulders
-  const sw = b.shoulder * (woman ? 0.88 : 1);
-  const hw = b.hip * (woman ? 1.06 : 1);
-  const ww = woman ? hw * 0.8 : hw * 0.98;
+  const sw = b.shoulder * (woman ? 0.88 : neutral ? 0.94 : 1);
+  const hw = b.hip * (woman ? 1.06 : neutral ? 1.03 : 1);
+  const ww = woman ? hw * 0.8 : neutral ? hw * 0.9 : hw * 0.98;
   const stoop = age === "elder" ? 2 : 0;
   const r = b.head;
   const hx = 1 + stoop;
@@ -135,7 +136,7 @@ export function drawPerson(
     const o = c.outfit;
     if (o === "shirt-pants" || o === "blouse-pants") {
       limb(ctx, [hip, knee, ankle], b.limb + (o === "blouse-pants" ? 1.2 : 0.5), c.bottom, O);
-    } else if (o === "shirt-shorts") {
+    } else if (o === "shirt-shorts" || o === "blouse-shorts") {
       limb(ctx, [knee, ankle], b.limb - 1.3, c.skin, O);
       limb(ctx, [hip, mix(hip, knee, 1.08)], b.limb + 1.6, c.bottom, O);
     } else {
@@ -252,7 +253,7 @@ export function drawPerson(
       shape(c.top, () => { ctx.moveTo(3.8, sY - 1.2); ctx.lineTo(0.6, sY + 3.4); ctx.lineTo(1.8, sY - 1.4); }, 1.1);
       ctx.fillStyle = O;
       for (let by = sY + 6; by < hemY - 2; by += 4.5) { ctx.beginPath(); ctx.arc(0.8, by, 0.55, 0, Math.PI * 2); ctx.fill(); }
-    } else if (woman) {
+    } else if (woman || neutral) {
       shape(c.skin, () => ctx.ellipse(0.6, sY - 1, 3, 2.2, 0, 0, Math.PI), 1.1);
     } else {
       ctx.strokeStyle = O;
@@ -340,8 +341,15 @@ export function drawPerson(
     case "shirt-pants":
     case "shirt-shorts":
     case "blouse-pants":
+    case "blouse-shorts":
       waistband();
       top(hemShirt, hw + 0.8);
+      break;
+    case "shirt-skirt":
+      // a tucked-in shirt over a skirt
+      top(waistY + 1.5, ww + 0.3);
+      if (seated) lap();
+      else skirt(kneeY + (age === "kid" ? 1 : 3), age === "kid" ? 2.6 : 3.4);
       break;
     case "blouse-skirt":
       top(waistY + 1.5, ww + 0.3);

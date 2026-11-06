@@ -35,8 +35,11 @@ export type Place = {
   id: string;
   /** Full name shown on the marker and the card, e.g. "ชิงช้าสวรรค์". */
   name: string;
-  /** Short name for the bottom row of places. */
+  /** Short name for the map. */
   shortName: string;
+  /** Which section of the map lists it (see FestivalConfig.mapGroups), and a small picture (an emoji) for its tile. */
+  group?: string;
+  icon?: string;
   /** Where the small glowing marker sits in the world. */
   marker: Point;
   /** Where the visitor character walks to and stops. */
@@ -105,9 +108,12 @@ export type VisitorLook = {
   /** Pattern, hem band and hair-tie colour. */
   accent: string;
   outline: string;
-  figure: "man" | "woman";
-  /** Men wear shirts with trousers or shorts; skirts, pha sin and dresses are for women and girls. */
-  outfit: "shirt-pants" | "shirt-shorts" | "blouse-pants" | "blouse-skirt" | "pha-sin" | "dress";
+  /** Body build. Visitors always use "neutral": clothes and hair are chosen freely, with no gender attached. Crowd extras may use the others. */
+  figure: "man" | "woman" | "neutral";
+  /** Any outfit goes with any body: nothing is "for" one gender. */
+  outfit: "shirt-pants" | "shirt-shorts" | "shirt-skirt" | "blouse-pants" | "blouse-shorts" | "blouse-skirt" | "pha-sin" | "dress";
+  /** Who the visitor is tonight: decides which fortune slips they get. */
+  stage?: "student" | "worker" | "other";
   hairStyle: "short" | "crop" | "bald" | "long" | "ponytail" | "bob" | "bun";
   age?: "adult" | "kid" | "elder";
   sleeves?: "short" | "long" | "none";
@@ -137,10 +143,14 @@ export type FestivalConfig = {
     sampleTag: string;
     yourWishTag: string;
   };
+  /** Sections of the map, in order, e.g. "ทำบุญ", "เดินเล่น", "ลอยกระทง". Each place says which one it belongs to. */
+  mapGroups: { id: string; label: string; icon: string }[];
+  /** The "where first?" question shown on arrival. `go` is the place to walk to; leave it out to just start strolling. */
+  startChoices: { id: string; icon: string; label: string; text: string; go?: string; hint: string }[];
   /** Clearly-labelled example wishes shown on other krathongs until there is a real shared wall. */
   sampleWishes: string[];
   /** Fortune slips for the temple's siamsi sticks. */
-  fortunes: string[];
+  fortunes: { student: string[]; worker: string[]; other: string[] };
   /** Krathong designs to choose from at the krathong shop. */
   krathongs: FairItem[];
   welcomeHint: string;

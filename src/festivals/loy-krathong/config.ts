@@ -5,7 +5,7 @@ import type { FestivalConfig } from "../types";
 
 export const loyKrathongConfig: FestivalConfig = {
   id: "loy-krathong",
-  brand: "ลอยกระทงริมเล",
+  brand: "ลอยกระทงริมทะเล",
   tagline: "งานวัดเล็กๆ ริมทะเล",
   edition: "ไหว้พระ เล่นเกม รำวง แล้วไปลอยกระทงกัน",
   intro: {
@@ -24,6 +24,16 @@ export const loyKrathongConfig: FestivalConfig = {
     sampleTag: "ตัวอย่าง",
     yourWishTag: "ของคุณ · เห็นแค่คุณ",
   },
+  mapGroups: [
+    { id: "merit", label: "ทำบุญ", icon: "🙏" },
+    { id: "stroll", label: "เดินเล่นในงาน", icon: "🎡" },
+    { id: "float", label: "ลอยกระทง ปล่อยโคม", icon: "🏮" },
+  ],
+  startChoices: [
+    { id: "merit", icon: "🙏", label: "ไปทำบุญก่อน", text: "ไหว้พระ จุดธูป เสี่ยงเซียมซี", go: "temple", hint: "ถึงวัดแล้ว ไหว้พระและเสี่ยงเซียมซีได้เลย" },
+    { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายเพื่อเดิน หรือแตะดวงไฟเพื่อไปเที่ยว" },
+    { id: "float", icon: "🪔", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
+  ],
   // Example wishes for the other krathongs on the water. Always shown with a "ตัวอย่าง" tag:
   // there is no shared online wall yet, so these are not real visitors.
   sampleWishes: [
@@ -42,17 +52,40 @@ export const loyKrathongConfig: FestivalConfig = {
   ],
 
   // Fortune slips for the siamsi sticks at the temple. Written for fun, all gentle.
-  fortunes: [
-    "ใบที่ ๑ · ดวงดีมาก สิ่งที่ตั้งใจไว้ค่อยๆ เป็นจริง อดทนอีกนิดนะ",
-    "ใบที่ ๗ · การงานรุ่งเรือง จะมีผู้ใหญ่ใจดีคอยช่วยเหลือ",
-    "ใบที่ ๑๒ · ความรักสดใส คนที่อยู่ข้างๆ คือคนที่ห่วงใยคุณจริง",
-    "ใบที่ ๑๘ · การเงินคล่องตัว ใช้จ่ายพอดีแล้วจะมีเก็บ",
-    "ใบที่ ๒๑ · สุขภาพแข็งแรง พักผ่อนให้พอแล้วทุกอย่างจะดีขึ้น",
-    "ใบที่ ๒๕ · การเดินทางราบรื่น จะได้เจอเพื่อนใหม่ที่ดี",
-    "ใบที่ ๒๘ · ครอบครัวอบอุ่น จะมีข่าวดีจากคนไกลบ้าน",
-    "ใบที่ ๓๐ · เรื่องที่กังวลอยู่จะคลี่คลายในเร็ววัน",
-    "ใบที่ ๓๓ · การเรียนก้าวหน้า ตั้งใจอีกนิดจะได้ผลเกินคาด",
-  ],
+  fortunes: {
+    // วัยเรียน: study, exams, the road ahead, a little love
+    student: [
+      "ใบที่ ๓๓ · การเรียนก้าวหน้า ตั้งใจอีกนิดจะได้ผลเกินคาด",
+      "ใบที่ ๑๔ · การสอบราบรื่น อ่านทบทวนอีกหน่อยแล้วจะจำได้แม่นขึ้น",
+      "ใบที่ ๑๙ · จะได้เพื่อนร่วมทีมที่ใจดี งานกลุ่มผ่านไปได้ด้วยดี",
+      "ใบที่ ๒๓ · เส้นทางเรียนต่อชัดเจนขึ้น อย่าเพิ่งกังวลเกินไป",
+      "ใบที่ ๒๖ · สิ่งที่ฝึกฝนวันนี้จะเป็นต้นทุนที่ดีในอนาคต มีโอกาสดีรออยู่",
+      "ใบที่ ๓๙ · ผลสอบหรือผลงานที่รอคอยจะออกมาน่าพอใจ",
+      "ใบที่ ๑๒ · ความรักสดใส คนที่อยู่ข้างๆ คือคนที่ห่วงใยคุณจริง",
+      "ใบที่ ๓๕ · มีคนแอบเอ็นดูอยู่ ใจเย็นๆ แล้วเรื่องดีๆ จะมาเอง",
+    ],
+    // วัยทำงาน: money, work, health, love, a little luck
+    worker: [
+      "ใบที่ ๗ · การงานรุ่งเรือง จะมีผู้ใหญ่ใจดีคอยช่วยเหลือ",
+      "ใบที่ ๒๙ · งานที่ติดขัดจะคลี่คลาย มีโอกาสดีเข้ามาในเร็วๆ นี้",
+      "ใบที่ ๑๘ · การเงินคล่องตัว ใช้จ่ายพอดีแล้วจะมีเก็บ",
+      "ใบที่ ๔๑ · มีรายได้เสริมเข้ามาแบบไม่คาดคิด แต่อย่าลืมเก็บออมไว้บ้าง",
+      "ใบที่ ๒๑ · สุขภาพแข็งแรง พักผ่อนให้พอแล้วทุกอย่างจะดีขึ้น",
+      "ใบที่ ๓๔ · เหนื่อยมาเยอะแล้ว ดูแลตัวเองให้ดี แล้วแรงจะกลับมา",
+      "ใบที่ ๑๒ · ความรักสดใส คนที่อยู่ข้างๆ คือคนที่ห่วงใยคุณจริง",
+      "ใบที่ ๔๕ · โชคลาภเล็กๆ กำลังเดินทางมา ลองเปิดใจรับโอกาสใหม่ดูนะ",
+    ],
+    // อื่นๆ: a bit of everything: money, work, love, health
+    other: [
+      "ใบที่ ๑ · ดวงดีมาก สิ่งที่ตั้งใจไว้ค่อยๆ เป็นจริง อดทนอีกนิดนะ",
+      "ใบที่ ๑๘ · การเงินคล่องตัว ใช้จ่ายพอดีแล้วจะมีเก็บ",
+      "ใบที่ ๗ · การงานรุ่งเรือง จะมีผู้ใหญ่ใจดีคอยช่วยเหลือ",
+      "ใบที่ ๑๒ · ความรักสดใส คนที่อยู่ข้างๆ คือคนที่ห่วงใยคุณจริง",
+      "ใบที่ ๒๑ · สุขภาพแข็งแรง พักผ่อนให้พอแล้วทุกอย่างจะดีขึ้น",
+      "ใบที่ ๒๘ · ครอบครัวอบอุ่น จะมีข่าวดีจากคนไกลบ้าน",
+      "ใบที่ ๓๐ · เรื่องที่กังวลอยู่จะคลี่คลายในเร็ววัน",
+    ],
+  },
 
   // Krathong designs at the krathong shop. Free to pick: nothing is sold in the game.
   krathongs: [
@@ -69,6 +102,8 @@ export const loyKrathongConfig: FestivalConfig = {
   places: [
     {
       id: "temple",
+      group: "merit",
+      icon: "🛕",
       name: "วัดริมทะเล",
       shortName: "วัด",
       marker: { x: 300, y: 420 },
@@ -79,6 +114,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "wheel",
+      group: "stroll",
+      icon: "🎡",
       name: "ชิงช้าสวรรค์",
       shortName: "ชิงช้าสวรรค์",
       marker: { x: 860, y: 404 },
@@ -89,6 +126,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "stage",
+      group: "stroll",
+      icon: "🎶",
       name: "เวทีรำวง",
       shortName: "รำวง",
       marker: { x: 1145, y: 556 },
@@ -99,6 +138,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "games",
+      group: "stroll",
+      icon: "🎯",
       name: "ซุ้มเกม",
       shortName: "ซุ้มเกม",
       marker: { x: 1445, y: 628 },
@@ -109,6 +150,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "boutique",
+      group: "float",
+      icon: "🌸",
       name: "ร้านกระทง",
       shortName: "ร้านกระทง",
       marker: { x: 1740, y: 630 },
@@ -119,6 +162,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "shore",
+      group: "float",
+      icon: "🌊",
       name: "ท่าลอยกระทง",
       shortName: "ลอยกระทง",
       marker: { x: 1900, y: 556 },
@@ -130,6 +175,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "candy",
+      group: "stroll",
+      icon: "🍭",
       name: "ร้านสายไหม",
       shortName: "สายไหม",
       marker: { x: 2095, y: 650 },
@@ -144,6 +191,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "memory",
+      group: "stroll",
+      icon: "📷",
       name: "มุมความทรงจำ",
       shortName: "ความทรงจำ",
       marker: { x: 2406, y: 648 },
@@ -154,6 +203,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "flowers",
+      group: "merit",
+      icon: "🌼",
       name: "ร้านดอกไม้",
       shortName: "ร้านดอกไม้",
       marker: { x: 522, y: 664 },
@@ -169,6 +220,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "lanterns",
+      group: "float",
+      icon: "🏮",
       name: "ลานปล่อยโคม",
       shortName: "ปล่อยโคม",
       marker: { x: 656, y: 700 },
@@ -190,6 +243,8 @@ export const loyKrathongConfig: FestivalConfig = {
     },
     {
       id: "ice",
+      group: "stroll",
+      icon: "🍧",
       name: "ร้านน้ำแข็งไส",
       shortName: "น้ำแข็งไส",
       marker: { x: 2200, y: 650 },
@@ -232,19 +287,11 @@ export const loyKrathongConfig: FestivalConfig = {
   // Who you are at the fair. The first one is picked unless the player chooses another on the welcome screen.
   visitors: [
     {
-      id: "woman",
-      label: "ผู้หญิง",
+      id: "default",
+      label: "คุณ",
       look: {
-        figure: "woman", outfit: "pha-sin", hairStyle: "bun", flower: true, sleeves: "short",
-        skin: "#f6d2b8", hair: "#2a1a24", top: "#ffd27a", bottom: "#ef6f8e", accent: "#fff0b8", outline: "#2a1d4a",
-      },
-    },
-    {
-      id: "man",
-      label: "ผู้ชาย",
-      look: {
-        figure: "man", outfit: "shirt-pants", hairStyle: "short", collar: true, pattern: "floral",
-        skin: "#eec1a0", hair: "#1c1418", top: "#ffd27a", bottom: "#34406e", accent: "#ef6f8e", outline: "#2a1d4a", height: 1.03,
+        figure: "neutral", stage: "other", outfit: "blouse-pants", hairStyle: "short", sleeves: "short",
+        skin: "#eec1a0", hair: "#1c1418", top: "#ffd27a", bottom: "#34406e", accent: "#fff0b8", outline: "#2a1d4a", flower: true,
       },
     },
   ],

@@ -96,7 +96,7 @@ export function MemoryCard({ memories: m, look, hand, brand, treasureTotal }: Pr
       {image && (
         <div className="memory-card">
           <img src={image} alt="การ์ดที่ระลึกคืนนี้" />
-          <a className="panel-action secondary" href={image} download="ลอยกระทงริมเล.png">บันทึกรูปลงเครื่อง</a>
+          <a className="panel-action secondary" href={image} download="ลอยกระทงริมทะเล.png">บันทึกรูปลงเครื่อง</a>
         </div>
       )}
       <p className="wish-fine">การ์ดสร้างในเครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นที่ไหน</p>

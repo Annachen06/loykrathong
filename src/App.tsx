@@ -9,6 +9,7 @@ import { Intro } from "./components/Intro";
 import { PlaceMarkers } from "./components/PlaceMarkers";
 import { PlacePanel } from "./components/PlacePanel";
 import { MapMenu } from "./components/MapMenu";
+import { StartChoice } from "./components/StartChoice";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
@@ -59,6 +60,7 @@ export default function App() {
   const nearRef = useRef<string | null>(null);
 
   const [entered, setEntered] = useState(false);
+  const [asking, setAsking] = useState(false); // the "where to first?" question right after entering
   const [target, setTarget] = useState<string | null>(null); // place being walked to / selected
   const [openId, setOpenId] = useState<string | null>(null); // place whose panel is open
   const [hovered, setHovered] = useState<string | null>(null);
@@ -196,15 +198,21 @@ export default function App() {
     setEntered(true);
     engineRef.current?.renderer.follow(true);
     setReveal(true);
+    setAsking(true);
     window.setTimeout(() => setReveal(false), 4500);
-    window.setTimeout(() => say(config.welcomeHint), 1200);
-  }, [entered, say]);
+  }, [entered]);
+  const startWhere = useCallback((choice: (typeof config.startChoices)[number]) => {
+    setAsking(false);
+    say(choice.hint);
+    if (choice.go) visit(choice.go);
+  }, [say, visit]);
 
   // ---- tapping the illustration
   const onPointerDown = (ev: React.PointerEvent<HTMLCanvasElement>) => {
     const e = engineRef.current;
     if (!e) return;
     if (!entered) return enter();
+    if (asking) setAsking(false); // tapping the world means "I'll look around myself"
     const w = e.renderer.toWorld(ev.clientX, ev.clientY);
     const tapped = e.scene.tap(w);
     if (tapped) {
@@ -336,7 +344,9 @@ export default function App() {
     say("ตั้งจิตอธิษฐาน แล้วเขย่าเซียมซีเบาๆ…");
     e.visitor.perform("fortune", 4.2, -1, () => {
       setRitual(null);
-      const f = config.fortunes[Math.floor(Math.random() * config.fortunes.length)];
+      // slips that fit who you are tonight: a student hears about exams and the road ahead, a worker about money, work and health
+      const pool = config.fortunes[look.stage ?? "other"];
+      const f = pool[Math.floor(Math.random() * pool.length)];
       remember({ fortune: f });
       sfx("chime");
       setBubble({ title: "เซียมซีหล่นออกมาหนึ่งไม้", text: f, tag: "เสี่ยงเซียมซีเพื่อความสนุก", key: Date.now() });
@@ -460,7 +470,16 @@ export default function App() {
         ui={config.ui}
       />
 
-      <MapMenu places={config.places} active={target} onVisit={visit} hidden={!entered || ride.view} ui={config.ui} />
+      <MapMenu
+        places={config.places}
+        groups={config.mapGroups}
+        quick={[{ id: "temple", label: "ไหว้พระ", icon: "🙏" }, { id: "shore", label: "ลอยกระทง", icon: "🏮" }]}
+        active={target}
+        onVisit={visit}
+        hidden={!entered || asking || ride.view}
+        ui={config.ui}
+      />
+      <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 
       {openPlace && (
         <PlacePanel

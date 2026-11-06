@@ -82,22 +82,27 @@ async function desktopSuite(browser) {
   check("environment is animated", changed);
 
   check("intro is shown first, where you make your own character", (await p.locator(".look-chip").count()) > 10 && await p.isVisible(".intro-enter"));
-  // body shape, clothes and hair are separate choices (no man/woman button)
-  await p.click('.look-chip[data-look="man"]');
+  // age, clothes and hair are separate choices (no man/woman button, no body-shape button)
+  check("no body-shape or man/woman choice", (await p.locator('[aria-label="รูปร่าง"], [data-look="man"], [data-look="woman"]').count()) === 0);
+  check("life stage choices: student, worker, other", (await p.locator('.look-chip[data-look="student"], .look-chip[data-look="worker"], .look-chip[data-look="other"]').count()) === 3);
+  await p.click('.look-chip[data-look="student"]');
   await p.click('.look-chip[data-look="pha-sin"]');
   await p.click('.look-chip[data-look="bun"]');
   await p.click(".intro-enter");
   await p.waitForTimeout(1600);
   check("entering hides the intro", !(await p.isVisible(".intro-enter")));
-  check("your choices dress the visitor", (await p.evaluate(() => { const l = window.__fair.visitor.look; return l.figure + "/" + l.outfit + "/" + l.hairStyle; })) === "man/pha-sin/bun");
+  check("your choices dress the visitor", (await p.evaluate(() => { const l = window.__fair.visitor.look; return l.stage + "/" + l.outfit + "/" + l.hairStyle + "/" + l.figure; })) === "student/pha-sin/bun/neutral");
   check("sound starts when you enter the fair", (await state(p)).sound.running);
+  check("arrival asks where to go first (three choices)", (await p.locator(".start-choice .start-option").count()) === 3 && (await p.isVisible(".start-choice")));
+  await p.click('.start-option[data-start="stroll"]');
+  check("choosing to stroll closes the question and shows the map", !(await p.$(".start-choice")) && (await p.isVisible(".map-toggle")));
   await p.click(".sound-toggle");
   check("the sound button mutes", (await state(p)).sound.muted && (await p.getAttribute(".sound-toggle", "aria-label")) === "เปิดเสียง");
   await p.click(".sound-toggle");
   check("…and unmutes", !(await state(p)).sound.muted);
-  check("only one map button instead of a row of tabs", (await p.locator(".dock button:visible").count()) === 1);
+  check("map button is large and has two shortcuts beside it", (await p.locator(".dock-row button:visible").count()) === 3 && (await p.locator(".map-toggle").boundingBox()).height >= 48);
   await p.click(".map-toggle");
-  check("map button opens the list of places", (await p.locator(".dock ul button").count()) === (await places(p)).length);
+  check("map lists every place as a tile, in sections", (await p.locator(".map-sheet ul button").count()) === (await places(p)).length && (await p.locator(".map-sheet h3").count()) === 3);
   // tap the sand just beside the visitor (the sky would send them out onto the pier)
   const beside = await p.evaluate(() => { const v = window.__fair.visitor; return window.__fair.renderer.toScreen(v.x - 80, v.y + 10); });
   await p.mouse.click(beside.x, beside.y);
@@ -363,6 +368,7 @@ async function phoneSuite(browser) {
   await p.goto(BASE);
   await p.waitForFunction(() => !!window.__fair);
   await p.tap(".intro-enter");
+  await p.tap('.start-option[data-start="stroll"]');
   await p.waitForTimeout(1600);
   await p.screenshot({ path: path.join(SHOTS, "phone-start.png") });
 
@@ -373,7 +379,7 @@ async function phoneSuite(browser) {
   check("phone: scene is recomposed, not shrunk", v.visW < 400 && v.scale > 1, `shows ${Math.round(v.visW)}×${Math.round(v.visH)} world units at ${v.scale.toFixed(2)}×`);
 
   const s0 = await state(p);
-  const sp = await toScreen(p, s0.x + 120, 930);
+  const sp = await toScreen(p, s0.x + 120, 905);
   await p.touchscreen.tap(sp.x, sp.y);
   await waitStopped(p);
   const s1 = await state(p);
@@ -414,6 +420,10 @@ async function reducedMotionSuite(browser) {
   await p.goto(BASE);
   await p.waitForFunction(() => !!window.__fair);
   await p.click(".intro-enter");
+  // "go to the temple first" walks there and opens its card
+  await p.click('.start-option[data-start="merit"]');
+  await p.waitForSelector(".panel h2", { timeout: 20000 });
+  check("start choice: going to the temple first opens the temple", (await panelTitle(p)) === "วัดริมทะเล");
   await viaMap(p, "ร้านกระทง");
   await p.waitForSelector(".panel h2", { timeout: 15000 });
   check("reduced motion: world still works", errors.length === 0, errors.join(" | "));

@@ -4,20 +4,26 @@ import { drawPerson } from "../engine/person";
 
 type Props = { config: FestivalConfig; onEnter: (look: VisitorLook) => void; hidden: boolean };
 
-// Everyone dresses as they like: body shape, clothes and hair are separate choices, with no "man" or "woman" button.
-const BODIES: { id: VisitorLook["figure"]; label: string }[] = [
-  { id: "man", label: "ทรงตรง" },
-  { id: "woman", label: "ทรงเว้า" },
+// Everyone dresses as they like: age, clothes and hair are separate choices, with no "man" or "woman" button
+// and no outfit that belongs to one gender. The stage only decides which fortune slips you get at the temple.
+type Stage = NonNullable<VisitorLook["stage"]>;
+const STAGES: { id: Stage; label: string }[] = [
+  { id: "student", label: "วัยเรียน" },
+  { id: "worker", label: "วัยทำงาน" },
+  { id: "other", label: "อื่นๆ" },
 ];
 const OUTFITS: { id: VisitorLook["outfit"]; label: string }[] = [
   { id: "pha-sin", label: "ผ้าซิ่น" },
   { id: "dress", label: "ชุดเดรส" },
   { id: "blouse-skirt", label: "เสื้อ+กระโปรง" },
+  { id: "shirt-skirt", label: "เชิ้ต+กระโปรง" },
   { id: "blouse-pants", label: "เสื้อ+กางเกง" },
   { id: "shirt-pants", label: "เชิ้ต+กางเกง" },
+  { id: "blouse-shorts", label: "เสื้อ+ขาสั้น" },
   { id: "shirt-shorts", label: "เชิ้ต+ขาสั้น" },
 ];
 const HAIRS: { id: VisitorLook["hairStyle"]; label: string }[] = [
+  { id: "bald", label: "ไม่มีผม" },
   { id: "crop", label: "สั้นเกรียน" },
   { id: "short", label: "สั้น" },
   { id: "bob", label: "บ๊อบ" },
@@ -36,6 +42,10 @@ const PALETTES: [string, string, string][] = [
   ["#5a7ad0", "#d8c49a", "#c8d8ff"],
   ["#fff4e2", "#7a4ab0", "#ffcf6e"],
   ["#33303c", "#2e3a6a", "#ef6f8e"],
+  ["#fffaf0", "#33406a", "#e8c066"],
+  ["#a8c8e8", "#4a4a5a", "#ffffff"],
+  ["#8fd0b0", "#f0e6cc", "#ffffff"],
+  ["#d8584a", "#33303c", "#ffd27a"],
 ];
 type PatternId = NonNullable<VisitorLook["pattern"]> | "plain";
 const PATTERNS: { id: PatternId; label: string }[] = [
@@ -49,8 +59,8 @@ const STORE_KEY = "fair-look";
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 
 function tidy(look: VisitorLook): VisitorLook {
-  // shirts get a collar; everything else keeps its own neckline
-  return { ...look, collar: look.outfit.startsWith("shirt"), sleeves: look.outfit === "pha-sin" ? look.sleeves ?? "short" : "short" };
+  // the visitor always has the neutral build; age follows the chosen stage; shirts get a collar
+  return { ...look, figure: "neutral", age: "adult" as const, stage: look.stage ?? "other", collar: look.outfit.startsWith("shirt"), sleeves: look.outfit === "pha-sin" ? look.sleeves ?? "short" : "short" };
 }
 
 function randomLook(base: VisitorLook): VisitorLook {
@@ -58,7 +68,7 @@ function randomLook(base: VisitorLook): VisitorLook {
   const pattern = pick(PATTERNS).id;
   return tidy({
     ...base,
-    figure: pick(BODIES).id,
+    stage: pick(STAGES).id,
     outfit: pick(OUTFITS).id,
     hairStyle: pick(HAIRS).id,
     skin: pick(SKINS),
@@ -73,11 +83,11 @@ function randomLook(base: VisitorLook): VisitorLook {
 function savedLook(fallback: VisitorLook): VisitorLook {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return { ...fallback, ...(JSON.parse(raw) as Partial<VisitorLook>) };
+    if (raw) return tidy({ ...fallback, ...(JSON.parse(raw) as Partial<VisitorLook>) });
   } catch {
     /* storage may be blocked */
   }
-  return fallback;
+  return tidy(fallback);
 }
 
 /** The first moment: the world is already alive behind a soft veil. Make your character, then step in. */
@@ -108,7 +118,7 @@ export function Intro({ config, onEnter, hidden }: Props) {
             </button>
           </div>
           <div className="look-options">
-            <Choice label="รูปร่าง" items={BODIES} value={look.figure} onPick={(figure) => set({ figure })} tab={tab} />
+            <Choice label="คุณคือ" items={STAGES} value={look.stage ?? "other"} onPick={(stage) => set({ stage })} tab={tab} />
             <Choice label="ชุด" items={OUTFITS} value={look.outfit} onPick={(outfit) => set({ outfit })} tab={tab} />
             <Choice label="ลาย" items={PATTERNS} value={look.pattern ?? "plain"} onPick={(p: PatternId) => set({ pattern: p === "plain" ? undefined : p })} tab={tab} />
             <Choice label="ทรงผม" items={HAIRS} value={look.hairStyle} onPick={(hairStyle) => set({ hairStyle })} tab={tab} />
