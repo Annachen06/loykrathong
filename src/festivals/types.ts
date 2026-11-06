@@ -170,8 +170,9 @@ export type Scene = {
   /** Static scenery in front of the sea (sand, stalls, pier). Painted once per resize. */
   paintFront(ctx: CanvasRenderingContext2D): void;
   update(dt: number, visitor: Point): void;
-  /** Optional: take over the camera (centre and zoom), e.g. while riding the Ferris wheel. null = follow the visitor. */
-  camera?(): { x: number; y: number; zoom: number; wide?: boolean } | null;
+  /** Optional: take over the camera (centre and zoom), e.g. while riding the Ferris wheel. null = follow the visitor.
+   *  `wide` lets it look past the world's edges; `cover` means something else fills the screen, so the world needn't be drawn. */
+  camera?(): { x: number; y: number; zoom: number; wide?: boolean; cover?: boolean } | null;
   /** Animated layer between back and front (stars, moon, water, things floating on it). */
   drawMiddle(ctx: CanvasRenderingContext2D, t: number, cam: CameraView): void;
   /** Animated layer over the front scenery but behind people (lights, palms, foam). */

@@ -647,6 +647,27 @@ function stall(ctx: CanvasRenderingContext2D, x: number, w: number, base: number
 
 /** Little banana-leaf krathong: folded leaf petals, lotus, marigold and a candle. */
 /** A krathong on the water. `style` is one of the shop designs: banana, lotus, bread, coconut. */
+/**
+ * The same krathong, drawn from a ready-made picture. Dozens float on the sea at once, so each look
+ * (style and flower colour) is drawn once in detail and then reused every frame.
+ */
+const krathongSprites = new Map<string, HTMLCanvasElement>();
+const SPRITE_RES = 4; // pixels per world unit: sharp even close up on a high-resolution screen
+export function drawKrathongCached(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, flower = "#ffa8c2", style = "banana") {
+  const key = style + flower;
+  let c = krathongSprites.get(key);
+  if (!c) {
+    c = document.createElement("canvas");
+    c.width = 50 * SPRITE_RES;
+    c.height = 40 * SPRITE_RES;
+    const k = c.getContext("2d")!;
+    k.scale(SPRITE_RES, SPRITE_RES);
+    drawKrathong(k, 25, 30, 1, flower, style);
+    krathongSprites.set(key, c);
+  }
+  ctx.drawImage(c, x - 25 * s, y - 30 * s, 50 * s, 40 * s);
+}
+
 export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, flower = "#ffa8c2", style = "banana") {
   ctx.save();
   ctx.translate(x, y);

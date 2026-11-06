@@ -15,7 +15,7 @@ import { FloatForm } from "./components/FloatForm";
 import { FairGames, type Prize } from "./components/FairGames";
 import { ItemPicker } from "./components/ItemPicker";
 import { TemplePanel } from "./components/TemplePanel";
-import { RideView } from "./components/RideView";
+import { RideView, type RideSource } from "./components/RideView";
 import { MemoryCard, type Memories } from "./components/MemoryCard";
 import { drawHeldThing } from "./engine/person";
 import { drawKrathong } from "./festivals/loy-krathong/scenery";
@@ -78,6 +78,13 @@ export default function App() {
     setMemories((prev) => ({ ...prev, ...(typeof m === "function" ? m(prev) : m) })), []);
 
   const say = useCallback((text: string) => setHint({ text, key: Date.now() }), []);
+  // what the Ferris wheel cabin view needs each frame: how high you are, where along the beach, and the fair to paint below
+  const rideSource = useCallback((): RideSource | null => {
+    const e = engineRef.current;
+    if (!e) return null;
+    const st = e.scene.stats();
+    return { high: st.rideHigh ?? 0, x: st.rideX ?? 0, paintFair: e.renderer.paintFair };
+  }, []);
 
   // ---- start the world once
   useEffect(() => {
@@ -477,7 +484,7 @@ export default function App() {
         </PlacePanel>
       )}
 
-      <RideView show={ride.view} progress={ride.progress} look={look} />
+      <RideView show={ride.view} progress={ride.progress} source={rideSource} />
       <Hint hint={hint} />
       <WishBubble bubble={bubble} onClose={() => setBubble(null)} />
 

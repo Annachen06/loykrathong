@@ -12,12 +12,38 @@ export type Renderer = ReturnType<typeof createRenderer>;
 const MAX_LAYER_PIXELS = 16_000_000;
 
 export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig, scene: Scene, visitor: Visitor) {
-  const ctx = canvas.getContext("2d")!;
+  // The scene always paints every pixel, so the canvas needs no transparency (cheaper to draw and show).
+  const ctx = canvas.getContext("2d", { alpha: false })!;
   const back = document.createElement("canvas");
   const front = document.createElement("canvas");
   const { width: W, height: H, focusY, portraitHeight, viewHeight } = config.layout;
 
   const view = { vw: 1, vh: 1, scale: 1, dpr: 1, layerK: 1, visW: 1, visH: 1, zoom: 1 };
+  // The cached front layer is empty above the tallest building; only the part with something in it is copied each frame.
+  let frontTop = 0;
+
+  // Smoothness first: if frames come too slowly, draw at a slightly lower resolution (sharp screens have pixels to spare).
+  // Steps only go down, after two slow stretches in a row, so a single hiccup doesn't blur the picture.
+  const QUALITY = [2, 1.5, 1.25, 1];
+  let quality = 0;
+  let slowRuns = 0;
+  let sampleFrom = 0;
+  const samples: number[] = [];
+  function watchSpeed(dt: number, now: number) {
+    if (document.hidden || now < sampleFrom) { samples.length = 0; return; }
+    samples.push(dt);
+    if (samples.length < 90) return;
+    const sorted = samples.slice().sort((a, b) => a - b);
+    const typical = sorted[Math.floor(sorted.length / 2)];
+    samples.length = 0;
+    slowRuns = typical > 0.0185 ? slowRuns + 1 : 0; // under about 55 frames a second
+    if (slowRuns >= 2 && renderDpr() > 1) {
+      while (quality < QUALITY.length - 1 && QUALITY[quality] >= renderDpr()) quality++;
+      slowRuns = 0;
+      resize(false); // repaint the scenery at the new resolution, but keep the camera where it is
+    }
+  }
+  const renderDpr = () => Math.min(window.devicePixelRatio || 1, QUALITY[quality]);
   const cam = { x: 0, y: 0 };
   const ripples: { x: number; y: number; life: number }[] = [];
   let following = false;
@@ -48,7 +74,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   }
 
   function paintLayers() {
-    let k = view.scale * view.dpr;
+    let k = view.scale * view.dpr; // same resolution as the screen, so copying it each frame is a plain 1:1 copy
     k = Math.min(k, Math.sqrt(MAX_LAYER_PIXELS / (W * H)));
     view.layerK = k;
     for (const [layer, paint] of [[back, scene.paintBack], [front, scene.paintFront]] as const) {
@@ -58,12 +84,32 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
       c.setTransform(k, 0, 0, k, 0, 0);
       paint(c);
     }
+    frontTop = firstPaintedRow(front) / k;
   }
 
-  function resize() {
+  /** The highest row of a layer with anything drawn on it (checked on a small copy, once per repaint). */
+  function firstPaintedRow(layer: HTMLCanvasElement) {
+    try {
+      const sw = 64, sh = 128;
+      const probe = document.createElement("canvas");
+      probe.width = sw;
+      probe.height = sh;
+      const p = probe.getContext("2d", { willReadFrequently: true })!;
+      p.drawImage(layer, 0, 0, sw, sh);
+      const data = p.getImageData(0, 0, sw, sh).data;
+      for (let row = 0; row < sh; row++) {
+        for (let col = 0; col < sw; col++) if (data[(row * sw + col) * 4 + 3] > 0) return Math.max(0, ((row - 1) / sh) * layer.height);
+      }
+    } catch {
+      /* reading pixels can be refused; then copy the whole layer */
+    }
+    return 0;
+  }
+
+  function resize(snap = true) {
     view.vw = Math.max(1, window.innerWidth);
     view.vh = Math.max(1, window.innerHeight);
-    view.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    view.dpr = renderDpr();
     // Portrait phones: frame the lower part of the world (beach, stalls, sea) a little closer.
     const portrait = view.vw / view.vh < 0.9;
     view.scale = Math.max(view.vw / W, view.vh / (portrait ? portraitHeight : viewHeight));
@@ -72,6 +118,8 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     canvas.width = Math.round(view.vw * view.dpr);
     canvas.height = Math.round(view.vh * view.dpr);
     paintLayers();
+    sampleFrom = performance.now() + 2000; // let things settle before judging speed again
+    if (!snap) return;
     const t = cameraTarget();
     cam.x = t.x;
     cam.y = t.y;
@@ -79,9 +127,9 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
 
   // Copy the part of a cached layer that is on screen. The camera can look past the world's edges
   // (the wide view from the Ferris wheel), so only the overlapping part is copied.
-  const blit = (layer: HTMLCanvasElement) => {
+  const blit = (layer: HTMLCanvasElement, top = 0) => {
     const k = view.layerK;
-    const x0 = Math.max(0, cam.x), y0 = Math.max(0, cam.y);
+    const x0 = Math.max(0, cam.x), y0 = Math.max(top, cam.y);
     const x1 = Math.min(W, cam.x + view.visW), y1 = Math.min(H, cam.y + view.visH);
     if (x1 <= x0 || y1 <= y0) return;
     const s = view.scale * view.zoom * view.dpr;
@@ -92,6 +140,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     const dt = Math.min(0.05, (now - (last || now)) / 1000);
     last = now;
     time += dt;
+    watchSpeed(dt, now);
 
     scene.update(dt, visitor);
     visitor.update(dt);
@@ -111,16 +160,26 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     cam.x = clamp(cam.x, 0, Math.max(0, W - view.visW));
     cam.y = view.visH <= H ? clamp(cam.y, 0, H - view.visH) : Math.min(cam.y, H - view.visH);
 
+    if (over?.cover) {
+      // a full-screen view covers the world (the Ferris wheel cabin): keep time moving, skip the drawing
+      onFrame?.();
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
     const s = view.scale * view.zoom * view.dpr;
     const world = () => ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = config.layout.skyTop ?? "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (cam.x < 0 || cam.y < 0 || cam.x + view.visW > W + 0.5 || cam.y + view.visH > H + 0.5) {
+      // looking past the edge of the world (the wide view from the Ferris wheel): night sky there
+      ctx.fillStyle = config.layout.skyTop ?? "#000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     blit(back);
     world();
     scene.drawMiddle(ctx, time, { x: cam.x, y: cam.y, w: view.visW, h: view.visH });
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    blit(front);
+    blit(front, frontTop);
     world();
     scene.drawGround(ctx, time, highlight);
 
@@ -161,6 +220,20 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
       window.removeEventListener("resize", onResize);
     },
     follow(on: boolean) { following = on; },
+    /**
+     * Paint the fair (stalls, palms, lights and the people in it) onto another canvas whose transform is already
+     * set to world units: used by the view from the Ferris wheel cabin, which sees the fair from up high.
+     * Only world x from x0 to x1 is needed.
+     */
+    paintFair(c: CanvasRenderingContext2D, x0: number, x1: number) {
+      const k = view.layerK;
+      const a = Math.max(0, x0), b = Math.min(W, x1);
+      if (b <= a) return;
+      c.drawImage(front, a * k, frontTop * k, (b - a) * k, (H - frontTop) * k, a, frontTop, b - a, H - frontTop);
+      scene.drawGround(c, time, null);
+      const order = [...scene.actors].sort((p, q) => p.y - q.y);
+      for (const act of order) act.draw(c, time);
+    },
     setHighlight(id: string | null) { highlight = id; },
     ripple(p: Point) { ripples.push({ x: p.x, y: p.y, life: 0 }); },
     setOnFrame(fn: (() => void) | null) { onFrame = fn; },
