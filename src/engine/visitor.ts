@@ -20,6 +20,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
     hold: undefined as Hold | undefined,
     holdColor: undefined as string | undefined,
     holdColor2: undefined as string | undefined,
+    holdStyle: undefined as string | undefined,
     act: null as null | { kind: Activity; start: number; until: number; done?: () => void },
     pose: { kneel: 0, wai: 0, bow: 0, raise: 0 },
     x: layout.spawn.x,
@@ -147,7 +148,7 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       ctx.stroke();
       ctx.restore();
       drawPerson(ctx, v.x, v.y, s * 1.08, v.facing, v.phase, v.stride, t, v.look, {
-        dance: v.danceAmount, ...v.pose, hold: v.hold, holdColor: v.holdColor, holdColor2: v.holdColor2,
+        dance: v.danceAmount, ...v.pose, hold: v.hold, holdColor: v.holdColor, holdColor2: v.holdColor2, holdStyle: v.holdStyle,
       });
     },
   };

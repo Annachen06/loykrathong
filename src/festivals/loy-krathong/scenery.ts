@@ -675,15 +675,21 @@ export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.lineJoin = "round";
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.8;
-  const base = { banana: "#3f9a68", lotus: "#4f9a52", bread: "#d9a25a", coconut: "#8a5a3a" }[style] ?? "#3f9a68";
+  if (style === "swan") {
+    swanKrathong(ctx, flower);
+    ctx.restore();
+    return;
+  }
+  const base = { banana: "#3f9a68", lotus: "#4f9a52", bread: "#d9a25a", coconut: "#8a5a3a", gold: "#d89a28", moon: "#8a7ac8" }[style] ?? "#3f9a68";
   ctx.fillStyle = base;
   ctx.beginPath();
   ctx.ellipse(0, 0, 20, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  if (style === "lotus") {
+  if (style === "lotus" || style === "moon") {
+    const rings = style === "moon" ? [[0, "#f4f0ff"], [1, "#d6ccff"]] as const : [[0, "#ffc2d6"], [1, "#ff9ec0"]] as const;
     // two rings of pink lotus petals
-    for (const [ring, col] of [[0, "#ffc2d6"], [1, "#ff9ec0"]] as const) {
+    for (const [ring, col] of rings) {
       ctx.fillStyle = col;
       for (let i = -2; i <= 2; i++) {
         ctx.beginPath();
@@ -698,7 +704,7 @@ export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number
       }
     }
   } else {
-    ctx.fillStyle = style === "bread" ? "#e8b872" : style === "coconut" ? "#4f9a52" : "#5cc08a";
+    ctx.fillStyle = style === "bread" ? "#e8b872" : style === "coconut" ? "#4f9a52" : style === "gold" ? "#ffd24a" : "#5cc08a";
     ctx.beginPath();
     for (let i = -3; i <= 3; i++) {
       ctx.moveTo(i * 5.4 - 4.5, -1);
@@ -710,6 +716,23 @@ export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number
     if (style === "bread") {
       ctx.fillStyle = "rgba(120,70,30,0.5)";
       for (const dx of [-12, -4, 6, 13]) ctx.fillRect(dx, 1, 1.6, 1.6);
+    }
+    if (style === "gold") {
+      // gold leaf catching the light
+      ctx.fillStyle = "#fff6c8";
+      for (const [gx, gy] of [[-13, -4], [-2, -6], [9, -4], [-7, 2], [12, 1]]) {
+        ctx.beginPath();
+        ctx.moveTo(gx, gy - 2.6);
+        ctx.lineTo(gx + 0.7, gy - 0.7);
+        ctx.lineTo(gx + 2.6, gy);
+        ctx.lineTo(gx + 0.7, gy + 0.7);
+        ctx.lineTo(gx, gy + 2.6);
+        ctx.lineTo(gx - 0.7, gy + 0.7);
+        ctx.lineTo(gx - 2.6, gy);
+        ctx.lineTo(gx - 0.7, gy - 0.7);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   }
   ctx.fillStyle = flower;
@@ -729,6 +752,79 @@ export function drawKrathong(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
+
+/** The white swan krathong: a long-necked swan with a little garden of flowers and the candle on its back. */
+function swanKrathong(ctx: CanvasRenderingContext2D, flower: string) {
+  // body and folded wings
+  ctx.fillStyle = "#fffaf0";
+  ctx.beginPath();
+  ctx.moveTo(-20, -2);
+  ctx.quadraticCurveTo(-22, -12, -14, -9);
+  ctx.quadraticCurveTo(-4, 6, 14, -2);
+  ctx.quadraticCurveTo(20, 6, 6, 7);
+  ctx.lineTo(-12, 7);
+  ctx.quadraticCurveTo(-20, 6, -20, -2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#efe6f6";
+  ctx.beginPath();
+  ctx.moveTo(-14, -1);
+  ctx.quadraticCurveTo(-2, -9, 10, -3);
+  ctx.quadraticCurveTo(-1, 3, -14, -1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // neck and head
+  ctx.strokeStyle = "#2a1d4a";
+  ctx.lineWidth = 6.6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(13, -1);
+  ctx.quadraticCurveTo(21, -10, 17, -18);
+  ctx.quadraticCurveTo(14, -24, 19, -27);
+  ctx.stroke();
+  ctx.strokeStyle = "#fffaf0";
+  ctx.lineWidth = 3.4;
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = "#2a1d4a";
+  ctx.lineWidth = 1.8;
+  ctx.fillStyle = "#fffaf0";
+  ctx.beginPath();
+  ctx.ellipse(20, -27, 3.6, 3, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ff9a3a";
+  ctx.beginPath();
+  ctx.moveTo(23, -28.5);
+  ctx.lineTo(28, -26.5);
+  ctx.lineTo(23, -25.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#2a1d4a";
+  ctx.beginPath();
+  ctx.arc(20.6, -28, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  // flowers and the candle on its back
+  ctx.fillStyle = flower;
+  ctx.beginPath();
+  ctx.ellipse(-8, -8, 4, 5, -0.4, 0, Math.PI * 2);
+  ctx.ellipse(2, -8, 4, 5, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffcf4a";
+  ctx.beginPath();
+  ctx.arc(-3, -10, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#fff4e2";
+  ctx.beginPath();
+  ctx.roundRect(-1.6, -26, 3.2, 12, 1.5);
+  ctx.fill();
+  ctx.stroke();
 }
 
 function boutique(ctx: CanvasRenderingContext2D, x: number, w: number, base: number) {

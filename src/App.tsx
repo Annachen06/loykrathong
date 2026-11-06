@@ -152,6 +152,7 @@ export default function App() {
     v.hold = shown?.hold;
     v.holdColor = shown?.color;
     v.holdColor2 = shown?.color2;
+    v.holdStyle = shown?.style;
     v.look = look;
   }, [hand, ritual, look]);
 
@@ -375,7 +376,7 @@ export default function App() {
     window.setTimeout(() => {
       if (e.visitor.act?.kind !== "lantern") { setRitual(null); return; } // walked away before letting go
       setRitual(null);
-      e.scene.runAction("lanterns", "release", e.visitor, { wish, flower: lantern.color });
+      e.scene.runAction("lanterns", "release", e.visitor, { wish, flower: lantern.color, style: lantern.style, color2: lantern.color2 });
       remember((m) => ({ lanterns: [...m.lanterns, wish] }));
       say(`ปล่อย${lantern.name}ลอยขึ้นฟ้าแล้ว แตะที่โคมเพื่ออ่านคำอธิษฐานได้นะ`);
     }, 2700);
@@ -494,7 +495,7 @@ export default function App() {
             <MemoryCard
               memories={memories}
               look={look}
-              hand={hand?.hold ? { hold: hand.hold, color: hand.color, color2: hand.color2 } : undefined}
+              hand={hand?.hold ? { hold: hand.hold, color: hand.color, color2: hand.color2, style: hand.style } : undefined}
               brand={config.brand}
               treasureTotal={config.curios.length}
             />

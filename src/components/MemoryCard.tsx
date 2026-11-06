@@ -19,7 +19,7 @@ export type Memories = {
 type Props = {
   memories: Memories;
   look: VisitorLook;
-  hand?: { hold: Hold; color?: string; color2?: string };
+  hand?: { hold: Hold; color?: string; color2?: string; style?: string };
   brand: string;
   treasureTotal: number;
 };
@@ -61,7 +61,7 @@ export function MemoryCard({ memories: m, look, hand, brand, treasureTotal }: Pr
     ctx.beginPath();
     ctx.roundRect(22, 592, 676, 346, 22);
     ctx.fill();
-    drawPerson(ctx, 150, 560, 4.2, 1, 0, 0, 1, look, hand ? { hold: hand.hold, holdColor: hand.color, holdColor2: hand.color2 } : {});
+    drawPerson(ctx, 150, 560, 4.2, 1, 0, 0, 1, look, hand ? { hold: hand.hold, holdColor: hand.color, holdColor2: hand.color2, holdStyle: hand.style } : {});
     ctx.fillStyle = "#ffcf6e";
     ctx.font = "500 46px Mitr, sans-serif";
     ctx.fillText(brand, 300, 330);

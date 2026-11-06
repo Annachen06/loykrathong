@@ -16,10 +16,11 @@ export function ItemPicker({ items, owned, pickLabel, onPick, preview }: Props) 
   return (
     <ul className="item-picker">
       {items.map((item) => (
-        <li key={item.id}>
+        <li key={item.id} className={item.premium ? "is-premium" : undefined}>
           <ItemPicture item={item} preview={preview} />
           <div className="item-words">
             <strong>{item.name}</strong>
+            {item.premium && <em className="premium-tag">รุ่นพิเศษ · ฟรีช่วงทดลอง</em>}
             <span>{item.text}</span>
           </div>
           <button type="button" className="item-pick" data-item={item.id} onClick={() => onPick(item)} aria-label={`${pickLabel}${item.name}`}>

@@ -60,6 +60,10 @@ export const loyKrathongConfig: FestivalConfig = {
     { id: "lotus", name: "กระทงดอกบัว", text: "กลีบบัวสีชมพูซ้อนกัน สวยหวาน", hold: "krathong", color: "#ff9ec0", color2: "#ffc2d6" },
     { id: "bread", name: "กระทงขนมปัง", text: "ปลากินได้ ไม่เป็นขยะในทะเล", hold: "krathong", color: "#ff8fb0", color2: "#d9a25a" },
     { id: "coconut", name: "กระทงกาบมะพร้าว", text: "แข็งแรง ลอยได้ไกล ตกแต่งด้วยดอกมะลิ", hold: "krathong", color: "#fffaf0", color2: "#8a5a3a" },
+    // special editions: free during the trial run
+    { id: "gold", name: "กระทงทองคำเปลว", text: "ปิดทองทั้งใบ ลอยไปมีประกายวิบวับตามน้ำ", hold: "krathong", color: "#fff1b0", color2: "#e0a830", premium: true },
+    { id: "moon", name: "กระทงบัวแสงจันทร์", text: "กลีบบัวสีเงินเรืองแสงนวลเหมือนพระจันทร์", hold: "krathong", color: "#e8e0ff", color2: "#9a8ad8", premium: true },
+    { id: "swan", name: "กระทงหงส์ขาว", text: "หงส์ขาวคอยาว ประดับดอกไม้บนหลัง", hold: "krathong", color: "#ffb3d4", color2: "#fffaf0", premium: true },
   ],
 
   places: [
@@ -178,6 +182,10 @@ export const loyKrathongConfig: FestivalConfig = {
         { id: "lantern-pink", name: "โคมสีชมพู", text: "ขอเรื่องความรักให้สดใส", hold: "lantern", color: "#ff9ec0" },
         { id: "lantern-white", name: "โคมสีขาว", text: "ใจสงบ เริ่มต้นใหม่", hold: "lantern", color: "#fff4e2" },
         { id: "lantern-gold", name: "โคมสีทอง", text: "ขอให้โชคดี มีเงินมีทอง", hold: "lantern", color: "#ffd95a" },
+        // special editions: free during the trial run
+        { id: "lantern-heart", name: "โคมหัวใจ", text: "โคมรูปหัวใจ ส่งความรักขึ้นฟ้า", hold: "lantern", color: "#ff7fa8", style: "heart", premium: true },
+        { id: "lantern-sparkle", name: "โคมทองประกาย", text: "โปรยประกายทองเป็นทางยาวตอนลอยขึ้น", hold: "lantern", color: "#ffd24a", style: "gold", premium: true },
+        { id: "lantern-lanna", name: "โคมลายล้านนา", text: "กระดาษสาลายดอก มีพู่ห้อยสองข้าง", hold: "lantern", color: "#fff4e2", color2: "#d0453a", style: "lanna", premium: true },
       ],
     },
     {

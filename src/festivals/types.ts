@@ -23,6 +23,10 @@ export type FairItem = {
   wear?: "flower";
   /** Can be offered at the temple. */
   offering?: boolean;
+  /** A special edition (gold krathong, heart lantern...). Free while the fair is in its trial run. */
+  premium?: boolean;
+  /** Which shape to draw when there is more than one (lanterns: "heart", "gold", "lanna"). */
+  style?: string;
 };
 export type Rect = { x0: number; y0: number; x1: number; y1: number };
 
@@ -183,7 +187,7 @@ export type Scene = {
   /** Runs a place's action. Returns false if the action is unknown. */
   runAction(
     placeId: string, actionId: string, visitor: Point & { look: VisitorLook },
-    input?: { wish?: string; style?: string; flower?: string; hold?: HeldThing },
+    input?: { wish?: string; style?: string; flower?: string; color2?: string; hold?: HeldThing },
   ): boolean;
   /** A tap on the world that isn't a place: krathongs on the water, creatures... null if nothing there. */
   tap(p: Point): TapResult | null;

@@ -1,7 +1,7 @@
 // The living part of the Loy Krathong world: everything that moves or reacts.
 import type { Actor, CameraView, Point, Scene, TapResult, VisitorLook } from "../types";
 import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../../engine/math";
-import { drawPerson, LANTERN_UP, type Hold, type Pose } from "../../engine/person";
+import { drawPaperLantern, drawPerson, LANTERN_UP, type Hold, type Pose } from "../../engine/person";
 import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
 import { boothSign, drawKrathongCached, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
@@ -10,7 +10,7 @@ import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, S
 type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string };
 const STYLES = ["banana", "banana", "lotus", "bread", "coconut"];
 /** A sky lantern (khom loi). Yours carry your colour and wish and can be tapped while they are still low enough to reach. */
-type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; wish?: string; age?: number };
+type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; color2?: string; style?: string; wish?: string; age?: number; trail?: number };
 type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; rgb: string; g: number; size: number; front: boolean; flash?: boolean };
 type Petal = { x: number; y: number; vx: number; vy: number; rot: number; spin: number; life: number; color: string };
 
@@ -712,6 +712,11 @@ export function createLoyKrathongScene(): Scene {
       const depth = (k.y - HORIZON) / (SHORE - HORIZON);
       k.x += (k.vx + Math.sin(k.p * 0.6) * 4) * dt * (0.4 + depth);
       k.y += k.vy * dt * (0.25 + depth);
+      if (k.style === "gold" && !calm && Math.random() < dt * 9) {
+        // gold leaf glinting on the ripples behind it
+        const sc = 0.25 + clamp(depth, 0, 1) * 0.8;
+        sparks.push({ x: k.x + rand(-18, 18) * sc, y: k.y + rand(-2, 6) * sc, vx: rand(-3, 3), vy: -rand(2, 8), life: 0, max: rand(0.6, 1.1), rgb: "255,226,140", g: 0, size: 1.6 * sc + 0.4, front: false });
+      }
     }
     for (let i = floaters.length - 1; i >= 0; i--) if (floaters[i].y < HORIZON + 6) floaters.splice(i, 1);
 
@@ -724,6 +729,14 @@ export function createLoyKrathongScene(): Scene {
         l.y += l.vy * dt * (0.35 + lift * 0.9);
         l.x += (Math.sin(l.p * 0.5) * l.sway * 0.4 + 7) * dt * lift;
         l.s = Math.max(0.45, l.s - dt * 0.012);
+        if (l.style === "gold" && l.age > 0.4 && !calm) {
+          // the sparkle lantern leaves a trail of falling gold glitter
+          l.trail = (l.trail ?? 0) + dt;
+          while (l.trail > 0.07) {
+            l.trail -= 0.07;
+            sparks.push({ x: l.x + rand(-8, 8) * l.s, y: l.y + 16 * l.s, vx: rand(-6, 6), vy: rand(4, 14), life: 0, max: rand(1.2, 2), rgb: "255,224,130", g: 6, size: 1.8, front: true });
+          }
+        }
         continue;
       }
       l.y += l.vy * dt * (0.5 + l.s * 0.6);
@@ -959,6 +972,8 @@ export function createLoyKrathongScene(): Scene {
       ctx.fillStyle = `rgba(255,200,120,${0.28 * flick})`;
       ctx.fillRect(k.x - 1.5 * s, k.y + 4 * s, 3 * s, 18 * s);
       glow(ctx, k.x, k.y - 16 * s, 34 * s * (k.mine ? 1.6 : 1), "255,200,120", 0.55 * flick);
+      if (k.style === "moon") glow(ctx, k.x, k.y - 8 * s, 70 * s, "201,190,255", 0.5 + 0.15 * Math.sin(t * 1.5 + k.p));
+      if (k.style === "gold") glow(ctx, k.x, k.y - 6 * s, 52 * s, "255,214,110", 0.4);
       drawKrathongCached(ctx, k.x, k.y + bob, s, k.lotus, k.style);
       ctx.fillStyle = `rgba(255,240,180,${flick})`;
       ctx.beginPath();
@@ -1344,44 +1359,13 @@ export function createLoyKrathongScene(): Scene {
     }
   }
 
-  /** Your own lantern: bigger, in the colour you chose, with a flame you can see through the paper. */
+  /** Your own lantern: bigger, in the colour and shape you chose, drawn the same way as the one in your hands. */
   function drawMyLantern(ctx: CanvasRenderingContext2D, l: Lantern, t: number) {
-    const s = l.s, x = l.x, y = l.y;
     const flick = 0.88 + 0.12 * Math.sin(t * 9 + l.p * 5);
-    glow(ctx, x, y + 4 * s, 64 * s, "255,190,110", 0.6 * flick);
-    ctx.save();
-    ctx.lineJoin = "round";
-    ctx.fillStyle = l.color ?? "#ffb35c";
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = Math.max(1, 1.6 * s);
-    ctx.beginPath();
-    ctx.moveTo(x - 10 * s, y + 14 * s);
-    ctx.lineTo(x - 14 * s, y - 12 * s);
-    ctx.quadraticCurveTo(x, y - 24 * s, x + 14 * s, y - 12 * s);
-    ctx.lineTo(x + 10 * s, y + 14 * s);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // the warm light inside the paper
-    ctx.globalAlpha = 0.55 * flick;
-    ctx.fillStyle = "#fff2c0";
-    ctx.beginPath();
-    ctx.ellipse(x, y + 4 * s, 6 * s, 9 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // the wire ring and the little fuel cake burning at the bottom
-    ctx.strokeStyle = "rgba(42,29,74,0.7)";
-    ctx.lineWidth = Math.max(0.8, 1.1 * s);
-    ctx.beginPath();
-    ctx.moveTo(x - 10 * s, y + 14 * s);
-    ctx.lineTo(x, y + 19 * s);
-    ctx.lineTo(x + 10 * s, y + 14 * s);
-    ctx.stroke();
-    ctx.fillStyle = `rgba(255,${Math.round(200 * flick)},90,1)`;
-    ctx.beginPath();
-    ctx.ellipse(x, y + 18 * s, 2.4 * s, 3.4 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    glow(ctx, l.x, l.y + 4 * l.s, 64 * l.s, l.style === "heart" ? "255,150,190" : "255,190,110", 0.6 * flick);
+    // released at s = 0.4 · LANTERN_UP · person scale, so this starts exactly the size it was in your hands
+    const k = l.s / 0.4;
+    drawPaperLantern(ctx, l.x, l.y, k, l.color ?? "#ffb35c", t + l.p, l.style, l.color2, OUTLINE, Math.max(0.8, (0.9 * k) / LANTERN_UP));
   }
 
   function drawTop(ctx: CanvasRenderingContext2D, t: number) {
@@ -1463,7 +1447,7 @@ export function createLoyKrathongScene(): Scene {
         // it leaves your raised hands exactly where you were holding it (see the raised pose in person.ts)
         const ps = depthScale(visitor.y) * 1.08;
         const ly = visitor.y + (-50.5 - 21.5 - 6 * LANTERN_UP) * ps;
-        lanterns.push({ x: visitor.x + ps, y: ly, vy: -rand(22, 26), sway: rand(10, 16), p: rand(0, 6.28), s: 0.4 * LANTERN_UP * ps, mine: true, color: input?.flower, wish: input?.wish ?? "", age: 0 });
+        lanterns.push({ x: visitor.x + ps, y: ly, vy: -rand(22, 26), sway: rand(10, 16), p: rand(0, 6.28), s: 0.4 * LANTERN_UP * ps, mine: true, color: input?.flower, color2: input?.color2, style: input?.style, wish: input?.wish ?? "", age: 0, trail: 0 });
         lanternCount++;
         burst(visitor.x, ly + 10 * ps, "255,214,140", 12);
         events.push({ name: "chime", x: visitor.x, y: visitor.y });

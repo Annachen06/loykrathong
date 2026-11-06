@@ -147,6 +147,8 @@ async function desktopSuite(browser) {
   // Krathong shop: pick a design, it's in your hand, and the card offers to take you to the pier.
   await viaMap(p, "ร้านกระทง");
   await p.waitForSelector('.item-pick[data-item="lotus"]', { timeout: 15000 });
+  check("krathong shop shows special editions, free during the trial", (await p.locator(".item-picker li.is-premium").count()) === 3 && (await p.textContent(".item-picker li.is-premium")).includes("ฟรีช่วงทดลอง"));
+  check("no payment step anywhere in the shop", !(await p.textContent(".panel")).match(/บาท|ชำระ|ซื้อ/));
   await p.click('.item-pick[data-item="lotus"]');
   check("krathong shop: picking a krathong puts it in your hand", (await state(p)).hold === "krathong");
   await p.screenshot({ path: path.join(SHOTS, "desktop-krathong-shop.png") });
@@ -198,6 +200,7 @@ async function desktopSuite(browser) {
   await viaMap(p, "ลานปล่อยโคม");
   await p.waitForSelector(".lantern-colors", { timeout: 20000 });
   check("lantern ground offers lantern colours", (await p.locator(".lantern-color").count()) >= 3);
+  check("lantern ground has special lanterns too", (await p.locator(".lantern-color .premium-tag").count()) === 3);
   await p.click('[data-lantern="lantern-pink"]');
   check("lantern button names the chosen colour", (await p.textContent(".float-form .panel-action")).includes("โคมสีชมพู"));
   await p.fill("#lantern-wish", "ขอให้โคมลอยถึงพระจันทร์");

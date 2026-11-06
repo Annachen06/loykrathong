@@ -25,6 +25,8 @@ export type Pose = {
   holdColor?: string;
   /** Second colour (the krathong's base). */
   holdColor2?: string;
+  /** Shape variant of the held thing (special lanterns). */
+  holdStyle?: string;
 };
 
 type P = [number, number];
@@ -510,51 +512,115 @@ export function drawPerson(
   const hand = arm(1);
   if (hold === "lantern" && raise > 0.5) {
     // held high in both hands, full size, about to be let go
-    paperLantern(ctx, 1, hand[1] - 6 * LANTERN_UP, LANTERN_UP, pose.holdColor ?? "#ffb35c", O, t);
-  } else if (hold) drawHeld(ctx, hold, hand, pose.holdColor ?? "#ef5a5a", pose.holdColor2 ?? "#4f9a52", t, sY, O);
+    drawPaperLantern(ctx, 1, hand[1] - 6 * LANTERN_UP, LANTERN_UP, pose.holdColor ?? "#ffb35c", t, pose.holdStyle, pose.holdColor2, O);
+  } else if (hold) drawHeld(ctx, hold, hand, pose.holdColor ?? "#ef5a5a", pose.holdColor2 ?? "#4f9a52", t, sY, O, pose.holdStyle);
 
   ctx.restore();
 }
 
 /** Draw just a held thing on its own (for the little pictures on stall cards). */
-export function drawHeldThing(ctx: CanvasRenderingContext2D, hold: Hold, x: number, y: number, scale: number, color = "#ef5a5a", color2 = "#4f9a52") {
+export function drawHeldThing(ctx: CanvasRenderingContext2D, hold: Hold, x: number, y: number, scale: number, color = "#ef5a5a", color2 = "#4f9a52", style?: string) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  drawHeld(ctx, hold, [0, 0], color, color2, 0, -30, "#2a1d4a");
+  drawHeld(ctx, hold, [0, 0], color, color2, 0, -30, "#2a1d4a", style);
   ctx.restore();
 }
 
 /** How much bigger the lantern is when held up to be let go. The scene's released lantern matches this size. */
 export const LANTERN_UP = 2.1;
 
-/** A paper sky lantern (khom loi) whose wire ring sits at (x, y + 6k). */
-function paperLantern(ctx: CanvasRenderingContext2D, x: number, y: number, k: number, color: string, O: string, t: number) {
+/**
+ * A paper sky lantern (khom loi) whose wire ring sits at (x, y + 6k). Shared by the hand, the stall card and the sky.
+ * style: undefined (plain), "heart", "gold" (glitters) or "lanna" (patterned paper with tassels, pattern in color2).
+ */
+export function drawPaperLantern(
+  ctx: CanvasRenderingContext2D, x: number, y: number, k: number, color: string, t: number,
+  style?: string, color2 = "#d0453a", O = "#2a1d4a", lineWidth = 0.9,
+) {
   const g = ctx.createRadialGradient(x, y, k, x, y, 16 * k);
   g.addColorStop(0, "rgba(255,200,120,0.55)");
   g.addColorStop(1, "rgba(255,200,120,0)");
   ctx.fillStyle = g;
   ctx.fillRect(x - 16 * k, y - 16 * k, 32 * k, 32 * k);
+  ctx.save();
+  ctx.lineJoin = "round";
   ctx.fillStyle = color;
   ctx.strokeStyle = O;
-  ctx.lineWidth = 0.9;
+  ctx.lineWidth = lineWidth;
   ctx.beginPath();
-  ctx.moveTo(x - 4.2 * k, y + 6 * k);
-  ctx.lineTo(x - 5.6 * k, y - 5 * k);
-  ctx.quadraticCurveTo(x, y - 9 * k, x + 5.6 * k, y - 5 * k);
-  ctx.lineTo(x + 4.2 * k, y + 6 * k);
-  ctx.closePath();
+  if (style === "heart") {
+    ctx.moveTo(x, y + 6.5 * k);
+    ctx.bezierCurveTo(x - 9 * k, y - 0.5 * k, x - 7 * k, y - 10.5 * k, x, y - 5.5 * k);
+    ctx.bezierCurveTo(x + 7 * k, y - 10.5 * k, x + 9 * k, y - 0.5 * k, x, y + 6.5 * k);
+  } else {
+    ctx.moveTo(x - 4.2 * k, y + 6 * k);
+    ctx.lineTo(x - 5.6 * k, y - 5 * k);
+    ctx.quadraticCurveTo(x, y - 9 * k, x + 5.6 * k, y - 5 * k);
+    ctx.lineTo(x + 4.2 * k, y + 6 * k);
+    ctx.closePath();
+  }
   ctx.fill();
+  if (style === "lanna") {
+    // bands of a simple flower pattern on the mulberry paper
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = color2;
+    for (const by of [-3.2, 3]) {
+      ctx.fillRect(x - 7 * k, y + by * k - 0.45 * k, 14 * k, 0.9 * k);
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.arc(x + i * 2.2 * k, y + (by + (by < 0 ? 1.6 : -1.6)) * k, 0.55 * k, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  if (style === "gold") {
+    ctx.fillStyle = "rgba(255,255,230,0.75)";
+    ctx.fillRect(x - 3.6 * k, y - 5 * k, 1 * k, 9 * k);
+  }
   ctx.stroke();
+  if (style === "lanna") {
+    // a tassel at each lower corner
+    for (const side of [-1, 1]) {
+      ctx.strokeStyle = color2;
+      ctx.lineWidth = Math.max(lineWidth, 0.5 * k);
+      ctx.beginPath();
+      ctx.moveTo(x + side * 4.2 * k, y + 6 * k);
+      ctx.lineTo(x + side * 4.6 * k + Math.sin(t * 2 + side) * 0.4 * k, y + 9.5 * k);
+      ctx.stroke();
+    }
+  }
   ctx.fillStyle = `rgba(255,240,190,${0.8 + 0.15 * Math.sin(t * 9)})`;
   ctx.beginPath();
-  ctx.ellipse(x, y + 4 * k, 1.4 * k, 2 * k, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + (style === "heart" ? 1.5 : 4) * k, 1.4 * k, 2 * k, 0, 0, Math.PI * 2);
   ctx.fill();
+  if (style === "gold") {
+    // little four-point glints around the paper
+    ctx.fillStyle = "#fffbe0";
+    for (let i = 0; i < 4; i++) {
+      const a = t * 1.3 + i * 1.57, tw = 0.5 + 0.5 * Math.sin(t * 5 + i * 2);
+      const gx = x + Math.cos(a) * 8 * k, gy = y - 1 * k + Math.sin(a) * 7 * k, r = (0.6 + tw * 0.9) * k;
+      ctx.beginPath();
+      ctx.moveTo(gx, gy - r * 2);
+      ctx.lineTo(gx + r * 0.4, gy - r * 0.4);
+      ctx.lineTo(gx + r * 2, gy);
+      ctx.lineTo(gx + r * 0.4, gy + r * 0.4);
+      ctx.lineTo(gx, gy + r * 2);
+      ctx.lineTo(gx - r * 0.4, gy + r * 0.4);
+      ctx.lineTo(gx - r * 2, gy);
+      ctx.lineTo(gx - r * 0.4, gy - r * 0.4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
-function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: string, color2: string, t: number, sY: number, O: string) {
+function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: string, color2: string, t: number, sY: number, O: string, style?: string) {
   const [x, y] = hand;
   ctx.lineWidth = 1.2;
   ctx.strokeStyle = O;
@@ -655,7 +721,7 @@ function drawHeld(ctx: CanvasRenderingContext2D, hold: Hold, hand: P, color: str
     ctx.stroke();
   } else if (hold === "lantern") {
     // a paper sky lantern (khom loi), lit, carried above the hand
-    paperLantern(ctx, x + 1, y - 6 + Math.sin(t * 2) * 0.4, 1, color, O, t);
+    drawPaperLantern(ctx, x + 1, y - 6 + Math.sin(t * 2) * 0.4, 1, color, t, style, color2, O);
   } else if (hold === "garland") {
     // a jasmine garland (phuang malai) hanging from the hand
     ctx.strokeStyle = O;
