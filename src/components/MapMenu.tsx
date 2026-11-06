@@ -4,8 +4,6 @@ import type { FestivalConfig, Place } from "../festivals/types";
 type Props = {
   places: Place[];
   groups: FestivalConfig["mapGroups"];
-  /** Places with a button that is always visible beside the map button, e.g. the temple and the pier. */
-  quick: { id: string; label: string; icon: string }[];
   active: string | null;
   onVisit: (id: string) => void;
   hidden: boolean;
@@ -13,10 +11,10 @@ type Props = {
 };
 
 /**
- * The map: a big, always-visible "แผนที่งาน" button with two shortcuts beside it (the temple, the pier).
+ * The map: a big, always-visible "แผนที่งาน" button.
  * It opens a sheet of everywhere in the fair, in sections (merit, stroll, float), each place a large tile with a picture.
  */
-export function MapMenu({ places, groups, quick, active, onVisit, hidden, ui }: Props) {
+export function MapMenu({ places, groups, active, onVisit, hidden, ui }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLElement>(null);
 
@@ -66,11 +64,6 @@ export function MapMenu({ places, groups, quick, active, onVisit, hidden, ui }: 
           </svg>
           {open ? ui.close : ui.mapLabel}
         </button>
-        {!open && quick.map((q) => (
-          <button key={q.id} type="button" className="dock-quick" data-quick={q.id} tabIndex={tab} onClick={() => go(q.id)} aria-label={`${ui.walkTo}${q.label}`}>
-            <span aria-hidden="true">{q.icon}</span> {q.label}
-          </button>
-        ))}
       </div>
     </nav>
   );

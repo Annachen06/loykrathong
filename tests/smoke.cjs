@@ -100,7 +100,8 @@ async function desktopSuite(browser) {
   check("the sound button mutes", (await state(p)).sound.muted && (await p.getAttribute(".sound-toggle", "aria-label")) === "เปิดเสียง");
   await p.click(".sound-toggle");
   check("…and unmutes", !(await state(p)).sound.muted);
-  check("map button is large and has two shortcuts beside it", (await p.locator(".dock-row button:visible").count()) === 3 && (await p.locator(".map-toggle").boundingBox()).height >= 48);
+  check("map button is large and alone (no extra shortcut buttons)", (await p.locator(".dock-row button:visible").count()) === 1 && (await p.locator(".map-toggle").boundingBox()).height >= 48);
+  check("no on-screen stick on a desktop with a mouse", !(await p.isVisible(".joystick")));
   await p.click(".map-toggle");
   check("map lists every place as a tile, in sections", (await p.locator(".map-sheet ul button").count()) === (await places(p)).length && (await p.locator(".map-sheet h3").count()) === 3);
   // tap the sand just beside the visitor (the sky would send them out onto the pier)
@@ -391,11 +392,31 @@ async function phoneSuite(browser) {
   check("phone: scene is recomposed, not shrunk", v.visW < 400 && v.scale > 1, `shows ${Math.round(v.visW)}×${Math.round(v.visH)} world units at ${v.scale.toFixed(2)}×`);
 
   const s0 = await state(p);
-  const sp = await toScreen(p, s0.x + 120, 905);
+  const sp = await toScreen(p, s0.x - 120, 905);
   await p.touchscreen.tap(sp.x, sp.y);
   await waitStopped(p);
   const s1 = await state(p);
-  check("phone: tap the sand to walk", Math.abs(s1.x - (s0.x + 120)) < 3, `${s0.x} → ${s1.x}`);
+  check("phone: tap the sand to walk", Math.abs(s1.x - (s0.x - 120)) < 3, `${s0.x} → ${s1.x}`);
+
+  // the on-screen stick: drag right to walk right, let go to stop
+  check("phone: an on-screen stick is shown", await p.isVisible(".joystick"));
+  const jb = await p.locator(".joystick").boundingBox();
+  const jc = { x: jb.x + jb.width / 2, y: jb.y + jb.height / 2 };
+  const fire = (type, x, y) => p.evaluate(([type, x, y]) => {
+    const t = type === "pointerdown" ? document.querySelector(".joystick") : window;
+    t.dispatchEvent(new PointerEvent(type, { pointerId: 7, clientX: x, clientY: y, bubbles: true, pointerType: "touch" }));
+  }, [type, x, y]);
+  const j0 = await state(p);
+  await fire("pointerdown", jc.x, jc.y);
+  await fire("pointermove", jc.x + 50, jc.y);
+  await p.waitForTimeout(700);
+  const j1 = await state(p);
+  check("phone: dragging the stick right walks the visitor right", j1.x > j0.x + 40 && j1.moving, `${j0.x} → ${j1.x}`);
+  await fire("pointerup", jc.x + 50, jc.y);
+  await p.waitForTimeout(200);
+  const j2 = await state(p);
+  await p.waitForTimeout(300);
+  check("phone: letting go of the stick stops the visitor", !j2.moving && (await state(p)).x === j2.x);
 
   for (const pl of await places(p)) {
     await viaMap(p, pl.name, true);

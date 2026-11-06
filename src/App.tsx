@@ -10,6 +10,7 @@ import { PlaceMarkers } from "./components/PlaceMarkers";
 import { PlacePanel } from "./components/PlacePanel";
 import { MapMenu } from "./components/MapMenu";
 import { StartChoice } from "./components/StartChoice";
+import { Joystick } from "./components/Joystick";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
@@ -297,6 +298,14 @@ export default function App() {
   }, [entered, closePanel]);
 
   const openPlace = config.places.find((p) => p.id === openId) ?? null;
+  // the on-screen stick: moving it closes any open card and walks that way, like the arrow keys
+  const steer = useCallback((x: number, y: number) => {
+    const e = engineRef.current;
+    if (!e || e.scene.visitorAway()) return;
+    if (x || y) closePanel();
+    e.visitor.steer.x = x;
+    e.visitor.steer.y = y;
+  }, [closePanel]);
 
   const runAction = () => {
     const e = engineRef.current;
@@ -473,12 +482,12 @@ export default function App() {
       <MapMenu
         places={config.places}
         groups={config.mapGroups}
-        quick={[{ id: "temple", label: "ไหว้พระ", icon: "🙏" }, { id: "shore", label: "ลอยกระทง", icon: "🌸" }]}
         active={target}
         onVisit={visit}
         hidden={!entered || asking || ride.view}
         ui={config.ui}
       />
+      <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view} />
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 
       {openPlace && (
