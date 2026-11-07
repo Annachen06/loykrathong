@@ -60,10 +60,10 @@ export function createLoyKrathongScene(): Scene {
       lotus: flower ?? LOTUS[(Math.random() * 4) | 0],
     });
   /** A krathong another visitor floated (only its look is known): out on the water already, or arriving from the shore. */
-  const addShared = (items: { style: string; color: string }[], fresh: boolean) => {
+  const addShared = (items: { style: string; color: string; wish?: string }[], fresh: boolean) => {
     for (const it of items) {
-      if (fresh) floaters.push({ x: rand(1820, 1990), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: "", style: it.style, lotus: it.color, shared: true });
-      else floaters.push({ x: rand(860, W - 40), y: rand(HORIZON + 40, SHORE - 20), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: "", style: it.style, lotus: it.color, shared: true });
+      if (fresh) floaters.push({ x: rand(1820, 1990), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true });
+      else floaters.push({ x: rand(860, W - 40), y: rand(HORIZON + 40, SHORE - 20), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true });
     }
   };
   const spawnLantern = (x: number, y: number, s = rand(0.35, 0.9)) =>
@@ -1678,7 +1678,9 @@ export function createLoyKrathongScene(): Scene {
       burst(best.x, best.y - 20, "255,246,225", 6);
       return {
         bubble: best.shared
-          ? { title: "กระทงของใครสักคน", text: "มีคนมาลอยกระทงในงานนี้เหมือนกัน ไม่ระบุว่าเป็นของใคร ขอให้ทุกคำอธิษฐานเป็นจริงนะ", tag: "ผู้ร่วมงานจริง" }
+          ? best.wish
+            ? { title: config.ui.wishTitle, text: best.wish, tag: "จากผู้ร่วมงานจริง · ไม่ระบุตัวตน" }
+            : { title: "กระทงของใครสักคน", text: "มีคนมาลอยกระทงในงานนี้เหมือนกัน ไม่ระบุว่าเป็นของใคร ขอให้ทุกคำอธิษฐานเป็นจริงนะ", tag: "ผู้ร่วมงานจริง" }
           : best.mine
           ? { title: config.ui.wishTitle, text: best.wish || "กระทงของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag }
           : { title: config.ui.wishTitle, text: best.wish, tag: config.ui.sampleTag },

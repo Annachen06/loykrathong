@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { activeFestival } from "./festivals";
 import type { FairItem, Scene, VisitorLook } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
-import { createSharedSea, sharedEnabled, type SharedConfig } from "./engine/sharedSea";
+import { cleanWish, createSharedSea, sharedEnabled, type SharedConfig } from "./engine/sharedSea";
 import { createVisitor, type Visitor } from "./engine/visitor";
 import { createSound, type Sound, type SoundName } from "./engine/sound";
 import { dist } from "./engine/math";
@@ -79,7 +79,7 @@ export default function App() {
   const [ritual, setRitual] = useState<FairItem | null>(null); // briefly held during an activity (the siamsi cup)
   const cardHoldRef = useRef<FairItem | null>(null);
   // the shared sea: other visitors' krathongs (look only, nobody's name), when the owner has set a database up
-  const sharedCfg: SharedConfig | undefined = (window as unknown as { __FAIR_SHARED__?: SharedConfig }).__FAIR_SHARED__ ?? config.shared;
+  const sharedCfg: SharedConfig | undefined = { ...config.shared, ...(window as unknown as { __FAIR_SHARED__?: SharedConfig }).__FAIR_SHARED__ };
   const sharedOn = sharedEnabled(sharedCfg);
   const seaRef = useRef<ReturnType<typeof createSharedSea> | null>(null);
   const seaMe = useRef({ nonce: Math.random().toString(36).slice(2, 14), last: 0, sent: 0 });
@@ -232,14 +232,14 @@ export default function App() {
     sea.latest(40).then((items) => {
       if (!alive) return;
       for (const k of items) latest = Math.max(latest, k.t);
-      scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l })), false);
+      scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l, wish: k.w })), false);
     }).catch(() => {});
     const timer = window.setInterval(() => {
       if (document.hidden || !latest) return;
       sea.since(latest).then((items) => {
         if (!alive || !items.length) return;
         for (const k of items) latest = Math.max(latest, k.t);
-        scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l })), true);
+        scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l, wish: k.w })), true);
       }).catch(() => {});
     }, Math.max(1000, sharedCfg.pollMs ?? 20000));
     return () => { alive = false; window.clearInterval(timer); seaRef.current = null; };
@@ -437,7 +437,7 @@ export default function App() {
 
   // ---- the pier: kneel at the end and set your krathong on the water
   const krathong = bag.find((i) => i.hold === "krathong") ?? null;
-  const floatKrathong = (wish: string) => {
+  const floatKrathong = (wish: string, share = false) => {
     const e = engineRef.current;
     if (!e || !openPlace?.action) return;
     const k = krathong ?? config.krathongs[0];
@@ -454,10 +454,13 @@ export default function App() {
       if (krathong) consume(krathong);
       // everyone else sees it float too: only its look goes out, never the wish
       const me = seaMe.current, now = Date.now();
-      if (seaRef.current && now - me.last > 15000 && me.sent < 12) {
+      if (seaRef.current && now - me.last > (sharedCfg?.minGapMs ?? 15000) && me.sent < 12) {
         me.last = now;
         me.sent++;
-        seaRef.current.publish({ s: k.id, l: k.color ?? "#ffcf4a", t: now, c: me.nonce }).catch(() => {});
+        // the wish goes out only if its owner agreed AND it is plain kind words (no contact details, no blocked words)
+        const shown = share && wish ? cleanWish(wish, sharedCfg?.blocked) : "";
+        if (share && wish && !shown) window.setTimeout(() => say("คำอธิษฐานนี้มีข้อมูลที่อาจบอกตัวตนได้ จึงเก็บไว้แค่ในเครื่องคุณ"), 3800);
+        seaRef.current.publish({ s: k.id, l: k.color ?? "#ffcf4a", t: now, c: me.nonce, ...(shown ? { w: shown } : {}) }).catch(() => {});
       }
       remember((m) => ({ wishes: [...m.wishes, wish] }));
       say(doneHint);

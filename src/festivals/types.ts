@@ -149,7 +149,7 @@ export type FestivalConfig = {
   /** The maker's story, told in a sheet that opens from a small button (kept word for word as the owner wrote it). */
   story?: { title: string; subtitle: string; paragraphs: string[] };
   /** The shared sea: krathongs floated by other visitors show up for everyone, with no names. Off until filled in. */
-  shared?: { projectId: string; apiKey: string; collection?: string; pollMs?: number };
+  shared?: { projectId: string; apiKey: string; collection?: string; pollMs?: number; minGapMs?: number; blocked?: string[] };
   /** Inviting a friend: the words that go with the link when it is shared. */
   invite?: { label: string; title: string; text: string; copied: string; failed: string };
   mapGroups: { id: string; label: string; icon: string }[];
@@ -203,7 +203,7 @@ export type Scene = {
   /** Optional: while on, the scene leaves out tap hints and cues (used when a still picture of it is painted). */
   setStill?(on: boolean): void;
   /** Optional: krathongs floated by other visitors (only their look). `fresh` ones arrive at the shore; the rest are already out on the water. */
-  addShared?(items: { style: string; color: string }[], fresh: boolean): void;
+  addShared?(items: { style: string; color: string; wish?: string }[], fresh: boolean): void;
   /** Drawn over everyone (sky lanterns, sparkles). */
   drawTop(ctx: CanvasRenderingContext2D, t: number): void;
   /** Runs a place's action. Returns false if the action is unknown. */

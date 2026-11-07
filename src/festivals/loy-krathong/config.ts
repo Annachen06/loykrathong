@@ -44,7 +44,12 @@ export const loyKrathongConfig: FestivalConfig = {
     qr: supportQr,
   },
   // The shared sea (see src/engine/sharedSea.ts and SHARED_SEA.md). Fill in your own Firebase project to switch it on.
-  shared: { projectId: "", apiKey: "" },
+  shared: {
+    projectId: "",
+    apiKey: "",
+    // wishes holding any of these words are never shared or shown (add more any time)
+    blocked: ["ควย", "เหี้ย", "สัส", "เย็ด", "fuck", "shit"],
+  },
   invite: {
     label: "ชวนเพื่อนมาลอยกระทงด้วยกัน",
     title: "ลอยกระทงริมทะเล",

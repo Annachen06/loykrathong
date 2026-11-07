@@ -470,13 +470,13 @@ async function desktopSuite(browser) {
 // The shared sea: other visitors' krathongs (their look only) show up for everyone; yours goes out with no wish and no name.
 async function sharedSuite(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  await ctx.addInitScript(() => { window.__FAIR_SHARED__ = { projectId: "test-sea", apiKey: "test-key", pollMs: 1500 }; });
+  await ctx.addInitScript(() => { window.__FAIR_SHARED__ = { projectId: "test-sea", apiKey: "test-key", pollMs: 1500, minGapMs: 0 }; });
   const p = await ctx.newPage();
   const errors = [];
   p.on("pageerror", (e) => errors.push(String(e)));
-  const doc = (st, lo, t, c = "other") => ({ document: { fields: { s: { stringValue: st }, l: { stringValue: lo }, t: { integerValue: String(t) }, c: { stringValue: c } } } });
+  const doc = (st, lo, t, c = "other", w) => ({ document: { fields: { s: { stringValue: st }, l: { stringValue: lo }, t: { integerValue: String(t) }, c: { stringValue: c }, ...(w ? { w: { stringValue: w } } : {}) } } });
   const now = Date.now();
-  const older = [doc("gold", "#fff1b0", now - 5000), doc("moon", "#e8e0ff", now - 4000), doc("lotus", "#ff9ec0", now - 3000), doc("evil<script>", "#ff9ec0", now - 2000), doc("lotus", "javascript:1", now - 1000)];
+  const older = [doc("gold", "#fff1b0", now - 5000, "o1", "ขอให้ทุกคนมีความสุข"), doc("moon", "#e8e0ff", now - 4000, "o2", "ติดต่อฉันที่ line:abc123 หรือ 0812345678"), doc("lotus", "#ff9ec0", now - 3000, "o3", "ไอ้เหี้ยทั้งหลาย"), doc("evil<script>", "#ff9ec0", now - 2000), doc("lotus", "javascript:1", now - 1000)];
   let created = null, later = [], queries = 0;
   const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
   await p.route("https://firestore.googleapis.com/**", async (route) => {
@@ -501,21 +501,40 @@ async function sharedSuite(browser) {
   let fl = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.shared));
   check("shared sea: krathongs others floated appear on the water", fl.length === 3 && fl.some((k) => k.style === "gold") && fl.some((k) => k.style === "moon"), JSON.stringify(fl.map((k) => k.style)));
   check("shared sea: odd or unsafe data from outside is ignored", !fl.some((k) => !/^#[0-9a-f]{6}$/i.test(k.lotus)) && !fl.some((k) => String(k.style).includes("<")));
-  check("shared sea: nothing says whose they are (no wish text on them)", fl.every((k) => k.wish === "" && !k.mine));
+  check("shared sea: a shared wish can be read, but one with contact details or a blocked word is dropped (the krathong stays)", fl.find((k) => k.style === "gold").wish === "ขอให้ทุกคนมีความสุข" && fl.find((k) => k.style === "moon").wish === "" && fl.filter((k) => k.style === "lotus")[0].wish === "" && fl.every((k) => !k.mine));
   // a new krathong arrives from someone else while you are here
   later = [doc("coconut", "#fffaf0", Date.now() + 100)];
   await p.waitForFunction(() => window.__fair.scene.debug().floaters.filter((k) => k.shared).length >= 4, null, { timeout: 8000 }).catch(() => {});
   fl = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.shared));
   check("shared sea: a krathong floated by someone else arrives while you are there", fl.length === 4 && fl.some((k) => k.style === "coconut"), String(fl.length));
-  // floating yours sends only its look
+  // floating yours: the wish goes out only when the box is ticked, and only if it is plain kind words
+  const floatOnce = async (wish, share) => {
+    created = null;
+    await viaMap(p, "ท่าลอยกระทง");
+    await p.waitForSelector("#wish-input", { timeout: 20000 });
+    await p.fill("#wish-input", wish);
+    const box = p.locator(".share-wish input");
+    if ((await box.isChecked()) !== share) await box.click();
+    await p.click(".float-form .panel-action");
+    await p.waitForTimeout(2600);
+    return created;
+  };
   await viaMap(p, "ท่าลอยกระทง");
   await p.waitForSelector("#wish-input", { timeout: 20000 });
-  check("float card says your krathong is shown to others but the wish stays private", (await p.textContent(".float-form .privacy")).includes("ไม่บอกว่าเป็นของใคร") && (await p.textContent(".float-form .privacy")).includes("เป็นความลับ"));
-  await p.fill("#wish-input", "ขอให้เป็นความลับ");
+  check("float card asks whether others may read the wish, ticked by default, with a clear warning", (await p.locator(".share-wish input").isChecked()) && (await p.textContent(".float-form .privacy")).includes("ไม่บอกว่าเป็นของใคร") && (await p.textContent(".float-form .privacy")).includes("อย่าใส่ชื่อ"));
+  await p.click(".share-wish input");
+  check("unticked: the card says the wish stays private", (await p.textContent(".float-form .privacy")).includes("เป็นความลับ"));
+  await p.click(".share-wish input");
+  await p.fill("#wish-input", "ขอให้ฝนไม่ตกวันลอยกระทง");
   await p.click(".float-form .panel-action");
   await p.waitForTimeout(2600);
-  const keys = created ? Object.keys(created.fields).sort().join(",") : "";
-  check("shared sea: floating yours sends only kind, colour, time and a throwaway tag", keys === "c,l,s,t" && created.fields.s.stringValue === "banana" && !JSON.stringify(created).includes("ความลับ"), JSON.stringify(created));
+  let keys = created ? Object.keys(created.fields).sort().join(",") : "";
+  check("shared sea: a shared wish goes out with only kind, colour, time, throwaway tag and the wish", keys === "c,l,s,t,w" && created.fields.w.stringValue === "ขอให้ฝนไม่ตกวันลอยกระทง" && created.fields.s.stringValue === "banana", JSON.stringify(created));
+  let c2 = await floatOnce("ขอให้เป็นความลับ", false);
+  check("shared sea: with the box unticked the wish never leaves the device", !!c2 && Object.keys(c2.fields).sort().join(",") === "c,l,s,t" && !JSON.stringify(c2).includes("ความลับ"), JSON.stringify(c2));
+  let c3 = await floatOnce("โทรหาฉัน 0812345678", true);
+  check("shared sea: a wish with a phone number is kept private even if ticked", !!c3 && !c3.fields.w, JSON.stringify(c3));
+  check("shared sea: …and the person is told why", (await p.textContent(".hint").catch(() => "")).length >= 0 && (await p.waitForFunction(() => document.querySelector(".hint")?.textContent.includes("เก็บไว้แค่ในเครื่องคุณ"), null, { timeout: 6000 }).then(() => true).catch(() => false)));
   const before = queries;
   await p.waitForTimeout(3200);
   fl = await p.evaluate(() => window.__fair.scene.debug().floaters);
