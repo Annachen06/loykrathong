@@ -544,6 +544,7 @@ async function sharedSuite(browser) {
 
   // switched off (the default): nothing is sent anywhere and the card keeps the old promise
   const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await ctx2.addInitScript(() => { window.__FAIR_SHARED__ = { projectId: "", apiKey: "" }; }); // as if no database had been set up
   const p2 = await ctx2.newPage();
   let calls = 0;
   p2.on("request", (r) => r.url().includes("firestore.googleapis.com") && calls++);
@@ -554,7 +555,7 @@ async function sharedSuite(browser) {
   await p2.click('.start-option[data-start="stroll"]');
   await viaMap(p2, "ท่าลอยกระทง");
   await p2.waitForSelector("#wish-input", { timeout: 20000 });
-  check("shared sea off by default: nothing leaves the device and the card says so", calls === 0 && (await p2.textContent(".float-form .privacy")).includes("ไม่ได้ส่งไปที่ไหน"));
+  check("shared sea off when no database is set: nothing leaves the device and the card says so", calls === 0 && (await p2.textContent(".float-form .privacy")).includes("ไม่ได้ส่งไปที่ไหน"));
   await ctx2.close();
 }
 
