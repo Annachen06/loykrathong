@@ -3,7 +3,7 @@ import type { FestivalConfig } from "../festivals/types";
 import { CreatorNote } from "./CreatorNote";
 import { SupportSlip } from "./SupportSlip";
 
-/** A small cup icon in the bottom-right corner. Tap it for the creator's corner: a thank-you, the PromptPay QR, a place to send the slip, and a note of encouragement. */
+/** A small cup icon in the bottom-right corner. Tap it for the creator's corner: a note of encouragement first, then a thank-you, the PromptPay QR and a place to send the slip. */
 export function NoteButton({ hidden, support }: { hidden: boolean; support?: FestivalConfig["support"] }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -21,6 +21,7 @@ export function NoteButton({ hidden, support }: { hidden: boolean; support?: Fes
       {open && (
         <div className="note-pop" role="dialog" aria-label={support?.title ?? "ฝากข้อความให้กำลังใจผู้สร้าง"}>
           <button type="button" className="note-close" aria-label="ปิด" onClick={() => setOpen(false)}>✕</button>
+          <CreatorNote />
           {support && (
             <section className="support">
               <h3>{support.title}</h3>
@@ -32,7 +33,6 @@ export function NoteButton({ hidden, support }: { hidden: boolean; support?: Fes
               {support.qr && <SupportSlip />}
             </section>
           )}
-          <CreatorNote />
         </div>
       )}
       <button

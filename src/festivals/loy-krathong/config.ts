@@ -43,6 +43,13 @@ export const loyKrathongConfig: FestivalConfig = {
     // the owner's PromptPay QR: scan with any banking app and type any amount
     qr: supportQr,
   },
+  invite: {
+    label: "ชวนเพื่อนมาลอยกระทงด้วยกัน",
+    title: "ลอยกระทงริมทะเล",
+    text: "มาลอยกระทงริมทะเลด้วยกันนะ 🌕 งานวัดเล็กๆ ริมทะเล ไหว้พระ เล่นเกม ปล่อยโคม แล้วลอยกระทงใต้พระจันทร์เต็มดวง",
+    copied: "คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย",
+    failed: "คัดลอกไม่ได้ ลองคัดลอกที่อยู่เว็บจากแถบด้านบนส่งให้เพื่อนนะ",
+  },
   mapGroups: [
     { id: "merit", label: "ทำบุญ", icon: "🙏" },
     { id: "stroll", label: "เดินเล่นในงาน", icon: "🎡" },

@@ -195,6 +195,27 @@ export default function App() {
     e.renderer.snapshot(canvas, spot, 1.5, (c) => e.visitor.drawStill(c, spot.x, spot.y, held));
   }, []);
 
+  /** Ask a friend along: share the link with a short invitation (the share sheet on phones, copy to the clipboard elsewhere). */
+  const invite = useCallback(async () => {
+    const cfg = config.invite;
+    if (!cfg) return;
+    const url = window.location.origin + window.location.pathname;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: cfg.title, text: cfg.text, url });
+        return;
+      }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return; // they closed the share sheet
+    }
+    try {
+      await navigator.clipboard.writeText(`${cfg.text} ${url}`);
+      say(cfg.copied);
+    } catch {
+      say(cfg.failed);
+    }
+  }, [say]);
+
   const awayMessage = () =>
     engineRef.current?.scene.stats().riding ? "กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ" : "กำลังรำวงอยู่บนเวที รอเพลงจบก่อนนะ";
 
@@ -468,6 +489,19 @@ export default function App() {
       </header>
 
       <div className="top-actions">
+      {config.invite && (
+        <button
+          type="button"
+          className={`story-toggle invite-toggle ${entered ? "" : "is-hidden"}`}
+          tabIndex={entered ? 0 : -1}
+          aria-label={config.invite.label}
+          title={config.invite.label}
+          onClick={invite}
+        >
+          <span aria-hidden="true">👫</span>
+          <span className="story-toggle-text">ชวนเพื่อน</span>
+        </button>
+      )}
       {config.story && (
         <button
           type="button"
@@ -565,6 +599,7 @@ export default function App() {
               memories={memories}
               paintScene={paintCard}
               brand={config.brand}
+              onInvite={config.invite ? invite : undefined}
               treasureTotal={config.curios.length}
             />
           )}

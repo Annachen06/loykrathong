@@ -21,12 +21,14 @@ type Props = {
   paintScene: (canvas: HTMLCanvasElement) => void;
   brand: string;
   treasureTotal: number;
+  /** Ask a friend along to float a krathong too. */
+  onInvite?: () => void;
 };
 
 const CARD_NAME = "loykrathong-memory.png";
 
 /** What you did tonight, listed, and gathered into a 9:16 souvenir card (for an Instagram Story) you can save. Nothing leaves this device. */
-export function MemoryCard({ memories: m, paintScene, brand, treasureTotal }: Props) {
+export function MemoryCard({ memories: m, paintScene, brand, treasureTotal, onInvite }: Props) {
   const [card, setCard] = useState<{ url: string; file: File } | null>(null);
   const [failed, setFailed] = useState(false);
   const rows = memoryRows(m, treasureTotal);
@@ -76,6 +78,7 @@ export function MemoryCard({ memories: m, paintScene, brand, treasureTotal }: Pr
         {card ? <img src={card.url} alt="การ์ดความทรงจำคืนนี้" width={1080} height={1920} /> : <p className="wish-fine">{failed ? "สร้างการ์ดไม่สำเร็จ ลองเปิดมุมความทรงจำใหม่อีกครั้งนะ" : "กำลังเตรียมการ์ด…"}</p>}
       </div>
       <button type="button" className="panel-action" onClick={save} disabled={!card}>บันทึกการ์ดของฉัน</button>
+      {onInvite && <button type="button" className="panel-action secondary" onClick={onInvite}>ชวนเพื่อนมาลอยกระทงด้วยกัน</button>}
       {canShare && <button type="button" className="panel-action secondary" onClick={share}>แชร์ลงสตอรี่</button>}
       <p className="wish-fine">การ์ดสร้างในเครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นที่ไหน</p>
     </div>

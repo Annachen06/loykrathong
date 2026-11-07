@@ -265,6 +265,7 @@ async function desktopSuite(browser) {
   const vp = p.viewportSize();
   check("note icon sits small in the bottom-right corner", fab.width <= 48 && fab.x + fab.width > vp.width - 80 && fab.y + fab.height > vp.height - 100, JSON.stringify(fab));
   await p.click(".note-fab");
+  check("the note to the creator comes first in the corner popup, above the cocoa corner", await p.evaluate(() => { const a = document.querySelector(".note-pop .note-form"), b = document.querySelector(".note-pop .support"); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }));
   check("the corner popup has the Buy Me a Cocoa tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
   // the tip corner's slip form: only images are accepted, and the post carries the Netlify form name and the file
   check("tip corner no longer carries the 'scan with bank app' caption", !(await p.textContent(".support")).includes("สแกนด้วยแอปธนาคาร"));
@@ -306,15 +307,26 @@ async function desktopSuite(browser) {
   check("the note icon closes the note again", !(await p.$(".note-pop")));
 
   // The story button in the top corner opens the story over the world and the world keeps working underneath.
-  await p.click(".story-toggle");
+  await p.click(".story-toggle:not(.invite-toggle)");
   await p.waitForSelector(".story", { timeout: 3000 });
   await p.screenshot({ path: path.join(SHOTS, "desktop-story.png") });
   check("the story button opens the story, and the stick and note icon step aside", (await p.textContent(".story")).includes("เกาะสมุย") && (await p.isVisible(".story-art")));
   await p.click(".story-close");
   check("the story closes with its close button", !(await p.$(".story")));
-  await p.click(".story-toggle");
+  await p.click(".story-toggle:not(.invite-toggle)");
   await p.mouse.click(5, 450);
   check("tapping outside the story closes it", !(await p.$(".story")));
+
+  // Asking a friend along: the share sheet when there is one, otherwise the link and invitation are copied.
+  await p.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+  await p.click(".invite-toggle");
+  const shared = await p.evaluate(() => window.__shared);
+  check("invite shares the link with a short invitation", !!shared && shared.url === BASE && shared.text.includes("มาลอยกระทงริมทะเลด้วยกันนะ"), JSON.stringify(shared));
+  await p.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "share", { value: undefined, configurable: true }); Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t) => { window.__copied = t; } }, configurable: true }); });
+  await p.click(".invite-toggle");
+  await p.waitForSelector(".hint", { timeout: 3000 }).catch(() => {});
+  const copied = await p.evaluate(() => window.__copied);
+  check("without a share sheet, invite copies the invitation and link and says so", !!copied && copied.includes(BASE) && (await p.textContent(".hint")).includes("คัดลอกลิงก์แล้ว"), String(copied));
 
   // an aeroplane crosses the sky now and then, and fireworks go off often
   await p.evaluate(() => window.__fair.scene.debug().sendPlane());
