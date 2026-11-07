@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { activeFestival } from "./festivals";
 import type { FairItem, Scene, VisitorLook } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
+import { createSharedSea, sharedEnabled, type SharedConfig } from "./engine/sharedSea";
 import { createVisitor, type Visitor } from "./engine/visitor";
 import { createSound, type Sound, type SoundName } from "./engine/sound";
 import { dist } from "./engine/math";
@@ -77,6 +78,11 @@ export default function App() {
   const [hand, setHand] = useState<FairItem | null>(null); // the one shown in your hand
   const [ritual, setRitual] = useState<FairItem | null>(null); // briefly held during an activity (the siamsi cup)
   const cardHoldRef = useRef<FairItem | null>(null);
+  // the shared sea: other visitors' krathongs (look only, nobody's name), when the owner has set a database up
+  const sharedCfg: SharedConfig | undefined = (window as unknown as { __FAIR_SHARED__?: SharedConfig }).__FAIR_SHARED__ ?? config.shared;
+  const sharedOn = sharedEnabled(sharedCfg);
+  const seaRef = useRef<ReturnType<typeof createSharedSea> | null>(null);
+  const seaMe = useRef({ nonce: Math.random().toString(36).slice(2, 14), last: 0, sent: 0 });
   const [look, setLook] = useState(config.visitors[0].look);
   const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
   const [muted, setMuted] = useState(false);
@@ -215,6 +221,30 @@ export default function App() {
       say(cfg.failed);
     }
   }, [say]);
+
+  // ---- the shared sea: fill the water with the krathongs others floated, then keep an eye out for new ones
+  useEffect(() => {
+    if (!entered || !sharedEnabled(sharedCfg)) return;
+    const sea = createSharedSea(sharedCfg, config.krathongs.map((k) => k.id));
+    seaRef.current = sea;
+    let latest = 0, alive = true;
+    const scene = engineRef.current?.scene;
+    sea.latest(40).then((items) => {
+      if (!alive) return;
+      for (const k of items) latest = Math.max(latest, k.t);
+      scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l })), false);
+    }).catch(() => {});
+    const timer = window.setInterval(() => {
+      if (document.hidden || !latest) return;
+      sea.since(latest).then((items) => {
+        if (!alive || !items.length) return;
+        for (const k of items) latest = Math.max(latest, k.t);
+        scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l })), true);
+      }).catch(() => {});
+    }, Math.max(1000, sharedCfg.pollMs ?? 20000));
+    return () => { alive = false; window.clearInterval(timer); seaRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entered]);
 
   const awayMessage = () =>
     engineRef.current?.scene.stats().riding ? "กำลังนั่งชิงช้าสวรรค์อยู่ รอหมุนครบรอบก่อนนะ" : "กำลังรำวงอยู่บนเวที รอเพลงจบก่อนนะ";
@@ -422,6 +452,13 @@ export default function App() {
       sfx("splash");
       setRitual(null);
       if (krathong) consume(krathong);
+      // everyone else sees it float too: only its look goes out, never the wish
+      const me = seaMe.current, now = Date.now();
+      if (seaRef.current && now - me.last > 15000 && me.sent < 12) {
+        me.last = now;
+        me.sent++;
+        seaRef.current.publish({ s: k.id, l: k.color ?? "#ffcf4a", t: now, c: me.nonce }).catch(() => {});
+      }
       remember((m) => ({ wishes: [...m.wishes, wish] }));
       say(doneHint);
     }, 1500);
@@ -574,7 +611,7 @@ export default function App() {
           onClose={closePanel}
         >
           {openPlace.panel === "float" && openPlace.action && (
-            <FloatForm label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} />
+            <FloatForm shared={sharedOn} label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} />
           )}
           {openPlace.panel === "lantern" && openPlace.items && <LanternForm lanterns={openPlace.items} onRelease={releaseLantern} />}
           {openPlace.panel === "games" && <FairGames onPrize={onPrize} onPop={() => sfx("pop")} />}

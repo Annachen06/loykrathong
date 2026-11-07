@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The shared sea: anyone may look at the newest krathongs and float one of their own.
+    // A krathong is only a kind, a colour, a time and a throwaway tag: no wish, no name, nothing that says whose it is.
+    match /krathongs/{id} {
+      allow read: if request.query.limit <= 60;
+      allow create: if request.resource.data.keys().hasOnly(['s', 'l', 't', 'c'])
+        && request.resource.data.keys().hasAll(['s', 'l', 't', 'c'])
+        && request.resource.data.s in ['banana', 'lotus', 'bread', 'coconut', 'gold', 'moon', 'swan']
+        && request.resource.data.l is string
+        && request.resource.data.l.matches('^#[0-9a-fA-F]{6}$')
+        && request.resource.data.c is string
+        && request.resource.data.c.size() <= 24
+        && request.resource.data.t is int
+        && request.resource.data.t > request.time.toMillis() - 600000
+        && request.resource.data.t < request.time.toMillis() + 600000;
+      allow update, delete: if false;
+    }
+  }
+}

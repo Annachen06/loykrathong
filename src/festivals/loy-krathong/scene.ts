@@ -7,7 +7,7 @@ import { loyKrathongConfig as config } from "./config";
 import { boothSign, drawGate, drawKrathongCached, GATE, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
 import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
 
-type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string };
+type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string; shared?: boolean };
 const STYLES = ["banana", "banana", "lotus", "bread", "coconut"];
 /** A sky lantern (khom loi). Yours carry your colour and wish and can be tapped while they are still low enough to reach. */
 type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; color2?: string; style?: string; wish?: string; age?: number; trail?: number };
@@ -59,6 +59,13 @@ export function createLoyKrathongScene(): Scene {
       style: style ?? STYLES[(Math.random() * STYLES.length) | 0],
       lotus: flower ?? LOTUS[(Math.random() * 4) | 0],
     });
+  /** A krathong another visitor floated (only its look is known): out on the water already, or arriving from the shore. */
+  const addShared = (items: { style: string; color: string }[], fresh: boolean) => {
+    for (const it of items) {
+      if (fresh) floaters.push({ x: rand(1820, 1990), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: "", style: it.style, lotus: it.color, shared: true });
+      else floaters.push({ x: rand(860, W - 40), y: rand(HORIZON + 40, SHORE - 20), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: "", style: it.style, lotus: it.color, shared: true });
+    }
+  };
   const spawnLantern = (x: number, y: number, s = rand(0.35, 0.9)) =>
     lanterns.push({ x, y, vy: -rand(10, 18), sway: rand(8, 22), p: rand(0, 6.28), s });
 
@@ -1555,6 +1562,7 @@ export function createLoyKrathongScene(): Scene {
   return {
     paintBack,
     paintFront,
+    addShared,
     setStill(on) { still = on; },
     update,
     drawMiddle,
@@ -1660,7 +1668,7 @@ export function createLoyKrathongScene(): Scene {
       // a krathong on the water: read its wish
       let best: Floater | null = null, bestD = Infinity;
       for (const k of floaters) {
-        if (!k.wish && !k.mine) continue;
+        if (!k.wish && !k.mine && !k.shared) continue;
         const depth = clamp((k.y - HORIZON) / (SHORE - HORIZON), 0, 1);
         const s = 0.25 + depth * 0.8;
         const d = dist(p.x, p.y, k.x, k.y - 16 * s);
@@ -1669,14 +1677,16 @@ export function createLoyKrathongScene(): Scene {
       if (!best) return null;
       burst(best.x, best.y - 20, "255,246,225", 6);
       return {
-        bubble: best.mine
+        bubble: best.shared
+          ? { title: "กระทงของใครสักคน", text: "มีคนมาลอยกระทงในงานนี้เหมือนกัน ไม่ระบุว่าเป็นของใคร ขอให้ทุกคำอธิษฐานเป็นจริงนะ", tag: "ผู้ร่วมงานจริง" }
+          : best.mine
           ? { title: config.ui.wishTitle, text: best.wish || "กระทงของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag }
           : { title: config.ui.wishTitle, text: best.wish, tag: config.ui.sampleTag },
       };
     },
     visitorAway: () => ride.active || stageGuest.active,
     debug: () => ({
-      floaters: floaters.map((k) => ({ x: k.x, y: k.y, wish: k.wish, mine: k.mine })),
+      floaters: floaters.map((k) => ({ x: k.x, y: k.y, wish: k.wish, mine: k.mine, shared: !!k.shared, style: k.style, lotus: k.lotus })),
       lanterns: lanterns.map((l) => ({ x: l.x, y: l.y, mine: !!l.mine })),
       plane: plane ? { x: Math.round(plane.x), y: Math.round(plane.y), dir: plane.dir } : null,
       sparks: sparks.length,

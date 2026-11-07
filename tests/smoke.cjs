@@ -467,6 +467,78 @@ async function desktopSuite(browser) {
   await ctx.close();
 }
 
+// The shared sea: other visitors' krathongs (their look only) show up for everyone; yours goes out with no wish and no name.
+async function sharedSuite(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await ctx.addInitScript(() => { window.__FAIR_SHARED__ = { projectId: "test-sea", apiKey: "test-key", pollMs: 1500 }; });
+  const p = await ctx.newPage();
+  const errors = [];
+  p.on("pageerror", (e) => errors.push(String(e)));
+  const doc = (st, lo, t, c = "other") => ({ document: { fields: { s: { stringValue: st }, l: { stringValue: lo }, t: { integerValue: String(t) }, c: { stringValue: c } } } });
+  const now = Date.now();
+  const older = [doc("gold", "#fff1b0", now - 5000), doc("moon", "#e8e0ff", now - 4000), doc("lotus", "#ff9ec0", now - 3000), doc("evil<script>", "#ff9ec0", now - 2000), doc("lotus", "javascript:1", now - 1000)];
+  let created = null, later = [], queries = 0;
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
+  await p.route("https://firestore.googleapis.com/**", async (route) => {
+    const req = route.request();
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    const url = req.url(), body = JSON.parse(req.postData() || "{}");
+    if (url.includes(":runQuery")) {
+      queries++;
+      const sq = body.structuredQuery;
+      const rows = sq.where ? later : older;
+      return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(rows.length ? rows : [{ readTime: "x" }]) });
+    }
+    if (req.method() === "POST" && url.includes("/documents/krathongs")) { created = body; return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: "{}" }); }
+    return route.continue();
+  });
+  await p.goto(BASE);
+  await p.waitForFunction(() => !!window.__fair);
+  await p.click(".intro-enter");
+  await p.waitForTimeout(1500);
+  await p.click('.start-option[data-start="stroll"]');
+  await p.waitForFunction(() => window.__fair.scene.debug().floaters.some((k) => k.shared), null, { timeout: 8000 }).catch(() => {});
+  let fl = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.shared));
+  check("shared sea: krathongs others floated appear on the water", fl.length === 3 && fl.some((k) => k.style === "gold") && fl.some((k) => k.style === "moon"), JSON.stringify(fl.map((k) => k.style)));
+  check("shared sea: odd or unsafe data from outside is ignored", !fl.some((k) => !/^#[0-9a-f]{6}$/i.test(k.lotus)) && !fl.some((k) => String(k.style).includes("<")));
+  check("shared sea: nothing says whose they are (no wish text on them)", fl.every((k) => k.wish === "" && !k.mine));
+  // a new krathong arrives from someone else while you are here
+  later = [doc("coconut", "#fffaf0", Date.now() + 100)];
+  await p.waitForFunction(() => window.__fair.scene.debug().floaters.filter((k) => k.shared).length >= 4, null, { timeout: 8000 }).catch(() => {});
+  fl = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.shared));
+  check("shared sea: a krathong floated by someone else arrives while you are there", fl.length === 4 && fl.some((k) => k.style === "coconut"), String(fl.length));
+  // floating yours sends only its look
+  await viaMap(p, "ท่าลอยกระทง");
+  await p.waitForSelector("#wish-input", { timeout: 20000 });
+  check("float card says your krathong is shown to others but the wish stays private", (await p.textContent(".float-form .privacy")).includes("ไม่บอกว่าเป็นของใคร") && (await p.textContent(".float-form .privacy")).includes("เป็นความลับ"));
+  await p.fill("#wish-input", "ขอให้เป็นความลับ");
+  await p.click(".float-form .panel-action");
+  await p.waitForTimeout(2600);
+  const keys = created ? Object.keys(created.fields).sort().join(",") : "";
+  check("shared sea: floating yours sends only kind, colour, time and a throwaway tag", keys === "c,l,s,t" && created.fields.s.stringValue === "banana" && !JSON.stringify(created).includes("ความลับ"), JSON.stringify(created));
+  const before = queries;
+  await p.waitForTimeout(3200);
+  fl = await p.evaluate(() => window.__fair.scene.debug().floaters);
+  check("shared sea: it keeps checking quietly for new krathongs", queries > before);
+  check("shared sea: no errors", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+
+  // switched off (the default): nothing is sent anywhere and the card keeps the old promise
+  const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p2 = await ctx2.newPage();
+  let calls = 0;
+  p2.on("request", (r) => r.url().includes("firestore.googleapis.com") && calls++);
+  await p2.goto(BASE);
+  await p2.waitForFunction(() => !!window.__fair);
+  await p2.click(".intro-enter");
+  await p2.waitForTimeout(1500);
+  await p2.click('.start-option[data-start="stroll"]');
+  await viaMap(p2, "ท่าลอยกระทง");
+  await p2.waitForSelector("#wish-input", { timeout: 20000 });
+  check("shared sea off by default: nothing leaves the device and the card says so", calls === 0 && (await p2.textContent(".float-form .privacy")).includes("ไม่ได้ส่งไปที่ไหน"));
+  await ctx2.close();
+}
+
 async function phoneSuite(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();
@@ -564,6 +636,7 @@ async function reducedMotionSuite(browser) {
   const browser = await chromium.launch();
   try {
     await desktopSuite(browser);
+    await sharedSuite(browser);
     await phoneSuite(browser);
     await reducedMotionSuite(browser);
   } catch (e) {

@@ -2,6 +2,8 @@ import { useState } from "react";
 
 type Props = {
   label: string;
+  /** The krathong is also shown to other visitors (its look only). */
+  shared?: boolean;
   /** Name of the krathong in your hand, or null if you haven't picked one. */
   krathong: string | null;
   onFloat: (wish: string) => void;
@@ -9,7 +11,7 @@ type Props = {
 };
 
 /** At the end of the pier: write a wish (optional) and float your krathong. The wish stays on this device only. */
-export function FloatForm({ label, krathong, onFloat, onShop }: Props) {
+export function FloatForm({ label, shared, krathong, onFloat, onShop }: Props) {
   const [wish, setWish] = useState("");
   return (
     <form
@@ -26,7 +28,11 @@ export function FloatForm({ label, krathong, onFloat, onShop }: Props) {
       </p>
       <label htmlFor="wish-input">ตั้งจิตอธิษฐาน (ไม่ใส่ก็ได้)</label>
       <textarea id="wish-input" value={wish} maxLength={80} rows={2} placeholder="ขอให้…" onChange={(e) => setWish(e.target.value)} />
-      <p className="privacy">คำอธิษฐานของคุณเป็นความลับ อยู่แค่ในเครื่องนี้ ไม่ได้ส่งไปที่ไหน</p>
+      <p className="privacy">
+        {shared
+          ? "คำอธิษฐานของคุณเป็นความลับ อยู่แค่ในเครื่องนี้ ส่วนกระทงของคุณจะไปลอยให้คนอื่นในงานเห็นด้วย โดยไม่บอกว่าเป็นของใคร"
+          : "คำอธิษฐานของคุณเป็นความลับ อยู่แค่ในเครื่องนี้ ไม่ได้ส่งไปที่ไหน"}
+      </p>
       <button type="submit" className="panel-action">{label}</button>
     </form>
   );

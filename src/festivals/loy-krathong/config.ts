@@ -43,6 +43,8 @@ export const loyKrathongConfig: FestivalConfig = {
     // the owner's PromptPay QR: scan with any banking app and type any amount
     qr: supportQr,
   },
+  // The shared sea (see src/engine/sharedSea.ts and SHARED_SEA.md). Fill in your own Firebase project to switch it on.
+  shared: { projectId: "", apiKey: "" },
   invite: {
     label: "ชวนเพื่อนมาลอยกระทงด้วยกัน",
     title: "ลอยกระทงริมทะเล",
