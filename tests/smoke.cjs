@@ -234,9 +234,27 @@ async function desktopSuite(browser) {
   const mine = await p.textContent(".memory-list");
   check("Memory Corner lists the private wish from this visit", mine.includes("ขอให้ทดสอบผ่านทุกข้อ"), mine);
   check("Memory Corner lists the lantern wish too", mine.includes("ขอให้โคมลอยถึงพระจันทร์"), mine);
-  check("Memory Corner has a tip corner with a scannable QR, ", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
-  check("tip corner no longer carries the 'scan with bank app' caption or any slip form", !(await p.textContent(".support")).includes("สแกนด้วยแอปธนาคาร") && (await p.locator(".slip, .slip-form, input[type=file]").count()) === 0);
-  check("tip corner text is Anna's wording", (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี"));
+  check("Memory Corner has a tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
+  // the tip corner's slip form: only images are accepted, and the post carries the Netlify form name and the file
+  check("tip corner no longer carries the 'scan with bank app' caption", !(await p.textContent(".support")).includes("สแกนด้วยแอปธนาคาร"));
+  let posted = null;
+  await p.route("**/", async (route) => {
+    const req = route.request();
+    if (req.method() === "POST") { posted = req.postDataBuffer()?.toString("latin1") ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
+    return route.continue();
+  });
+  await p.click('.slip button:has-text("แนบหลักฐานการโอน")');
+  await p.fill('.slip-form input[name="name"]', "ผู้ใจดี");
+  await p.setInputFiles('.slip-form input[name="slip"]', { name: "note.txt", mimeType: "text/plain", buffer: Buffer.from("hi") });
+  await p.click('.slip-form button[type="submit"]');
+  check("slip form refuses a file that is not a picture", (await p.isVisible(".slip-problem")) && posted === null);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await p.setInputFiles('.slip-form input[name="slip"]', { name: "slip.png", mimeType: "image/png", buffer: png });
+  await p.click('.slip-form button[type="submit"]');
+  await p.waitForSelector(".slip-thanks", { timeout: 5000 }).catch(() => {});
+  check("slip form sends the Netlify form name, the nickname and the picture, then says thanks", !!posted && posted.includes('name="form-name"') && posted.includes("support-slip") && posted.includes('filename="slip.png"') && (await p.isVisible(".slip-thanks")), String(posted).slice(0, 80));
+  await p.unroute("**/");
+  check("the site ships a hidden form for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1);
 
   await p.click('.memory .panel-action:has-text("สร้างการ์ด")');
   await p.waitForSelector(".memory-card img");

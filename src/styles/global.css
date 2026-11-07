@@ -484,6 +484,19 @@ button { font: inherit; color: inherit; }
 .support h3 { margin: 0; font-size: 15px; font-weight: 500; }
 .support p { margin: 0; font-size: 13px; line-height: 1.45; color: #6a3a5a; white-space: pre-line; }
 .support-qr { width: 200px; max-width: 100%; height: auto; border-radius: 10px; background: #fff; border: 2px solid var(--ink); }
+.slip { width: 100%; margin-top: 4px; }
+.slip-form { display: flex; flex-direction: column; gap: 8px; }
+.slip-form label { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; font-weight: 500; }
+.slip-form input, .slip-form textarea {
+  width: 100%; padding: 9px 11px; border: 2px solid var(--ink); border-radius: 12px; background: #fffaf2; color: var(--ink);
+  font: inherit; font-size: 16px; resize: none; user-select: text;
+}
+.slip-form input[type="file"] { padding: 8px; font-size: 14px; background: #fff; }
+.slip-form input:focus, .slip-form textarea:focus { outline: 3px solid var(--rose); outline-offset: 1px; }
+.slip-lead { margin: 0; font-size: 13px; line-height: 1.45; color: #6a3a5a; }
+.slip-bot { position: absolute; left: -9999px; height: 0; overflow: hidden; margin: 0; }
+.slip-problem { margin: 0; font-size: 13px; color: #b3263e; font-weight: 500; }
+.slip-thanks { margin: 4px 0 0; font-size: 14px; font-weight: 500; }
 .premium-tag {
   display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; font-style: normal; font-size: 11.5px; font-weight: 500;
   background: linear-gradient(135deg, #ffe08a, #ffc24a); color: #5a3a10; border: 1px solid #c8902a; white-space: nowrap;
