@@ -12,6 +12,7 @@ import { MapMenu } from "./components/MapMenu";
 import { StartChoice } from "./components/StartChoice";
 import { Joystick } from "./components/Joystick";
 import { NoteButton } from "./components/NoteButton";
+import { StorySheet } from "./components/StorySheet";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
@@ -79,6 +80,7 @@ export default function App() {
   const [look, setLook] = useState(config.visitors[0].look);
   const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
   const [muted, setMuted] = useState(false);
+  const [story, setStory] = useState(false); // the maker's story sheet
   const sfx = useCallback((name: SoundName) => engineRef.current?.sound.play(name), []);
   // where the visitor last did something worth remembering: the souvenir card is "taken" there
   const spotRef = useRef<{ x: number; y: number } | null>(null);
@@ -465,6 +467,21 @@ export default function App() {
         <span className="brand-tag">{config.tagline}</span>
       </header>
 
+      <div className="top-actions">
+      {config.story && (
+        <button
+          type="button"
+          className={`story-toggle ${entered ? "" : "is-hidden"}`}
+          tabIndex={entered ? 0 : -1}
+          aria-label="เรื่องราวของลอยกัน"
+          title="เรื่องราวของลอยกัน"
+          onClick={() => setStory(true)}
+        >
+          <span aria-hidden="true">🌙</span>
+          <span className="story-toggle-text">เรื่องราว</span>
+        </button>
+      )}
+
       <button
         type="button"
         className={`sound-toggle ${entered ? "" : "is-hidden"}`}
@@ -487,6 +504,7 @@ export default function App() {
         </svg>
         <span>{muted ? "เปิดเสียง" : "เสียง"}</span>
       </button>
+      </div>
 
       <PlaceMarkers
         places={config.places}
@@ -508,8 +526,9 @@ export default function App() {
         hidden={!entered || asking || ride.view}
         ui={config.ui}
       />
-      <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view} />
-      <NoteButton hidden={!entered || asking || !!openPlace || ride.view} />
+      <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view || story} />
+      <NoteButton hidden={!entered || asking || !!openPlace || ride.view || story} />
+      {config.story && <StorySheet story={config.story} open={story} onClose={() => setStory(false)} />}
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 
       {openPlace && (
@@ -556,7 +575,7 @@ export default function App() {
       <Hint hint={hint} />
       <WishBubble bubble={bubble} onClose={() => setBubble(null)} />
 
-      <Intro config={config} onEnter={enter} hidden={entered} />
+      <Intro config={config} onEnter={enter} hidden={entered} onStory={config.story ? () => setStory(true) : undefined} />
     </main>
   );
 }

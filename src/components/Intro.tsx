@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FestivalConfig, VisitorLook } from "../festivals/types";
 import { drawPerson } from "../engine/person";
 
-type Props = { config: FestivalConfig; onEnter: (look: VisitorLook) => void; hidden: boolean };
+type Props = { config: FestivalConfig; onEnter: (look: VisitorLook) => void; hidden: boolean; onStory?: () => void };
 
 // Everyone dresses as they like: age, clothes and hair are separate choices, with no "man" or "woman" button
 // and no outfit that belongs to one gender. The stage only decides which fortune slips you get at the temple.
@@ -91,7 +91,7 @@ function savedLook(fallback: VisitorLook): VisitorLook {
 }
 
 /** The first moment: the world is already alive behind a soft veil. Make your character, then step in. */
-export function Intro({ config, onEnter, hidden }: Props) {
+export function Intro({ config, onEnter, hidden, onStory }: Props) {
   const [look, setLook] = useState<VisitorLook>(() => savedLook(config.visitors[0].look));
   const set = (patch: Partial<VisitorLook>) => setLook((l) => tidy({ ...l, ...patch }));
   const enter = () => {
@@ -159,6 +159,7 @@ export function Intro({ config, onEnter, hidden }: Props) {
           {config.intro.enterLabel}
         </button>
         <p className="intro-help">{config.intro.help}</p>
+        {onStory && <button type="button" className="intro-story" tabIndex={tab} onClick={onStory}>🌙 เรื่องราวของลอยกัน</button>}
       </div>
     </section>
   );

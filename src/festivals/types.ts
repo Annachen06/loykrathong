@@ -144,6 +144,8 @@ export type FestivalConfig = {
     yourWishTag: string;
   };
   /** Sections of the map, in order, e.g. "ทำบุญ", "เดินเล่น", "ลอยกระทง". Each place says which one it belongs to. */
+  /** The maker's story, told in a sheet that opens from a small button (kept word for word as the owner wrote it). */
+  story?: { title: string; subtitle: string; paragraphs: string[] };
   mapGroups: { id: string; label: string; icon: string }[];
   /** The "where first?" question shown on arrival. `go` is the place to walk to; leave it out to just start strolling. */
   startChoices: { id: string; icon: string; label: string; text: string; go?: string; hint: string }[];

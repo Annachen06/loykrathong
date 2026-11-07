@@ -84,6 +84,15 @@ export function createLoyKrathongScene(): Scene {
     }
     sparks.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.5, rgb, g: 0, size: 0, front: false, flash: true });
   }
+  /** The aeroplane enters from one side of what you can see and leaves at the other, in the part of the sky on screen. */
+  function sendPlane() {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const c = lastCam;
+    plane = {
+      x: dir === 1 ? c.x - 140 : c.x + c.w + 140, end: dir === 1 ? c.x + c.w + 200 : c.x - 200,
+      y: clamp(c.y + c.h * rand(0.1, 0.3), 70, HORIZON - 150), dir, speed: rand(70, 95), t: 0,
+    };
+  }
   /** One launch, or a volley of two or three bursts close together. */
   function launchFireworks() {
     const n = Math.random() < 0.45 ? 1 : Math.random() < 0.6 ? 2 : 3;
@@ -808,16 +817,7 @@ export function createLoyKrathongScene(): Scene {
       if (plane.dir === 1 ? plane.x > plane.end : plane.x < plane.end) plane = null;
     } else if (!calm) {
       nextPlane -= dt;
-      if (nextPlane <= 0) {
-        const dir = Math.random() < 0.5 ? 1 : -1;
-        // it enters from one side of what you can see and leaves at the other, in the part of the sky on screen
-        const c = lastCam;
-        plane = {
-          x: dir === 1 ? c.x - 140 : c.x + c.w + 140, end: dir === 1 ? c.x + c.w + 200 : c.x - 200,
-          y: clamp(c.y + c.h * rand(0.1, 0.3), 70, HORIZON - 150), dir, speed: rand(70, 95), t: 0,
-        };
-        nextPlane = rand(40, 75);
-      }
+      if (nextPlane <= 0) { sendPlane(); nextPlane = rand(40, 75); }
     }
     for (const s of shooting) s.life += dt;
     for (let i = shooting.length - 1; i >= 0; i--) if (shooting[i].life > 1) shooting.splice(i, 1);
@@ -1680,6 +1680,7 @@ export function createLoyKrathongScene(): Scene {
       lanterns: lanterns.map((l) => ({ x: l.x, y: l.y, mine: !!l.mine })),
       plane: plane ? { x: Math.round(plane.x), y: Math.round(plane.y), dir: plane.dir } : null,
       sparks: sparks.length,
+      sendPlane, // for the browser tests: call the aeroplane now
     }),
     stats: () => ({
       krathongsFloated: mineCount, lanternsReleased: lanternCount, curioTaps: pokes, riding: ride.active ? 1 : 0,

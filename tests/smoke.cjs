@@ -59,6 +59,13 @@ async function desktopSuite(browser) {
   await p.waitForFunction(() => !!window.__fair);
   await p.waitForTimeout(800);
 
+  // The maker's story can be read from the welcome screen, word for word, and closed again.
+  await p.click(".intro-story");
+  const storyText = await p.textContent(".story");
+  check("welcome screen: the story opens with the owner's own words", storyText.includes("เรื่องราวของลอยกัน 🌙") && storyText.includes("จากความทรงจำในวัยเด็ก สู่ลอยกระทงริมทะเล") && storyText.includes("ธีมลอยกระทงริมทะเลของเว็บลอยกัน เกิดจากความทรงจำในวัยเด็กของเราที่เกาะสมุย") && storyText.includes("มีเครื่องบินเที่ยวดึกบินผ่านบนท้องฟ้า มีเวทีร้องเพลง เต้นรำ และผู้คนออกมาเดินเที่ยวงานกัน") && storyText.includes("แบ่งปันบรรยากาศที่เราคิดถึงให้ทุกคนได้สัมผัส"));
+  await p.keyboard.press("Escape");
+  check("the story closes with Escape", !(await p.$(".story")));
+
   // The canvas should be painted with many different colours (not blank).
   const colours = await p.evaluate(() => {
     const c = document.querySelector("canvas.world");
@@ -277,8 +284,20 @@ async function desktopSuite(browser) {
   await p.click(".note-fab");
   check("the note icon closes the note again", !(await p.$(".note-pop")));
 
+  // The story button in the top corner opens the story over the world and the world keeps working underneath.
+  await p.click(".story-toggle");
+  await p.waitForSelector(".story", { timeout: 3000 });
+  await p.screenshot({ path: path.join(SHOTS, "desktop-story.png") });
+  check("the story button opens the story, and the stick and note icon step aside", (await p.textContent(".story")).includes("เกาะสมุย") && (await p.isVisible(".story-art")));
+  await p.click(".story-close");
+  check("the story closes with its close button", !(await p.$(".story")));
+  await p.click(".story-toggle");
+  await p.mouse.click(5, 450);
+  check("tapping outside the story closes it", !(await p.$(".story")));
+
   // an aeroplane crosses the sky now and then, and fireworks go off often
-  const plane = await p.waitForFunction(() => window.__fair.scene.debug().plane, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+  await p.evaluate(() => window.__fair.scene.debug().sendPlane());
+  const plane = await p.evaluate(() => window.__fair.scene.debug().plane);
   check("an aeroplane flies across the sky", !!plane && plane.y < 500, JSON.stringify(plane));
   const sparkPeak = await p.evaluate(async () => {
     let peak = 0;

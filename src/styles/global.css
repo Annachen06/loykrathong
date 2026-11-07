@@ -758,3 +758,44 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
   /* below the name and the sound button on a phone */
   .ride-caption { top: calc(var(--safe-top) + 66px); }
 }
+
+/* ---------------------------------------------------------------- the maker's story */
+.top-actions { position: absolute; top: calc(var(--safe-top) + 12px); right: calc(var(--safe-right) + 14px); display: flex; align-items: center; gap: 8px; z-index: 3; }
+.top-actions .sound-toggle { position: static; }
+.story-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 42px; min-width: 42px; padding: 8px 12px; justify-content: center;
+  border: 2px solid rgba(255, 244, 226, 0.5); border-radius: 999px; background: rgba(20, 18, 70, 0.7); color: var(--moonlight);
+  font: inherit; font-size: 13px; cursor: pointer; transition: opacity 0.8s 0.6s;
+}
+.story-toggle.is-hidden { opacity: 0; pointer-events: none; }
+.story-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.story-toggle-text { display: none; }
+@media (min-width: 640px) { .story-toggle-text { display: inline; } }
+.intro-story {
+  margin: 12px 0 0; padding: 8px 14px; border: 0; background: none; color: var(--moonlight); font: inherit; font-size: 14px;
+  text-decoration: underline; text-underline-offset: 4px; text-decoration-color: rgba(255, 244, 226, 0.5); cursor: pointer; opacity: 0.92;
+}
+.intro-story:hover { opacity: 1; }
+.intro-story:focus-visible { outline: 3px solid var(--moonlight); outline-offset: 2px; border-radius: 8px; }
+.story-backdrop {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: calc(var(--safe-top) + 14px) 14px calc(var(--safe-bottom) + 14px);
+  background: rgba(8, 10, 40, 0.62); backdrop-filter: blur(3px); animation: story-fade 0.3s ease-out;
+}
+.story {
+  position: relative; width: min(440px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+  border: 3px solid var(--ink); border-radius: 24px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 var(--ink), 0 18px 44px rgba(5, 4, 30, 0.55);
+  -webkit-user-select: text; user-select: text;
+}
+.story-art { display: block; width: 100%; height: auto; border-radius: 21px 21px 0 0; }
+.story-close {
+  position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255, 244, 226, 0.7);
+  background: rgba(20, 18, 70, 0.7); color: var(--moonlight); font-size: 15px; cursor: pointer;
+}
+.story-close:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.story-body { padding: 18px 22px 24px; }
+.story-body h2 { margin: 0; font-size: 24px; font-weight: 500; line-height: 1.25; }
+.story-sub { margin: 6px 0 14px !important; font-size: 15px !important; color: #a04668 !important; }
+.story-body p { margin: 0 0 12px; font-size: 15.5px; line-height: 1.75; }
+.story-body p:last-child { margin-bottom: 0; }
+@keyframes story-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .story-backdrop { animation: none; } }
