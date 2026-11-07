@@ -27,8 +27,9 @@ export const loyKrathongConfig: FestivalConfig = {
   },
   // The owner's own tip page or PromptPay QR goes here (nothing is shown until one is set).
   support: {
-    title: "ซื้อกาแฟให้กำลังใจคนทำ",
-    text: "งานนี้ทำด้วยใจ เล่นฟรีทุกอย่าง ถ้าชอบและอยากเป็นกำลังใจ ร่วมสมทบได้นิดหน่อยตามสะดวกนะคะ ไม่มีผลกับของที่ได้ในงาน",
+    title: "☕ Buy Me a Cocoa",
+    // blank lines separate paragraphs
+    text: "พื้นที่เล็ก ๆ แห่งนี้สร้างขึ้นด้วยความตั้งใจ เพื่อแบ่งปันความสุขให้ทุกคนได้เข้ามาเล่นกันฟรี ๆ\n\nหากคุณชอบผลงานและอยากเป็นส่วนหนึ่งในการสนับสนุนให้พื้นที่แห่งนี้เติบโตต่อไป สามารถส่งกำลังใจเล็ก ๆ น้อย ๆ ให้ผู้สร้างได้ตามความสะดวกนะคะ\n\nแต่แค่คุณแวะเข้ามาเที่ยว เราก็ดีใจมากแล้ว ขอให้ทุกวันเป็นวันที่ดีค่ะ ♡",
     linkLabel: "ให้กำลังใจ",
     // the owner's PromptPay QR: scan with any banking app and type any amount
     qr: supportQr,
