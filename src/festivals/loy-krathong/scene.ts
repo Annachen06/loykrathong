@@ -11,7 +11,7 @@ type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: 
 const STYLES = ["banana", "banana", "lotus", "bread", "coconut"];
 /** A sky lantern (khom loi). Yours carry your colour and wish and can be tapped while they are still low enough to reach. */
 type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; color2?: string; style?: string; wish?: string; age?: number; trail?: number };
-type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; rgb: string; g: number; size: number; front: boolean; flash?: boolean };
+type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; rgb: string; g: number; size: number; front: boolean; flash?: boolean; trail?: boolean };
 type Petal = { x: number; y: number; vx: number; vy: number; rot: number; spin: number; life: number; color: string };
 
 const LOTUS = ["#ffa8c2", "#fff2f6", "#c9b6ff", "#ffcf6e"];
@@ -35,6 +35,8 @@ export function createLoyKrathongScene(): Scene {
   const sparks: Spark[] = [];
   const petals: Petal[] = [];
   const shooting: { x: number; y: number; life: number }[] = [];
+  // an aeroplane crossing the night sky now and then, far up with its lights blinking
+  let plane: { x: number; y: number; dir: 1 | -1; speed: number; t: number; end: number } | null = null;
   const flies = Array.from({ length: calm ? 8 : 26 }, () => ({ x: rand(0, W), y: rand(650, 960), p: rand(0, 6.28), sp: rand(0.3, 1) }));
   const jellies = [
     { x: 1560, y: 700, p: 0, hue: "201,182,255" },
@@ -44,7 +46,7 @@ export function createLoyKrathongScene(): Scene {
   let mineCount = 0;
   let lanternCount = 0;
   let pokes = 0;
-  let nextFloater = 1, nextLantern = 0.5, nextFirework = 4, nextStar = 6;
+  let nextFloater = 1, nextLantern = 0.5, nextFirework = 2, nextStar = 6, nextPlane = 4;
 
   // Other people's krathongs: about half carry one of the clearly-labelled sample wishes.
   let wishIndex = Math.floor(Math.random() * config.sampleWishes.length);
@@ -66,15 +68,30 @@ export function createLoyKrathongScene(): Scene {
   for (let i = 0; i < 18; i++) spawnLantern(rand(700, W - 20), rand(40, 500));
 
   const events: { name: string; x: number; y: number }[] = [];
-  function firework() {
-    const x = rand(900, W - 100), y = rand(110, 320);
+  const FIREWORK_COLORS = ["255,207,110", "255,168,194", "201,182,255", "143,216,200", "255,244,226", "255,190,90"];
+  // bursts waiting for their turn: a volley goes off a moment apart
+  const volley: { in: number; x: number; y: number }[] = [];
+  function firework(at?: { x: number; y: number }) {
+    const x = at?.x ?? rand(760, W - 100), y = at?.y ?? rand(90, 330);
     events.push({ name: "firework", x, y });
-    const rgb = ["255,207,110", "255,168,194", "201,182,255", "143,216,200"][(Math.random() * 4) | 0];
-    for (let i = 0; i < 44; i++) {
-      const a = (i / 44) * Math.PI * 2, v = rand(60, 105);
-      sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: rand(1.4, 2), rgb, g: 26, size: 2, front: false });
+    const rgb = FIREWORK_COLORS[(Math.random() * FIREWORK_COLORS.length) | 0];
+    // an outer ring of streaks and a slower inner ring, so the burst looks full
+    for (const [n, lo, hi] of [[56, 110, 170], [34, 45, 90]] as const) {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rand(-0.04, 0.04), v = rand(lo, hi);
+        sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: rand(1.5, 2.3), rgb, g: 26, size: 3, front: false, trail: true });
+      }
     }
     sparks.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.5, rgb, g: 0, size: 0, front: false, flash: true });
+  }
+  /** One launch, or a volley of two or three bursts close together. */
+  function launchFireworks() {
+    const n = Math.random() < 0.45 ? 1 : Math.random() < 0.6 ? 2 : 3;
+    // over the sea, in the part of the sky that is on screen
+    const c = lastCam, top = clamp(c.y + c.h * 0.06, 60, HORIZON - 200);
+    const x = clamp(c.x + c.w * rand(0.12, 0.88), 760, W - 120), y = clamp(c.y + c.h * rand(0.08, 0.34), top, HORIZON - 120);
+    firework({ x, y });
+    for (let i = 1; i < n; i++) volley.push({ in: i * rand(0.35, 0.7), x: clamp(x + rand(-260, 260), 700, W - 80), y: clamp(y + rand(-50, 90), top, HORIZON - 110) });
   }
 
   function burst(x: number, y: number, rgb: string, n: number) {
@@ -785,6 +802,23 @@ export function createLoyKrathongScene(): Scene {
     }
     for (let i = petals.length - 1; i >= 0; i--) if (petals[i].life > 5 || petals[i].y < 0) petals.splice(i, 1);
 
+    if (plane) {
+      plane.t += dt;
+      plane.x += plane.dir * plane.speed * dt;
+      if (plane.dir === 1 ? plane.x > plane.end : plane.x < plane.end) plane = null;
+    } else if (!calm) {
+      nextPlane -= dt;
+      if (nextPlane <= 0) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        // it enters from one side of what you can see and leaves at the other, in the part of the sky on screen
+        const c = lastCam;
+        plane = {
+          x: dir === 1 ? c.x - 140 : c.x + c.w + 140, end: dir === 1 ? c.x + c.w + 200 : c.x - 200,
+          y: clamp(c.y + c.h * rand(0.1, 0.3), 70, HORIZON - 150), dir, speed: rand(70, 95), t: 0,
+        };
+        nextPlane = rand(40, 75);
+      }
+    }
     for (const s of shooting) s.life += dt;
     for (let i = shooting.length - 1; i >= 0; i--) if (shooting[i].life > 1) shooting.splice(i, 1);
 
@@ -827,7 +861,11 @@ export function createLoyKrathongScene(): Scene {
     }
     if (!calm) {
       nextFirework -= dt;
-      if (nextFirework <= 0) { firework(); nextFirework = rand(5, 10); }
+      if (nextFirework <= 0) { launchFireworks(); nextFirework = rand(2.4, 5); }
+      for (let i = volley.length - 1; i >= 0; i--) {
+        volley[i].in -= dt;
+        if (volley[i].in <= 0) { const v = volley.splice(i, 1)[0]; firework(v); }
+      }
       nextStar -= dt;
       if (nextStar <= 0) { shooting.push({ x: rand(300, 2400), y: rand(30, 200), life: 0 }); nextStar = rand(7, 16); }
     }
@@ -860,6 +898,56 @@ export function createLoyKrathongScene(): Scene {
     glow(h, 192, 192, u * 1.8, "255,246,225", 0.38);
     return halo;
   }
+  /** A small aeroplane seen from the side, with a faint trail, a blinking red light and a white flash. */
+  function drawPlane(ctx: CanvasRenderingContext2D, pl: { x: number; y: number; dir: 1 | -1; t: number }) {
+    ctx.save();
+    ctx.translate(pl.x, pl.y);
+    ctx.scale(pl.dir, 1);
+    // a thin vapour trail behind it
+    const trail = ctx.createLinearGradient(-190, 0, -26, 0);
+    trail.addColorStop(0, "rgba(255,255,255,0)");
+    trail.addColorStop(1, "rgba(255,250,240,0.22)");
+    ctx.fillStyle = trail;
+    ctx.fillRect(-190, -1.6, 164, 3.2);
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 2;
+    ctx.fillStyle = "#e9e6f6";
+    // fuselage
+    ctx.beginPath();
+    ctx.moveTo(30, 0);
+    ctx.quadraticCurveTo(26, -7, 8, -7);
+    ctx.lineTo(-22, -6);
+    ctx.lineTo(-30, -16);
+    ctx.lineTo(-22, -16);
+    ctx.lineTo(-12, -6);
+    ctx.lineTo(-26, 0);
+    ctx.lineTo(-22, 5);
+    ctx.lineTo(10, 6);
+    ctx.quadraticCurveTo(26, 6, 30, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // wing
+    ctx.fillStyle = "#c9c4e4";
+    ctx.beginPath();
+    ctx.moveTo(6, 2);
+    ctx.lineTo(-12, 15);
+    ctx.lineTo(-4, 15);
+    ctx.lineTo(16, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // windows
+    ctx.fillStyle = "#ffd98a";
+    for (let i = 0; i < 6; i++) ctx.fillRect(-14 + i * 6, -3.5, 2.6, 2.4);
+    // lights: red blinks slowly, white flashes sharply
+    const red = Math.sin(pl.t * 3) > 0.2;
+    const flash = (pl.t % 1.6) < 0.12;
+    if (red) { glow(ctx, 2, 12, 12, "255,90,90", 0.55); ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(2, 14, 2, 0, Math.PI * 2); ctx.fill(); }
+    if (flash) { glow(ctx, -28, -15, 16, "255,255,255", 0.8); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-28, -15, 2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
   function drawMiddle(ctx: CanvasRenderingContext2D, t: number, cam: CameraView) {
     lastCam = cam;
     const M = moonAt(cam);
@@ -890,7 +978,7 @@ export function createLoyKrathongScene(): Scene {
       ctx.stroke();
     }
 
-    // full moon, with the rabbit of Thai folklore faintly on its face
+    // full moon, a few faint craters
     ctx.drawImage(moonHalo(), M.x - M.r * 6, M.y - M.r * 6, M.r * 12, M.r * 12);
     const g = ctx.createRadialGradient(M.x - 24, M.y - 24, 8, M.x, M.y, M.r);
     g.addColorStop(0, "#fffdf6");
@@ -902,12 +990,13 @@ export function createLoyKrathongScene(): Scene {
     ctx.fill();
     ctx.fillStyle = "rgba(220,190,150,0.28)";
     ctx.beginPath();
-    ctx.ellipse(M.x + 6, M.y + 14, 22, 16, -0.2, 0, Math.PI * 2);
-    ctx.ellipse(M.x - 16, M.y - 4, 11, 10, 0, 0, Math.PI * 2);
-    ctx.ellipse(M.x - 14, M.y - 30, 4.5, 15, -0.3, 0, Math.PI * 2);
-    ctx.ellipse(M.x - 4, M.y - 30, 4.5, 15, 0.2, 0, Math.PI * 2);
-    ctx.ellipse(M.x + 28, M.y + 22, 6, 5, 0, 0, Math.PI * 2);
+    for (const [dx, dy, rx, ry] of [[-26, 18, 7, 6], [24, 24, 6, 5], [12, -28, 5, 4]]) {
+      ctx.moveTo(M.x + dx + rx, M.y + dy); // start each crater at its own edge, so they are not joined by lines
+      ctx.ellipse(M.x + dx, M.y + dy, rx, ry, 0, 0, Math.PI * 2);
+    }
     ctx.fill();
+
+    if (plane) drawPlane(ctx, plane);
 
     for (const s of sparks) {
       if (s.front) continue;
@@ -915,6 +1004,17 @@ export function createLoyKrathongScene(): Scene {
       if (s.flash) {
         glow(ctx, s.x, s.y, 120, s.rgb, 0.35 * k);
         glow(ctx, s.x, HORIZON + (HORIZON - s.y) * 0.25, 90, s.rgb, 0.14 * k);
+        continue;
+      }
+      if (s.trail) {
+        // a firework streak: a short line back along where the spark came from, fading as it falls
+        ctx.strokeStyle = `rgba(${s.rgb},${k})`;
+        ctx.lineWidth = 1.6 + 2.6 * k;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(s.x - s.vx * 0.1, s.y - s.vy * 0.1);
+        ctx.lineTo(s.x, s.y);
+        ctx.stroke();
         continue;
       }
       ctx.fillStyle = `rgba(${s.rgb},${k})`;
@@ -1578,6 +1678,8 @@ export function createLoyKrathongScene(): Scene {
     debug: () => ({
       floaters: floaters.map((k) => ({ x: k.x, y: k.y, wish: k.wish, mine: k.mine })),
       lanterns: lanterns.map((l) => ({ x: l.x, y: l.y, mine: !!l.mine })),
+      plane: plane ? { x: Math.round(plane.x), y: Math.round(plane.y), dir: plane.dir } : null,
+      sparks: sparks.length,
     }),
     stats: () => ({
       krathongsFloated: mineCount, lanternsReleased: lanternCount, curioTaps: pokes, riding: ride.active ? 1 : 0,

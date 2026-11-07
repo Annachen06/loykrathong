@@ -298,6 +298,16 @@ async function desktopSuite(browser) {
   await p.click(".note-fab");
   check("the note icon closes the note again", !(await p.$(".note-pop")));
 
+  // an aeroplane crosses the sky now and then, and fireworks go off often
+  const plane = await p.waitForFunction(() => window.__fair.scene.debug().plane, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+  check("an aeroplane flies across the sky", !!plane && plane.y < 500, JSON.stringify(plane));
+  const sparkPeak = await p.evaluate(async () => {
+    let peak = 0;
+    for (let i = 0; i < 70; i++) { peak = Math.max(peak, window.__fair.scene.debug().sparks); await new Promise((r) => setTimeout(r, 100)); }
+    return peak;
+  });
+  check("fireworks burst over the sea within a few seconds", sparkPeak >= 60, String(sparkPeak));
+
   // Clicking the stall artwork itself (not the marker) visits it.
   const boutique = (await places(p)).find((x) => x.id === "boutique");
   await p.waitForTimeout(300);

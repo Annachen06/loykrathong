@@ -118,7 +118,7 @@ export function RideView({ show, progress, source }: { show: boolean; progress: 
         ctx.fillRect(s.x * (vw + pad * 2) - pad, s.y * (Y0 - 30) - pad * 0.5, s.s, s.s);
       }
 
-      // the full moon, high over the sea, with the rabbit of Thai folklore on its face
+      // the full moon, high over the sea, with a few faint craters
       const mr = Math.min(Math.max(Math.min(vw, vh) * 0.075, 26), 58);
       const mx = vw * (vw < vh ? 0.64 : 0.66), my = Math.max(vh * 0.13, Y0 - F * 0.3);
       glow(ctx, mx, my, mr * 6, "190,200,255", 0.16);
@@ -134,10 +134,10 @@ export function RideView({ show, progress, source }: { show: boolean; progress: 
       ctx.fillStyle = "rgba(220,190,150,0.28)";
       ctx.beginPath();
       const u = mr / 80;
-      ctx.ellipse(mx + 6 * u, my + 14 * u, 22 * u, 16 * u, -0.2, 0, Math.PI * 2);
-      ctx.ellipse(mx - 16 * u, my - 4 * u, 11 * u, 10 * u, 0, 0, Math.PI * 2);
-      ctx.ellipse(mx - 14 * u, my - 30 * u, 4.5 * u, 15 * u, -0.3, 0, Math.PI * 2);
-      ctx.ellipse(mx - 4 * u, my - 30 * u, 4.5 * u, 15 * u, 0.2, 0, Math.PI * 2);
+      for (const [dx, dy, rx, ry] of [[-26, 18, 7, 6], [24, 24, 6, 5], [12, -28, 5, 4]]) {
+        ctx.moveTo(mx + (dx + rx) * u, my + dy * u); // start each crater at its own edge, so they are not joined by lines
+        ctx.ellipse(mx + dx * u, my + dy * u, rx * u, ry * u, 0, 0, Math.PI * 2);
+      }
       ctx.fill();
 
       // far islands on the horizon

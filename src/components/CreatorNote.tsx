@@ -36,7 +36,7 @@ export function CreatorNote() {
     <form className="slip-form note-form" name={NOTE_FORM} onSubmit={submit}>
       {/* a field only robots fill in; real visitors never see it */}
       <p className="slip-bot" aria-hidden="true"><label>อย่ากรอกช่องนี้ <input name="bot-field" tabIndex={-1} autoComplete="off" /></label></p>
-      <label>ฝากข้อความถึงผู้สร้าง ไม่ต้องโอนก็ส่งได้นะคะ<textarea name="message" rows={3} maxLength={500} placeholder="พิมพ์ข้อความตรงนี้ได้เลย" /></label>
+      <label>ฝากข้อความให้กำลังใจผู้สร้าง<textarea name="message" rows={3} maxLength={500} placeholder="พิมพ์ข้อความตรงนี้ได้เลย" /></label>
       {problem && <p className="slip-problem" role="alert">{problem}</p>}
       {state === "failed" && <p className="slip-problem" role="alert">ส่งไม่สำเร็จ ลองใหม่อีกครั้งนะคะ</p>}
       <button type="submit" className="panel-action secondary" disabled={state === "sending"}>{state === "sending" ? "กำลังส่ง…" : "ส่งข้อความ"}</button>
