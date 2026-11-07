@@ -19,5 +19,32 @@ service cloud.firestore {
         && request.resource.data.t < request.time.toMillis() + 600000;
       allow update, delete: if false;
     }
+
+    // Messages and transfer slips for the creator. Visitors can only add; only the creator (signed in on admin.html) can read.
+    function isCreator() {
+      return request.auth != null && request.auth.token.email == 'wachiraya.chrs@gmail.com';
+    }
+    match /notes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['m', 't'])
+        && request.resource.data.m is string
+        && request.resource.data.m.size() > 0 && request.resource.data.m.size() <= 500
+        && request.resource.data.t is int
+        && request.resource.data.t > request.time.toMillis() - 600000
+        && request.resource.data.t < request.time.toMillis() + 600000;
+      allow read, delete: if isCreator();
+      allow update: if false;
+    }
+    match /slips/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['m', 't', 'i'])
+        && request.resource.data.keys().hasAll(['t', 'i'])
+        && request.resource.data.m is string && request.resource.data.m.size() <= 500
+        && request.resource.data.i is string
+        && request.resource.data.i.size() <= 800000
+        && request.resource.data.t is int
+        && request.resource.data.t > request.time.toMillis() - 600000
+        && request.resource.data.t < request.time.toMillis() + 600000;
+      allow read, delete: if isCreator();
+      allow update: if false;
+    }
   }
 }

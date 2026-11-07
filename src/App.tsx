@@ -601,7 +601,7 @@ export default function App() {
         ui={config.ui}
       />
       <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view || story} />
-      <NoteButton support={config.support} hidden={!entered || asking || !!openPlace || ride.view || story} />
+      <NoteButton support={config.support} inbox={sharedCfg} hidden={!entered || asking || !!openPlace || ride.view || story} />
       {config.story && <StorySheet story={config.story} open={story} onClose={() => setStory(false)} />}
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 

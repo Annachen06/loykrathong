@@ -17,7 +17,7 @@ Other commands:
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Type-checks, then builds the site into `dist/` (this is what Netlify deploys) |
+| `npm run build` | Type-checks, then builds the site into `dist/` (this is what gets uploaded to the host) |
 | `npm run preview` | Serves the built `dist/` folder locally |
 | `npm run typecheck` | TypeScript check only |
 | `npm test` | Opens the built site in a headless browser and checks movement, places, phone layout. Run `npm run build` first. Needs Playwright once: `npm i -D playwright && npx playwright install chromium` |

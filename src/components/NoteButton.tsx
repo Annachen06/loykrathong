@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { FestivalConfig } from "../festivals/types";
+import type { SharedConfig } from "../engine/sharedSea";
 import { CreatorNote } from "./CreatorNote";
 import { SupportSlip } from "./SupportSlip";
 
 /** A small cup icon in the bottom-right corner. Tap it for the creator's corner: a note of encouragement first, then a thank-you, the PromptPay QR and a place to send the slip. */
-export function NoteButton({ hidden, support }: { hidden: boolean; support?: FestivalConfig["support"] }) {
+export function NoteButton({ hidden, support, inbox }: { hidden: boolean; support?: FestivalConfig["support"]; inbox?: SharedConfig }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (hidden) setOpen(false);
@@ -21,7 +22,7 @@ export function NoteButton({ hidden, support }: { hidden: boolean; support?: Fes
       {open && (
         <div className="note-pop" role="dialog" aria-label={support?.title ?? "ฝากข้อความให้กำลังใจผู้สร้าง"}>
           <button type="button" className="note-close" aria-label="ปิด" onClick={() => setOpen(false)}>✕</button>
-          <CreatorNote />
+          <CreatorNote inbox={inbox} />
           {support && (
             <section className="support">
               <h3>{support.title}</h3>
@@ -30,7 +31,7 @@ export function NoteButton({ hidden, support }: { hidden: boolean; support?: Fes
               {support.url && (
                 <a className="panel-action secondary" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
               )}
-              {support.qr && <SupportSlip />}
+              {support.qr && <SupportSlip inbox={inbox} />}
             </section>
           )}
         </div>

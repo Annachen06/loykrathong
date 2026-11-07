@@ -258,7 +258,7 @@ async function desktopSuite(browser) {
   await p.keyboard.press("Escape");
   check("Escape closes the card", !(await p.$(".panel")));
 
-  // A small icon in the bottom-right corner opens a note to the creator: only a message, sent to the Netlify form "creator-note".
+  // A small icon in the bottom-right corner opens a note to the creator: only a message, saved to the creator's inbox.
   let notePosted = null;
   await p.waitForSelector(".note-fab", { state: "visible", timeout: 5000 });
   const fab = await p.locator(".note-fab").boundingBox();
@@ -267,12 +267,15 @@ async function desktopSuite(browser) {
   await p.click(".note-fab");
   check("the note to the creator comes first in the corner popup, above the cocoa corner", await p.evaluate(() => { const a = document.querySelector(".note-pop .note-form"), b = document.querySelector(".note-pop .support"); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }));
   check("the corner popup has the Buy Me a Cocoa tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
-  // the tip corner's slip form: only images are accepted, and the post carries the Netlify form name and the file
+  // the tip corner's slip form: only images are accepted, and the picture is shrunk and saved to the inbox
   check("tip corner no longer carries the 'scan with bank app' caption", !(await p.textContent(".support")).includes("สแกนด้วยแอปธนาคาร"));
-  let posted = null;
-  await p.route("**/", async (route) => {
+  const inboxCors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
+  const sent = { slips: null, notes: null };
+  await p.route("https://firestore.googleapis.com/**", async (route) => {
     const req = route.request();
-    if (req.method() === "POST") { posted = req.postDataBuffer()?.toString("latin1") ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: inboxCors });
+    const m = req.url().match(/\/documents\/(slips|notes)\?/);
+    if (req.method() === "POST" && m) { sent[m[1]] = JSON.parse(req.postData() || "{}"); return route.fulfill({ status: 200, headers: inboxCors, contentType: "application/json", body: "{}" }); }
     return route.continue();
   });
   await p.click('.slip button:has-text("ส่งสลิปโกโก้ได้ที่นี่")');
@@ -280,29 +283,25 @@ async function desktopSuite(browser) {
   check("slip form has only a message and the slip picture", (await p.locator('.slip .slip-form input[name="name"], .slip .slip-form input[name="contact"], .slip .slip-form input[name="amount"]').count()) === 0);
   await p.setInputFiles('.slip .slip-form input[name="slip"]', { name: "note.txt", mimeType: "text/plain", buffer: Buffer.from("hi") });
   await p.click('.slip .slip-form button[type="submit"]');
-  check("slip form refuses a file that is not a picture", (await p.isVisible(".slip .slip-problem")) && posted === null);
+  check("slip form refuses a file that is not a picture", (await p.isVisible(".slip .slip-problem")) && sent.slips === null);
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
   await p.setInputFiles('.slip .slip-form input[name="slip"]', { name: "slip.png", mimeType: "image/png", buffer: png });
   await p.click('.slip .slip-form button[type="submit"]');
   await p.waitForSelector(".support .slip-thanks", { timeout: 5000 }).catch(() => {});
-  check("slip form sends the Netlify form name, the message and the picture, then says thanks", !!posted && posted.includes('name="form-name"') && posted.includes("support-slip") && posted.includes('filename="slip.png"') && (await p.isVisible(".support .slip-thanks")), String(posted).slice(0, 80));
-  await p.unroute("**/");
-  check("the site ships hidden forms for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1 && (await p.locator('form[name="creator-note"][data-netlify="true"]').count()) === 1);
+  const slipDoc = sent.slips?.fields;
+  check("slip form saves the message and a shrunken JPEG picture to the creator's inbox, then says thanks", !!slipDoc && slipDoc.m?.stringValue === "ขอบคุณค่ะ" && slipDoc.i?.stringValue.startsWith("data:image/jpeg;base64,") && Number.isFinite(Number(slipDoc.t?.integerValue)) && Object.keys(slipDoc).sort().join() === "i,m,t" && (await p.isVisible(".support .slip-thanks")), JSON.stringify(slipDoc)?.slice(0, 80));
+  check("the site no longer ships Netlify forms", (await p.locator("form[data-netlify]").count()) === 0);
 
-  await p.route("**/", async (route) => {
-    const req = route.request();
-    if (req.method() === "POST") { notePosted = req.postData() ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
-    return route.continue();
-  });
   await p.click('.note-form button[type="submit"]');
-  check("note to the creator: an empty message is not sent", (await p.isVisible(".note-form .slip-problem")) && notePosted === null);
+  check("note to the creator: an empty message is not sent", (await p.isVisible(".note-form .slip-problem")) && sent.notes === null);
   check("note form asks only for a message", (await p.locator(".note-form input:not([name='bot-field']), .note-form [type=file]").count()) === 0 && (await p.locator('.note-form textarea[name="message"]').count()) === 1);
   await p.fill('.note-form textarea[name="message"]', "ชอบมากเลยค่ะ ขอบคุณที่ทำให้");
   await p.click('.note-form button[type="submit"]');
   await p.waitForSelector(".note-pop > .slip-thanks", { timeout: 5000 }).catch(() => {});
-  check("note to the creator is posted to the Netlify form and says thanks", !!notePosted && notePosted.includes("form-name=creator-note") && notePosted.includes("message=") && (await p.isVisible(".note-pop > .slip-thanks")), String(notePosted).slice(0, 100));
+  const noteDoc = sent.notes?.fields;
+  check("note to the creator is saved to the creator's inbox and says thanks", !!noteDoc && noteDoc.m?.stringValue === "ชอบมากเลยค่ะ ขอบคุณที่ทำให้" && Object.keys(noteDoc).sort().join() === "m,t" && (await p.isVisible(".note-pop > .slip-thanks")), JSON.stringify(noteDoc)?.slice(0, 100));
   await p.screenshot({ path: path.join(SHOTS, "desktop-note.png") });
-  await p.unroute("**/");
+  await p.unroute("https://firestore.googleapis.com/**");
   await p.click(".note-fab");
   check("the note icon closes the note again", !(await p.$(".note-pop")));
 

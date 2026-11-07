@@ -1,13 +1,14 @@
 import { useState } from "react";
 
-/** Must match the hidden form in index.html, which is how Netlify finds the form when the site is uploaded. */
-export const SLIP_FORM = "support-slip";
-const MAX_BYTES = 5 * 1024 * 1024;
+import { sendToInbox, shrinkPicture } from "../engine/inbox";
+import type { SharedConfig } from "../engine/sharedSea";
+
+const MAX_BYTES = 10 * 1024 * 1024;
 
 type State = "idle" | "sending" | "sent" | "failed";
 
 /** After tipping: attach the transfer slip, so the owner can see whose gift it was and say thank you. Sent to the owner only. */
-export function SupportSlip() {
+export function SupportSlip({ inbox }: { inbox?: SharedConfig }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<State>("idle");
   const [problem, setProblem] = useState("");
@@ -19,13 +20,13 @@ export function SupportSlip() {
     const slip = data.get("slip");
     if (!(slip instanceof File) || !slip.size) return setProblem("กรุณาแนบรูปสลิปด้วยนะคะ");
     if (!slip.type.startsWith("image/")) return setProblem("แนบได้เฉพาะไฟล์รูปภาพ (ภาพสลิปหรือภาพหน้าจอ)");
-    if (slip.size > MAX_BYTES) return setProblem("รูปใหญ่เกินไป (ไม่เกิน 5 MB) ลองใช้ภาพหน้าจอแทนนะคะ");
+    if (slip.size > MAX_BYTES) return setProblem("รูปใหญ่เกินไป (ไม่เกิน 10 MB) ลองใช้ภาพหน้าจอแทนนะคะ");
     setProblem("");
     setState("sending");
-    data.set("form-name", SLIP_FORM);
+    if (String(data.get("bot-field") ?? "")) return setState("sent"); // a robot filled the hidden field: pretend all is well
     try {
-      const res = await fetch("/", { method: "POST", body: data });
-      if (!res.ok) throw new Error(String(res.status));
+      const picture = await shrinkPicture(slip);
+      await sendToInbox(inbox, "slips", { m: String(data.get("message") ?? "").trim(), i: picture });
       setState("sent");
       form.reset();
     } catch {
@@ -40,7 +41,7 @@ export function SupportSlip() {
       {!open ? (
         <button type="button" className="panel-action secondary" onClick={() => setOpen(true)}>ส่งสลิปโกโก้ได้ที่นี่ ☕</button>
       ) : (
-        <form className="slip-form" name={SLIP_FORM} onSubmit={submit} encType="multipart/form-data">
+        <form className="slip-form" name="support-slip" onSubmit={submit}>
           <p className="slip-lead">แนบสลิปได้เลยค่ะ ผู้สร้างจะได้รับและขอบคุณถึงคุณ</p>
           {/* a field only robots fill in; real visitors never see it */}
           <p className="slip-bot" aria-hidden="true"><label>อย่ากรอกช่องนี้ <input name="bot-field" tabIndex={-1} autoComplete="off" /></label></p>
