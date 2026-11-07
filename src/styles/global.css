@@ -480,10 +480,6 @@ button { font: inherit; color: inherit; }
 .lantern-color.on { border-color: var(--ink); background: #fff3d6; box-shadow: 0 2px 0 var(--ink); }
 .lantern-color:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }
 .lantern-icon { width: 26px; height: 30px; }
-.support { margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: #fff3d6; border: 2px solid #e0b04a; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.support h3 { margin: 0; font-size: 15px; font-weight: 500; }
-.support p { margin: 0; font-size: 13px; line-height: 1.45; color: #6a3a5a; white-space: pre-line; }
-.support-qr { width: 200px; max-width: 100%; height: auto; border-radius: 10px; background: #fff; border: 2px solid var(--ink); }
 /* small corner icon for a note to the creator: above the on-screen stick on phones */
 .note { position: absolute; right: calc(var(--safe-right) + 16px); bottom: calc(var(--safe-bottom) + 16px); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; transition: opacity 0.3s; }
 .note.is-hidden { opacity: 0; pointer-events: none; }
@@ -493,21 +489,16 @@ button { font: inherit; color: inherit; }
   cursor: pointer; box-shadow: 0 3px 0 var(--ink), 0 0 14px rgba(255, 207, 110, 0.4); opacity: 0.92;
 }
 .note-fab:hover, .note-fab[aria-expanded="true"] { background: #fff; opacity: 1; }
-.note-pop { color: var(--ink); position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 110px); overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 18px; background: var(--paper); border: 3px solid var(--ink); box-shadow: 0 6px 0 var(--ink); }
+.note-pop { color: var(--ink); position: relative; width: min(300px, calc(100vw - 32px)); padding: 14px; border-radius: 18px; background: var(--paper); border: 3px solid var(--ink); box-shadow: 0 6px 0 var(--ink); }
 .note-close { position: absolute; top: 6px; right: 8px; width: 28px; height: 28px; border: 0; background: none; font-size: 15px; cursor: pointer; color: var(--ink); }
 .note-form label { padding-right: 0; }
-.note-pop .support { margin-top: 0; padding-right: 30px; }
-@media (pointer: coarse), (max-width: 560px) { .note-pop { max-height: calc(100vh - 156px - 60px - var(--safe-bottom) - 56px); } }
-.slip { width: 100%; margin-top: 4px; }
 .slip-form { display: flex; flex-direction: column; gap: 8px; }
 .slip-form label { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; font-weight: 500; }
 .slip-form input, .slip-form textarea {
   width: 100%; padding: 9px 11px; border: 2px solid var(--ink); border-radius: 12px; background: #fffaf2; color: var(--ink);
   font: inherit; font-size: 16px; resize: none; user-select: text;
 }
-.slip-form input[type="file"] { padding: 8px; font-size: 14px; background: #fff; }
 .slip-form input:focus, .slip-form textarea:focus { outline: 3px solid var(--rose); outline-offset: 1px; }
-.slip-lead { margin: 0; font-size: 13px; line-height: 1.45; color: #6a3a5a; }
 .slip-bot { position: absolute; left: -9999px; height: 0; overflow: hidden; margin: 0; }
 .slip-problem { margin: 0; font-size: 13px; color: #b3263e; font-weight: 500; }
 .slip-thanks { margin: 4px 0 0; font-size: 14px; font-weight: 500; }

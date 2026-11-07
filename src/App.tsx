@@ -509,7 +509,7 @@ export default function App() {
         ui={config.ui}
       />
       <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view} />
-      <NoteButton support={config.support} hidden={!entered || asking || !!openPlace || ride.view} />
+      <NoteButton hidden={!entered || asking || !!openPlace || ride.view} />
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 
       {openPlace && (

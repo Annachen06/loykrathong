@@ -11,12 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500&family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <!-- Netlify reads this form when the site is uploaded; the page's own slip form (SupportSlip) posts to it. -->
-    <form name="support-slip" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
-      <input name="bot-field" />
-      <textarea name="message"></textarea>
-      <input name="slip" type="file" />
-    </form>
+    <!-- Netlify reads this form when the site is uploaded; the page's own note form (CreatorNote) posts to it. -->
     <form name="creator-note" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
       <input name="bot-field" />
       <textarea name="message"></textarea>
