@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { makeMemoryCard } from "./memoryCardImage";
-import { SupportSlip } from "./SupportSlip";
 
 export type Memories = {
   wishes: string[];
@@ -22,13 +21,12 @@ type Props = {
   paintScene: (canvas: HTMLCanvasElement) => void;
   brand: string;
   treasureTotal: number;
-  support?: { title: string; text: string; url?: string; linkLabel?: string; qr?: string };
 };
 
 const CARD_NAME = "loykrathong-memory.png";
 
 /** What you did tonight, listed, and gathered into a 9:16 souvenir card (for an Instagram Story) you can save. Nothing leaves this device. */
-export function MemoryCard({ memories: m, paintScene, brand, treasureTotal, support }: Props) {
+export function MemoryCard({ memories: m, paintScene, brand, treasureTotal }: Props) {
   const [card, setCard] = useState<{ url: string; file: File } | null>(null);
   const [failed, setFailed] = useState(false);
   const rows = memoryRows(m, treasureTotal);
@@ -80,17 +78,6 @@ export function MemoryCard({ memories: m, paintScene, brand, treasureTotal, supp
       <button type="button" className="panel-action" onClick={save} disabled={!card}>บันทึกการ์ดของฉัน</button>
       {canShare && <button type="button" className="panel-action secondary" onClick={share}>แชร์ลงสตอรี่</button>}
       <p className="wish-fine">การ์ดสร้างในเครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นที่ไหน</p>
-      {support && (support.url || support.qr) && (
-        <aside className="support" aria-label={support.title}>
-          <h3>{support.title}</h3>
-          {support.text.split("\n\n").map((para, i) => <p key={i}>{para}</p>)}
-          {support.qr && <img className="support-qr" src={support.qr} alt="QR PromptPay สำหรับให้กำลังใจ สแกนด้วยแอปธนาคารแล้วใส่จำนวนเงินเอง" />}
-          {support.url && (
-            <a className="panel-action secondary" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
-          )}
-          {support.qr && <SupportSlip />}
-        </aside>
-      )}
     </div>
   );
 }
