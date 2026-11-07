@@ -1,9 +1,10 @@
-# MOONKRADE
+# ลอยกระทงริมเล
 
-**A Little Festival by the Sea.** First edition: *Loy Krathong by the Moonlit Sea.*
+**งานวัดเล็กๆ ริมทะเล** An online Loy Krathong temple fair by the sea. (The working name was MOONKRADE; the fair's name lives in `config.ts` as `brand` and also appears on the entrance arch.)
 
-An illustrated festival world that runs in the browser. You step onto a moonlit beach,
-tap the sand to walk, and tap glowing places to visit them.
+An illustrated Thai temple fair on a moonlit beach that runs in the browser, in Thai.
+Tap the sand to walk, tap glowing lights to visit places, ride the Ferris wheel, join the
+ram wong, play the fair games, read wishes on the krathongs and float your own.
 
 ## Run it
 
@@ -16,7 +17,7 @@ Other commands:
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Type-checks, then builds the site into `dist/` (this is what Netlify deploys) |
+| `npm run build` | Type-checks, then builds the site into `dist/` (this is what gets uploaded to the host) |
 | `npm run preview` | Serves the built `dist/` folder locally |
 | `npm run typecheck` | TypeScript check only |
 | `npm test` | Opens the built site in a headless browser and checks movement, places, phone layout. Run `npm run build` first. Needs Playwright once: `npm i -D playwright && npx playwright install chromium` |
@@ -27,14 +28,20 @@ Other commands:
 src/
   engine/                 reusable for every festival
     renderer.ts           full-screen canvas, camera, frame loop
-    visitor.ts            the little character: tap-to-walk + drawing
+    visitor.ts            the player character: tap-to-walk movement
+    person.ts             draws every person (outfit, hair, age, what they carry)
     walk.ts               where you can walk (beach + pier rectangles)
     math.ts               small helpers
   components/             reusable interface overlays (React)
     PlaceMarkers.tsx      glowing lights on each place; names appear when useful
-    PlaceDock.tsx         row of places at the bottom (always-available way to navigate)
+    MapMenu.tsx           one "แผนที่งาน" button that opens the list of places
     PlacePanel.tsx        the card that opens when you arrive
-    Intro.tsx, Hint.tsx
+    FloatForm.tsx         write a private wish and float your krathong
+    WishBubble.tsx        the note that opens when you tap a krathong on the water
+    WishBoard.tsx         Memory Corner: your wishes + example wishes
+    FairGames.tsx         balloon darts and ring toss
+    Intro.tsx             welcome screen; pick your character (ผู้หญิง / ผู้ชาย)
+    Hint.tsx
   festivals/
     types.ts              the contract between the engine and a festival
     index.ts              which festival is live
@@ -42,6 +49,7 @@ src/
       config.ts           places, text, colours, layout  ← edit words here
       world.ts            fixed positions (moon, pier, palms)
       scenery.ts          static artwork (sky, stalls, pier, gate…)
+      crowd.ts            what each person at the fair wears  ← add or change outfits here
       scene.ts            everything that moves (sea, lanterns, krathongs, creatures)
   App.tsx                 wires it all together
 ```

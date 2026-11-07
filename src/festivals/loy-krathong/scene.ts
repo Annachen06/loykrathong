@@ -1,17 +1,22 @@
 // The living part of the Loy Krathong world: everything that moves or reacts.
-import type { Actor, CameraView, Point, Scene } from "../types";
+import type { Actor, CameraView, Point, Scene, TapResult, VisitorLook } from "../types";
 import { clamp, dist, glow, lerp, prefersReducedMotion, rand, seeded } from "../../engine/math";
-import { drawKawaiiVisitor } from "../../engine/visitor";
+import { drawPaperLantern, drawPerson, LANTERN_UP, type Hold, type Pose } from "../../engine/person";
+import { crowdLooks } from "./crowd";
 import { loyKrathongConfig as config } from "./config";
-import { cliffPath, drawKrathong, lights, paintBack, paintFront, shoreY } from "./scenery";
-import { H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, W } from "./world";
+import { boothSign, drawGate, drawKrathongCached, GATE, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
+import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
 
-type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string };
-type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number };
-type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; rgb: string; g: number; size: number; front: boolean; flash?: boolean };
+type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string; shared?: boolean };
+const STYLES = ["banana", "banana", "lotus", "bread", "coconut"];
+/** A sky lantern (khom loi). Yours carry your colour and wish and can be tapped while they are still low enough to reach. */
+type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; color2?: string; style?: string; wish?: string; age?: number; trail?: number };
+type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; rgb: string; g: number; size: number; front: boolean; flash?: boolean; trail?: boolean };
 type Petal = { x: number; y: number; vx: number; vy: number; rot: number; spin: number; life: number; color: string };
 
 const LOTUS = ["#ffa8c2", "#fff2f6", "#c9b6ff", "#ffcf6e"];
+/** Paper colour and pattern colour for the hanging paper lanterns, in the order they are handed out. */
+const LANTERN_PAPERS: [string, string][] = [["#ffe9a8", "#d9803a"], ["#ffb35c", "#fff4e2"], ["#fff4e2", "#c8603a"], ["#ffc2d6", "#a8406a"], ["#ffd95a", "#a8602a"]];
 
 export function createLoyKrathongScene(): Scene {
   const calm = prefersReducedMotion();
@@ -20,7 +25,7 @@ export function createLoyKrathongScene(): Scene {
   const r = seeded(11);
   while (stars.length < 240) {
     const x = r() * W, y = r() * (HORIZON - 40);
-    if (x < 560 && y > 250) continue;
+    if (x < 780 && y > 360) continue; // behind the hills
     if (dist(x, y, MOON.x, MOON.y) < MOON.r * 2.2) continue;
     stars.push({ x, y, s: 0.8 + r() * 1.8, p: r() * 6.28, f: 0.6 + r() * 2 });
   }
@@ -30,32 +35,79 @@ export function createLoyKrathongScene(): Scene {
   const sparks: Spark[] = [];
   const petals: Petal[] = [];
   const shooting: { x: number; y: number; life: number }[] = [];
+  // an aeroplane crossing the night sky now and then, far up with its lights blinking
+  let plane: { x: number; y: number; dir: 1 | -1; speed: number; t: number; end: number } | null = null;
   const flies = Array.from({ length: calm ? 8 : 26 }, () => ({ x: rand(0, W), y: rand(650, 960), p: rand(0, 6.28), sp: rand(0.3, 1) }));
   const jellies = [
-    { x: 1420, y: 700, p: 0, hue: "201,182,255" },
-    { x: 1880, y: 740, p: 2, hue: "255,168,194" },
-    { x: 980, y: 690, p: 4, hue: "143,216,200" },
+    { x: 1560, y: 700, p: 0, hue: "201,182,255" },
+    { x: 2140, y: 740, p: 2, hue: "255,168,194" },
+    { x: 1150, y: 690, p: 4, hue: "143,216,200" },
   ];
   let mineCount = 0;
+  let lanternCount = 0;
   let pokes = 0;
-  let nextFloater = 1, nextLantern = 0.5, nextFirework = 4, nextStar = 6;
+  let nextFloater = 1, nextLantern = 0.5, nextFirework = 2, nextStar = 6, nextPlane = 4;
 
-  const spawnFloater = (x: number, y: number, mine: boolean) =>
-    floaters.push({ x, y, vx: rand(-6, 6), vy: -rand(5, 9) * (mine ? 1.5 : 1), p: rand(0, 6.28), life: 0, mine, lotus: mine ? "#ffa8c2" : LOTUS[(Math.random() * 4) | 0] });
+  // Other people's krathongs: about half carry one of the clearly-labelled sample wishes.
+  let wishIndex = Math.floor(Math.random() * config.sampleWishes.length);
+  const nearPier = (x: number) => Math.abs(x - PIER.x0) < 260;
+  const nextSampleWish = (x: number) =>
+    (Math.random() < (nearPier(x) ? 0.85 : 0.5) ? config.sampleWishes[wishIndex++ % config.sampleWishes.length] : "");
+  const spawnFloater = (x: number, y: number, mine: boolean, wish = mine ? "" : nextSampleWish(x), style?: string, flower?: string) =>
+    floaters.push({
+      x, y, vx: rand(-6, 6), vy: -rand(5, 9) * (mine ? 1.2 : 1), p: rand(0, 6.28), life: 0, mine, wish,
+      style: style ?? STYLES[(Math.random() * STYLES.length) | 0],
+      lotus: flower ?? LOTUS[(Math.random() * 4) | 0],
+    });
+  /** A krathong another visitor floated (only its look is known): out on the water already, or arriving from the shore. */
+  const addShared = (items: { style: string; color: string; wish?: string }[], fresh: boolean) => {
+    for (const it of items) {
+      if (fresh) floaters.push({ x: rand(1820, 1990), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true });
+      else floaters.push({ x: rand(860, W - 40), y: rand(HORIZON + 40, SHORE - 20), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true });
+    }
+  };
   const spawnLantern = (x: number, y: number, s = rand(0.35, 0.9)) =>
     lanterns.push({ x, y, vy: -rand(10, 18), sway: rand(8, 22), p: rand(0, 6.28), s });
 
-  for (let i = 0; i < 14; i++) spawnFloater(rand(200, 2300), rand(HORIZON + 30, SHORE - 20), false);
-  for (let i = 0; i < 18; i++) spawnLantern(rand(700, 2380), rand(40, 500));
+  for (let i = 0; i < 24; i++) spawnFloater(rand(860, W - 40), rand(HORIZON + 30, SHORE - 16), false);
+  // a cluster around the pier, so walking out you pass other people's wishes
+  for (let i = 0; i < 10; i++) spawnFloater(rand(1700, 2110), rand(HORIZON + 50, SHORE - 20), false);
+  for (let i = 0; i < 18; i++) spawnLantern(rand(700, W - 20), rand(40, 500));
 
-  function firework() {
-    const x = rand(820, 2300), y = rand(110, 320);
-    const rgb = ["255,207,110", "255,168,194", "201,182,255", "143,216,200"][(Math.random() * 4) | 0];
-    for (let i = 0; i < 44; i++) {
-      const a = (i / 44) * Math.PI * 2, v = rand(60, 105);
-      sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: rand(1.4, 2), rgb, g: 26, size: 2, front: false });
+  const events: { name: string; x: number; y: number }[] = [];
+  const FIREWORK_COLORS = ["255,207,110", "255,168,194", "201,182,255", "143,216,200", "255,244,226", "255,190,90"];
+  // bursts waiting for their turn: a volley goes off a moment apart
+  const volley: { in: number; x: number; y: number }[] = [];
+  function firework(at?: { x: number; y: number }) {
+    const x = at?.x ?? rand(760, W - 100), y = at?.y ?? rand(90, 330);
+    events.push({ name: "firework", x, y });
+    const rgb = FIREWORK_COLORS[(Math.random() * FIREWORK_COLORS.length) | 0];
+    // an outer ring of streaks and a slower inner ring, so the burst looks full
+    for (const [n, lo, hi] of [[56, 110, 170], [34, 45, 90]] as const) {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rand(-0.04, 0.04), v = rand(lo, hi);
+        sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: rand(1.5, 2.3), rgb, g: 26, size: 3, front: false, trail: true });
+      }
     }
     sparks.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.5, rgb, g: 0, size: 0, front: false, flash: true });
+  }
+  /** The aeroplane enters from one side of what you can see and leaves at the other, in the part of the sky on screen. */
+  function sendPlane() {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const c = lastCam;
+    plane = {
+      x: dir === 1 ? c.x - 140 : c.x + c.w + 140, end: dir === 1 ? c.x + c.w + 200 : c.x - 200,
+      y: clamp(c.y + c.h * rand(0.1, 0.3), 70, HORIZON - 150), dir, speed: rand(70, 95), t: 0,
+    };
+  }
+  /** One launch, or a volley of two or three bursts close together. */
+  function launchFireworks() {
+    const n = Math.random() < 0.45 ? 1 : Math.random() < 0.6 ? 2 : 3;
+    // over the sea, in the part of the sky that is on screen
+    const c = lastCam, top = clamp(c.y + c.h * 0.06, 60, HORIZON - 200);
+    const x = clamp(c.x + c.w * rand(0.12, 0.88), 760, W - 120), y = clamp(c.y + c.h * rand(0.08, 0.34), top, HORIZON - 120);
+    firework({ x, y });
+    for (let i = 1; i < n; i++) volley.push({ in: i * rand(0.35, 0.7), x: clamp(x + rand(-260, 260), 700, W - 80), y: clamp(y + rand(-50, 90), top, HORIZON - 110) });
   }
 
   function burst(x: number, y: number, rgb: string, n: number) {
@@ -67,7 +119,95 @@ export function createLoyKrathongScene(): Scene {
   // ---------------------------------------------------- curios (tappable creatures)
   const shell = { ...config.curios.find((c) => c.id === "shell")!.at, open: 0, openUntil: 0, t: 0 };
   const star = { ...config.curios.find((c) => c.id === "starfish")!.at, hop: 0, spin: 0 };
+  const conch = { ...config.curios.find((c) => c.id === "conch")!.at, wiggle: 0 };
+  const bottle = { ...config.curios.find((c) => c.id === "bottle")!.at, open: 0 };
+  const found = new Set<string>();
   let clock = 0;
+
+  const conchActor: Actor = {
+    y: conch.y,
+    draw(ctx, t) {
+      ctx.save();
+      ctx.translate(conch.x, conch.y);
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 18, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.rotate(Math.sin(conch.wiggle * 20) * 0.15 * conch.wiggle);
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.8;
+      ctx.lineJoin = "round";
+      ctx.fillStyle = "#ffe0c8";
+      ctx.beginPath();
+      ctx.moveTo(-16, -4);
+      ctx.quadraticCurveTo(-10, -20, 6, -16);
+      ctx.quadraticCurveTo(18, -12, 16, -2);
+      ctx.quadraticCurveTo(0, 2, -16, -4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ff9ec0";
+      ctx.beginPath();
+      ctx.ellipse(9, -6, 5, 3.4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(42,29,74,0.45)";
+      ctx.lineWidth = 1.1;
+      for (const dx of [-8, -2, 4]) {
+        ctx.beginPath();
+        ctx.moveTo(dx, -15 + Math.abs(dx) * 0.2);
+        ctx.lineTo(dx - 3, -3);
+        ctx.stroke();
+      }
+      ctx.restore();
+      if (!found.has("conch")) cue(ctx, conch.x, conch.y - 28, t, 0.8);
+    },
+  };
+
+  const bottleActor: Actor = {
+    y: bottle.y,
+    draw(ctx, t) {
+      ctx.save();
+      ctx.translate(bottle.x, bottle.y);
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 20, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.rotate(-0.25 + Math.sin(t * 1.2) * 0.03);
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.8;
+      ctx.fillStyle = "rgba(170,230,210,0.75)";
+      ctx.beginPath();
+      ctx.roundRect(-16, -12, 24, 12, 5);
+      ctx.roundRect(7, -9, 9, 6, 2);
+      ctx.fill();
+      ctx.stroke();
+      if (bottle.open < 0.5) {
+        ctx.fillStyle = "#b07a4a";
+        ctx.fillRect(15, -8.5, 4, 5);
+      }
+      ctx.fillStyle = "#fff4e2";
+      ctx.beginPath();
+      ctx.roundRect(-11, -9, 13, 6, 2);
+      ctx.fill();
+      ctx.restore();
+      if (bottle.open > 0.05) {
+        // the rolled note pops out
+        const k = bottle.open;
+        ctx.save();
+        ctx.translate(bottle.x + 20, bottle.y - 14 - k * 18);
+        ctx.rotate(0.2);
+        ctx.fillStyle = `rgba(255,244,226,${k})`;
+        ctx.strokeStyle = `rgba(42,29,74,${k})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(-8, -5, 16, 10, 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (!found.has("bottle")) cue(ctx, bottle.x, bottle.y - 30, t, 2.4);
+    },
+  };
 
   const shellActor: Actor = {
     y: shell.y,
@@ -183,7 +323,10 @@ export function createLoyKrathongScene(): Scene {
   };
 
   /** A tiny twinkle now and then, so curious visitors notice they can tap it. */
+  /** True while a still picture of the fair is painted (the souvenir card): no tap hints or tap cues in it. */
+  let still = false;
   function cue(ctx: CanvasRenderingContext2D, x: number, y: number, t: number, offset: number) {
+    if (still) return;
     const k = Math.max(0, Math.sin((t + offset) * 1.3)) ** 6;
     if (k < 0.02) return;
     glow(ctx, x, y, 12, "255,246,220", 0.8 * k);
@@ -195,45 +338,462 @@ export function createLoyKrathongScene(): Scene {
     ctx.stroke();
   }
 
+  // ---------------------------------------------------- the temple altar (โต๊ะหมู่บูชา)
+  const ALTAR = { x: 246, y: 834 };
+  const altar = { lit: -99, offered: [] as Hold[], glow: 0 };
+  // ---------------------------------------------------- the sky-lantern table (ลานปล่อยโคม)
+  // A low table with folded paper lanterns waiting to be opened, a few already lit, and a helper who lights them.
+  const TABLE = { x: 656, y: 858 };
+  const helper = crowdLooks[7 % crowdLooks.length];
+  const TABLE_COLORS = ["#ffb35c", "#ff9ec0", "#fff4e2", "#ffd95a", "#ffb35c"];
+  // ---------------------------------------------------- the arch over the pier's foot
+  // Drawn live and sorted with the people, so you walk behind it, and it turns see-through while you are under it.
+  const gateX = (PIER.x0 + PIER.x1) / 2;
+  let gateSee = 1;
+  const gateActor: Actor = {
+    y: GATE.base,
+    draw(ctx) {
+      ctx.save();
+      ctx.globalAlpha = gateSee;
+      drawGate(ctx, gateX);
+      ctx.restore();
+    },
+  };
+  const tableActor: Actor = {
+    y: TABLE.y,
+    draw(ctx, t) {
+      const { x, y } = TABLE;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(x, y + 2, 50, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      drawPerson(ctx, x + 30, y - 16, depthScale(y - 16) * 0.95, -1, 0, 0, t, helper, {});
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2;
+      // legs and top
+      ctx.fillStyle = "#7a5a4a";
+      for (const dx of [-36, 30]) { ctx.fillRect(x + dx, y - 34, 6, 34); ctx.strokeRect(x + dx, y - 34, 6, 34); }
+      ctx.fillStyle = "#c98a5a";
+      ctx.beginPath();
+      ctx.roundRect(x - 44, y - 42, 88, 10, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#e8c066";
+      ctx.fillRect(x - 44, y - 34, 88, 4);
+      // folded lanterns stacked on the table
+      for (let i = 0; i < 5; i++) {
+        const lx = x - 34 + i * 15, ly = y - 42;
+        ctx.fillStyle = TABLE_COLORS[i];
+        ctx.beginPath();
+        ctx.moveTo(lx - 6, ly);
+        ctx.lineTo(lx - 7, ly - 14);
+        ctx.quadraticCurveTo(lx, ly - 19, lx + 7, ly - 14);
+        ctx.lineTo(lx + 6, ly);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+      // one lit and ready, glowing on a little stand
+      const flick = 0.85 + 0.15 * Math.sin(t * 8);
+      glow(ctx, x - 58, y - 70, 42, "255,190,110", 0.5 * flick);
+      ctx.fillStyle = "#6a4a3a";
+      ctx.fillRect(x - 60, y - 52, 4, 52);
+      ctx.fillStyle = "#ffb35c";
+      ctx.beginPath();
+      ctx.moveTo(x - 66, y - 54);
+      ctx.lineTo(x - 69, y - 76);
+      ctx.quadraticCurveTo(x - 58, y - 86, x - 47, y - 76);
+      ctx.lineTo(x - 50, y - 54);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.globalAlpha = 0.6 * flick;
+      ctx.fillStyle = "#fff2c0";
+      ctx.beginPath();
+      ctx.ellipse(x - 58, y - 62, 4, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      boothSign(ctx, x, y - 112, "ปล่อยโคม");
+      ctx.restore();
+    },
+  };
+
+  // ---------------------------------------------------- flower cart by the temple gate
+  // Flowers for the temple are sold right outside it, as at a real temple fair: jasmine garlands, lotus buds, marigolds.
+  const CART = { x: 522, y: 852 };
+  const vendor = crowdLooks[4];
+  const cartActor: Actor = {
+    y: CART.y,
+    draw(ctx, t) {
+      const { x, y } = CART;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = OUTLINE;
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(x, y + 2, 62, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // the seller stands behind the cart
+      drawPerson(ctx, x + 22, y - 14, depthScale(y - 14) * 0.95, -1, 0, 0, t, vendor, {});
+      ctx.lineWidth = 2;
+      // umbrella
+      ctx.fillStyle = "#8a6a4a";
+      ctx.fillRect(x - 2, y - 176, 4, 126);
+      const dome = () => {
+        ctx.beginPath();
+        ctx.moveTo(x - 72, y - 136);
+        ctx.quadraticCurveTo(x - 60, y - 178, x, y - 182);
+        ctx.quadraticCurveTo(x + 60, y - 178, x + 72, y - 136);
+        for (let i = 0; i < 6; i++) ctx.quadraticCurveTo(x + 72 - i * 24 - 12, y - 128, x + 72 - (i + 1) * 24, y - 136);
+        ctx.closePath();
+      };
+      ctx.fillStyle = "#ef6f8e";
+      dome();
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = "#fff4e2";
+      for (const k of [-2, 0, 2]) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 184);
+        ctx.lineTo(x + k * 24 - 12, y - 120);
+        ctx.lineTo(x + k * 24 + 12, y - 120);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.strokeStyle = OUTLINE;
+      dome();
+      ctx.stroke();
+      // jasmine garlands hanging from the umbrella's edge
+      for (let i = 0; i < 3; i++) {
+        const gx = x - 52 + i * 15, top = y - 124 + i * 3, sw = Math.sin(t * 1.4 + i) * 1.5;
+        ctx.strokeStyle = "rgba(42,29,74,0.6)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gx, top - 6);
+        ctx.lineTo(gx + sw, top);
+        ctx.stroke();
+        for (let k = 0; k < 12; k++) {
+          const a = (k / 12) * Math.PI * 2;
+          ctx.fillStyle = k % 4 === 0 ? "#ffe9a8" : "#fffaf0";
+          ctx.beginPath();
+          ctx.arc(gx + sw + Math.sin(a) * 5, top + 9 - Math.cos(a) * 9, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = i === 1 ? "#ef5a5a" : "#ffb347";
+        ctx.beginPath();
+        ctx.ellipse(gx + sw, top + 22, 2.4, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // wheels
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2;
+      for (const dx of [-34, 34]) {
+        ctx.fillStyle = "#5a3a2a";
+        ctx.beginPath();
+        ctx.arc(x + dx, y - 11, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // the cart, with buckets of lotus buds and marigolds on top
+      ctx.fillStyle = "#c08a5a";
+      ctx.beginPath();
+      ctx.roundRect(x - 56, y - 52, 112, 34, 4);
+      ctx.fill();
+      ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const bx = x - 30 + i * 30;
+        for (let f = 0; f < 3; f++) {
+          ctx.fillStyle = i === 1 ? ["#ffb347", "#ff9a2a", "#ffcf3a"][f] : "#ff9ec0";
+          ctx.beginPath();
+          if (i === 1) ctx.arc(bx - 6 + f * 6, y - 66 - (f % 2) * 4, 4.4, 0, Math.PI * 2);
+          else ctx.ellipse(bx - 6 + f * 6, y - 68 - (f % 2) * 4, 3.6, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = "#7a9ad0";
+        ctx.beginPath();
+        ctx.roundRect(bx - 10, y - 64, 20, 13, 3);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+      boothSign(ctx, x, y - 34, "ดอกไม้");
+    },
+  };
+
+  const altarActor: Actor = {
+    y: ALTAR.y,
+    draw(ctx, t) {
+      const { x, y } = ALTAR;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2;
+      ctx.fillStyle = "rgba(8,6,24,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(x, y + 2, 34, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // two-step red table with gold trim
+      for (const [w, top, h] of [[30, -16, 16], [22, -28, 12]] as const) {
+        ctx.fillStyle = "#b8323c";
+        ctx.beginPath();
+        ctx.rect(x - w, y + top, w * 2, h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#ffcf6e";
+        ctx.fillRect(x - w + 1, y + top + 1, w * 2 - 2, 2.5);
+      }
+      // a small golden Buddha image on top
+      if (altar.glow > 0.01) glow(ctx, x, y - 50, 70, "255,214,140", 0.5 * altar.glow);
+      ctx.fillStyle = "#f2c14e";
+      ctx.beginPath();
+      ctx.ellipse(x, y - 30, 12, 4, 0, 0, Math.PI * 2); // lotus base
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 11, y - 32);
+      ctx.quadraticCurveTo(x - 10, y - 48, x, y - 50);
+      ctx.quadraticCurveTo(x + 10, y - 48, x + 11, y - 32);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y - 55, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y - 60);
+      ctx.lineTo(x, y - 67);
+      ctx.lineTo(x + 2, y - 60);
+      ctx.fill();
+      ctx.stroke();
+      // candles on both sides
+      for (const dx of [-24, 24]) {
+        ctx.fillStyle = "#fff4e2";
+        ctx.fillRect(x + dx - 1.6, y - 27, 3.2, 10);
+        ctx.strokeRect(x + dx - 1.6, y - 27, 3.2, 10);
+        const f = 0.8 + Math.sin(t * 11 + dx) * 0.2;
+        glow(ctx, x + dx, y - 30, 14, "255,200,110", 0.6 * f);
+        ctx.fillStyle = "#ffd36a";
+        ctx.beginPath();
+        ctx.ellipse(x + dx, y - 30, 1.4, 2.6 * f, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // offerings laid on the front of the table
+      altar.offered.forEach((h, i) => {
+        const ox = x - 16 + i * 9;
+        if (h === "lotus") {
+          ctx.fillStyle = "#ff9ec0";
+          ctx.beginPath();
+          ctx.moveTo(ox, y - 26);
+          ctx.quadraticCurveTo(ox + 4, y - 20, ox, y - 16);
+          ctx.quadraticCurveTo(ox - 4, y - 20, ox, y - 26);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          for (let j = 0; j < 7; j++) {
+            const a = (j / 6) * Math.PI;
+            ctx.fillStyle = j % 3 === 0 ? "#ff6f8e" : "#fffaf0";
+            ctx.beginPath();
+            ctx.arc(ox + Math.cos(a) * 3, y - 18 + Math.sin(a) * 3, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      });
+      // incense urn, with sticks and smoke after you light them
+      ctx.fillStyle = "#d8a84a";
+      ctx.beginPath();
+      ctx.ellipse(x, y - 6, 9, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      const lit = clock - altar.lit;
+      if (lit < 90) {
+        for (const dx of [-3, 0, 3]) {
+          ctx.strokeStyle = "#c8503c";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x + dx, y - 8);
+          ctx.lineTo(x + dx * 1.4, y - 24);
+          ctx.stroke();
+          glow(ctx, x + dx * 1.4, y - 24, 5, "255,140,90", 0.9);
+          // curling smoke
+          ctx.strokeStyle = `rgba(235,230,255,${0.35 * Math.max(0, 1 - lit / 90)})`;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          for (let k = 0; k <= 12; k++) {
+            const sy = y - 25 - k * 5;
+            const sx = x + dx * 1.4 + Math.sin(k * 0.7 - t * 2 + dx) * (2 + k * 0.6);
+            k ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
+          }
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    },
+  };
+
   // ---------------------------------------------------- festival-goers
-  const looks = [
-    { skin: "#f2c4a4", hair: "#2a1a30", top: "#8fd8c8", bottom: "#5a6ac8", accent: "#ffe7a3", outline: OUTLINE, bun: false },
-    { skin: "#ffd9c0", hair: "#4a2a40", top: "#ffa8c2", bottom: "#8a5ab8", accent: "#ffe7a3", outline: OUTLINE },
-    { skin: "#e0a888", hair: "#1e1428", top: "#fff4e2", bottom: "#c0506e", accent: "#ffcf6e", outline: OUTLINE, bun: false },
-    { skin: "#f6c9a8", hair: "#3a2a2a", top: "#c9b6ff", bottom: "#ef6f8e", accent: "#fff4e2", outline: OUTLINE },
-  ];
   const d = config.layout.depth;
   const depthScale = (y: number) => lerp(d.scaleBack, d.scaleFront, clamp((y - d.yBack) / (d.yFront - d.yBack), 0, 1));
-  const folks = [
-    { x: 700, y: 828, f: 1 }, { x: 940, y: 826, f: -1 }, { x: 1020, y: 832, f: -1 },
-    { x: 1200, y: 830, f: 1 }, { x: 1368, y: 838, f: -1 }, { x: 2090, y: 836, f: 1 },
-    { x: 2240, y: 846, f: -1 }, { x: 1560, y: 836, f: 1 }, { x: 300, y: 900, f: 1 },
-  ].map((p, i) => ({ ...p, look: looks[i % looks.length], idle: i * 1.3, walk: false, x0: 0, x1: 0, phase: 0 }));
-  folks.push({ x: 700, y: 925, f: 1, look: looks[1], idle: 0, walk: true, x0: 650, x1: 1450, phase: 0 });
-  folks.push({ x: 1800, y: 950, f: -1, look: looks[2], idle: 0, walk: true, x0: 1720, x1: 2280, phase: 0 });
+  // everyone gets their own outfit from crowd.ts: grown-ups and children take turns through the list
+  const grownUps = crowdLooks.filter((l) => l.age !== "kid");
+  const kids = crowdLooks.filter((l) => l.age === "kid");
+  let nextGrownUp = 0, nextKid = 0;
+  type Folk = { x: number; y: number; f: number; look: VisitorLook; idle: number; walk: boolean; x0: number; x1: number; phase: number; kid?: boolean; hold?: Hold; holdColor?: string; dance?: boolean; pose?: Pose };
+  const stand = (x: number, y: number, f: number, extra: Partial<Folk> = {}): Folk => {
+    const look = extra.kid ? kids[nextKid++ % kids.length] : grownUps[nextGrownUp++ % grownUps.length];
+    // older men lean on a walking stick
+    const hold = extra.hold ?? (look.age === "elder" && look.hairStyle === "bald" ? "cane" : undefined);
+    return { x, y, f, look, idle: x % 7, walk: false, x0: 0, x1: 0, phase: 0, ...extra, hold };
+  };
+  const stroll = (x0: number, x1: number, y: number, extra: Partial<Folk> = {}): Folk =>
+    stand(rand(x0, x1), y, Math.random() < 0.5 ? 1 : -1, { walk: true, x0, x1, ...extra });
+  const balloon = (holdColor: string): Partial<Folk> => ({ kid: true, hold: "balloon", holdColor });
+  const folks: Folk[] = [
+    // at the temple: someone kneels at the altar, others chat nearby
+    stand(352, 850, -1, { pose: { kneel: 1, wai: 1 } }), stand(170, 830, 1), stand(430, 834, -1), stand(470, 850, 1, balloon("#ffd84a")),
+    // queueing for the Ferris wheel
+    stand(800, 830, 1), stand(918, 834, -1), stand(950, 856, -1, balloon("#ef5a5a")),
+    // the crowd watching the ram wong (the dancers themselves are in the ring below)
+    stand(1070, 862, 1), stand(1120, 880, 1, { dance: true }), stand(1200, 868, -1), stand(1250, 890, -1, balloon("#5aa0ef")),
+    // at the game booths
+    stand(1330, 830, 1), stand(1400, 836, -1, { kid: true }), stand(1500, 832, 1), stand(1575, 840, -1),
+    // carrying krathongs from the shop out to the pier
+    stand(1690, 834, 1), stand(1795, 840, 1, { hold: "krathong" }), stand(1835, 836, 1, { hold: "krathong" }), stand(1975, 842, -1, { hold: "krathong" }),
+    // the sweet stalls and the memory corner
+    stand(2070, 836, 1, balloon("#ff8fc0")), stand(2130, 840, -1, { hold: "cottonCandy" }),
+    stand(2205, 846, 1), stand(2470, 838, 1), stand(2540, 842, -1),
+  ];
+  folks.push(
+    stroll(700, 1600, 925),
+    stroll(800, 1400, 955, balloon("#4fc08a")),
+    stroll(1500, 2300, 945, { hold: "krathong" }),
+    stroll(1960, 2520, 915),
+    stroll(300, 900, 950),
+    stroll(2100, 2520, 960, { kid: true, hold: "cottonCandy" }),
+  );
 
   const folkActors: Actor[] = folks.map((p) => ({
     get y() { return p.y; },
     draw(ctx, t) {
-      drawKawaiiVisitor(ctx, p.x, p.y, depthScale(p.y) * 0.95, p.f, p.phase, p.walk ? 0.8 : 0, t + p.idle, p.look);
+      const sc = depthScale(p.y) * 0.95;
+      drawPerson(ctx, p.x, p.y, sc, p.f, p.phase, p.walk ? 0.8 : 0, t + p.idle, p.look,
+        { dance: p.dance ? 1 : 0, hold: p.hold, holdColor: p.holdColor, ...p.pose });
     },
   }));
 
+  // ---------------------------------------------------- ram wong: dancers circle the stage, and you can join
+  const ringLooks = [grownUps[1], grownUps[0], grownUps[11], grownUps[7]];
+  const stageGuest = { active: false, until: 0, look: config.visitors[0].look };
+  const ringActor: Actor = {
+    y: GROUND - 2,
+    draw(ctx, t) {
+      const cx = (STAGE.x0 + STAGE.x1) / 2;
+      const n = ringLooks.length + (stageGuest.active ? 1 : 0);
+      const dancers = [];
+      for (let i = 0; i < n; i++) {
+        const a = clock * 0.45 + (i / n) * Math.PI * 2;
+        const look = i < ringLooks.length ? ringLooks[i] : stageGuest.look;
+        dancers.push({ a, look, guest: i >= ringLooks.length, y: STAGE.floor - 7 + Math.sin(a) * 7 });
+      }
+      dancers.sort((p, q) => p.y - q.y);
+      const base = depthScale(GROUND) * 0.95;
+      for (const d of dancers) {
+        const x = cx + Math.cos(d.a) * 78;
+        const sc = base * (0.94 + Math.sin(d.a) * 0.05) * (d.guest ? 1.08 : 1);
+        if (d.guest) {
+          ctx.strokeStyle = `rgba(255,214,140,${0.6 + 0.3 * Math.sin(t * 2.4)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(x, d.y, 20 * sc, 6 * sc, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        // walking the circle anticlockwise: the front half moves left
+        drawPerson(ctx, x, d.y, sc, Math.sin(d.a) > 0 ? -1 : 1, clock * 4 + d.a, 0.35, t + d.a, d.look, { dance: 1 });
+      }
+    },
+  };
+
   // ---------------------------------------------------- update
 
-  function update(dt: number) {
+  // ---------------------------------------------------- Ferris wheel and stage music
+  let wheelA = 0;
+  const ride = { active: false, cabin: 0, turned: 0, t: 0 };
+  const RIDE_SPIN = 0.32; // one full turn takes about 20 seconds
+  const you = { x: 0, y: 0 };
+  let pierFade = 0;
+  const rider = { look: config.visitors[0].look };
+  const notes: { x: number; y: number; life: number; vx: number; c: string }[] = [];
+  let nextNote = 0;
+
+  function update(dt: number, visitor: Point) {
     clock += dt;
+    you.x = visitor.x;
+    you.y = visitor.y;
+    // the arch fades while you walk through it, so it never hides you or looks like you are standing on it
+    const behind = visitor.y < GATE.base - 4 && Math.abs(visitor.x - gateX) < GATE.half + 40;
+    const under = behind ? (visitor.y < GATE.base - 60 ? 0.08 : 0.22) : 1;
+    gateSee += (under - gateSee) * Math.min(1, dt * 6);
+    const onPier = you.x > PIER.x0 - 70 && you.x < PIER.x1 + 70 && you.y < GROUND + 30;
+    pierFade = lerp(pierFade, onPier ? 1 : 0, Math.min(1, dt * 3));
+    // boarding takes a moment, then the wheel turns once at a gentle pace
+    const spin = ride.active ? (ride.t < 1.6 ? 0.05 : RIDE_SPIN) : 0.14 * (calm ? 0.5 : 1);
+    wheelA += spin * dt;
+    if (ride.active) {
+      ride.t += dt;
+      if (ride.t >= 1.6) ride.turned += spin * dt;
+      if (ride.turned >= Math.PI * 2) ride.active = false;
+    }
+    if (stageGuest.active && clock > stageGuest.until) stageGuest.active = false;
+    altar.glow = Math.max(0, altar.glow - dt * 0.25);
+    conch.wiggle = Math.max(0, conch.wiggle - dt);
+    if (bottle.open > 0 && bottle.open < 1) bottle.open = Math.min(1, bottle.open + dt * 2);
+    nextNote -= dt;
+    if (nextNote <= 0) {
+      const side = Math.random() < 0.5 ? STAGE.x0 - 19 : STAGE.x1 + 19;
+      notes.push({ x: side, y: GROUND - 96, life: 0, vx: rand(-10, 10), c: ["255,207,110", "255,168,194", "201,182,255"][(Math.random() * 3) | 0] });
+      nextNote = rand(0.5, 1.1);
+    }
+    for (const n of notes) { n.life += dt; n.y -= 26 * dt; n.x += (n.vx + Math.sin(n.life * 3) * 12) * dt; }
+    for (let i = notes.length - 1; i >= 0; i--) if (notes[i].life > 3) notes.splice(i, 1);
     for (const k of floaters) {
       k.life += dt;
       k.p += dt;
       const depth = (k.y - HORIZON) / (SHORE - HORIZON);
       k.x += (k.vx + Math.sin(k.p * 0.6) * 4) * dt * (0.4 + depth);
       k.y += k.vy * dt * (0.25 + depth);
+      if (k.style === "gold" && !calm && Math.random() < dt * 9) {
+        // gold leaf glinting on the ripples behind it
+        const sc = 0.25 + clamp(depth, 0, 1) * 0.8;
+        sparks.push({ x: k.x + rand(-18, 18) * sc, y: k.y + rand(-2, 6) * sc, vx: rand(-3, 3), vy: -rand(2, 8), life: 0, max: rand(0.6, 1.1), rgb: "255,226,140", g: 0, size: 1.6 * sc + 0.4, front: false });
+      }
     }
     for (let i = floaters.length - 1; i >= 0; i--) if (floaters[i].y < HORIZON + 6) floaters.splice(i, 1);
 
     for (const l of lanterns) {
       l.p += dt;
+      if (l.mine) {
+        // yours lifts off slowly from your hands, then catches the sea breeze
+        l.age = (l.age ?? 0) + dt;
+        const lift = Math.min(1, l.age / 3);
+        l.y += l.vy * dt * (0.35 + lift * 0.9);
+        l.x += (Math.sin(l.p * 0.5) * l.sway * 0.4 + 7) * dt * lift;
+        l.s = Math.max(0.45, l.s - dt * 0.012);
+        if (l.style === "gold" && l.age > 0.4 && !calm) {
+          // the sparkle lantern leaves a trail of falling gold glitter
+          l.trail = (l.trail ?? 0) + dt;
+          while (l.trail > 0.07) {
+            l.trail -= 0.07;
+            sparks.push({ x: l.x + rand(-8, 8) * l.s, y: l.y + 16 * l.s, vx: rand(-6, 6), vy: rand(4, 14), life: 0, max: rand(1.2, 2), rgb: "255,224,130", g: 6, size: 1.8, front: true });
+          }
+        }
+        continue;
+      }
       l.y += l.vy * dt * (0.5 + l.s * 0.6);
       l.x += Math.sin(l.p * 0.5) * l.sway * dt * 0.4 + 4 * dt;
       l.s = Math.max(0.25, l.s - dt * 0.01);
@@ -258,6 +818,14 @@ export function createLoyKrathongScene(): Scene {
     }
     for (let i = petals.length - 1; i >= 0; i--) if (petals[i].life > 5 || petals[i].y < 0) petals.splice(i, 1);
 
+    if (plane) {
+      plane.t += dt;
+      plane.x += plane.dir * plane.speed * dt;
+      if (plane.dir === 1 ? plane.x > plane.end : plane.x < plane.end) plane = null;
+    } else if (!calm) {
+      nextPlane -= dt;
+      if (nextPlane <= 0) { sendPlane(); nextPlane = rand(40, 75); }
+    }
     for (const s of shooting) s.life += dt;
     for (let i = shooting.length - 1; i >= 0; i--) if (shooting[i].life > 1) shooting.splice(i, 1);
 
@@ -287,20 +855,26 @@ export function createLoyKrathongScene(): Scene {
     }
 
     nextFloater -= dt;
-    if (nextFloater <= 0 && floaters.length < 28) {
-      spawnFloater(rand(250, 2300), SHORE - rand(4, 14), false);
-      nextFloater = rand(1.6, 3.6);
+    if (nextFloater <= 0 && floaters.length < 40) {
+      // people keep floating krathongs, many of them from around the pier
+      const x = Math.random() < 0.5 ? rand(1820, 1990) : rand(880, W - 40);
+      spawnFloater(x, SHORE - rand(4, 14), false);
+      nextFloater = rand(1, 2.4);
     }
     nextLantern -= dt;
     if (nextLantern <= 0 && lanterns.length < 34) {
-      spawnLantern(rand(700, 2380), rand(430, 560));
+      spawnLantern(rand(800, W - 20), rand(430, 560));
       nextLantern = rand(1.2, 2.8);
     }
     if (!calm) {
       nextFirework -= dt;
-      if (nextFirework <= 0) { firework(); nextFirework = rand(5, 10); }
+      if (nextFirework <= 0) { launchFireworks(); nextFirework = rand(2.4, 5); }
+      for (let i = volley.length - 1; i >= 0; i--) {
+        volley[i].in -= dt;
+        if (volley[i].in <= 0) { const v = volley.splice(i, 1)[0]; firework(v); }
+      }
       nextStar -= dt;
-      if (nextStar <= 0) { shooting.push({ x: rand(200, 2000), y: rand(30, 200), life: 0 }); nextStar = rand(7, 16); }
+      if (nextStar <= 0) { shooting.push({ x: rand(300, 2400), y: rand(30, 200), life: 0 }); nextStar = rand(7, 16); }
     }
   }
 
@@ -317,13 +891,78 @@ export function createLoyKrathongScene(): Scene {
     return { x, y, r: MOON.r };
   }
 
+  let lastCam: CameraView = { x: 0, y: 0, w: W, h: H };
+  // The moon's three soft halos, painted together once into one picture
+  let halo: HTMLCanvasElement | null = null;
+  function moonHalo() {
+    if (halo) return halo;
+    halo = document.createElement("canvas");
+    halo.width = halo.height = 384;
+    const h = halo.getContext("2d")!;
+    const u = 384 / 12; // one moon radius in pixels
+    glow(h, 192, 192, u * 6, "190,200,255", 0.18);
+    glow(h, 192, 192, u * 2.6, "255,240,215", 0.26);
+    glow(h, 192, 192, u * 1.8, "255,246,225", 0.38);
+    return halo;
+  }
+  /** A small aeroplane seen from the side, with a faint trail, a blinking red light and a white flash. */
+  function drawPlane(ctx: CanvasRenderingContext2D, pl: { x: number; y: number; dir: 1 | -1; t: number }) {
+    ctx.save();
+    ctx.translate(pl.x, pl.y);
+    ctx.scale(pl.dir, 1);
+    // a thin vapour trail behind it
+    const trail = ctx.createLinearGradient(-190, 0, -26, 0);
+    trail.addColorStop(0, "rgba(255,255,255,0)");
+    trail.addColorStop(1, "rgba(255,250,240,0.22)");
+    ctx.fillStyle = trail;
+    ctx.fillRect(-190, -1.6, 164, 3.2);
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 2;
+    ctx.fillStyle = "#e9e6f6";
+    // fuselage
+    ctx.beginPath();
+    ctx.moveTo(30, 0);
+    ctx.quadraticCurveTo(26, -7, 8, -7);
+    ctx.lineTo(-22, -6);
+    ctx.lineTo(-30, -16);
+    ctx.lineTo(-22, -16);
+    ctx.lineTo(-12, -6);
+    ctx.lineTo(-26, 0);
+    ctx.lineTo(-22, 5);
+    ctx.lineTo(10, 6);
+    ctx.quadraticCurveTo(26, 6, 30, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // wing
+    ctx.fillStyle = "#c9c4e4";
+    ctx.beginPath();
+    ctx.moveTo(6, 2);
+    ctx.lineTo(-12, 15);
+    ctx.lineTo(-4, 15);
+    ctx.lineTo(16, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // windows
+    ctx.fillStyle = "#ffd98a";
+    for (let i = 0; i < 6; i++) ctx.fillRect(-14 + i * 6, -3.5, 2.6, 2.4);
+    // lights: red blinks slowly, white flashes sharply
+    const red = Math.sin(pl.t * 3) > 0.2;
+    const flash = (pl.t % 1.6) < 0.12;
+    if (red) { glow(ctx, 2, 12, 12, "255,90,90", 0.55); ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(2, 14, 2, 0, Math.PI * 2); ctx.fill(); }
+    if (flash) { glow(ctx, -28, -15, 16, "255,255,255", 0.8); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-28, -15, 2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
   function drawMiddle(ctx: CanvasRenderingContext2D, t: number, cam: CameraView) {
+    lastCam = cam;
     const M = moonAt(cam);
-    // Everything in this layer sits behind the temple headland: clip it out.
+    // Everything in this layer sits behind the land on the left: clip it out.
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, W, H);
-    cliffPath(ctx);
+    ctx.rect(0, Math.min(0, cam.y), W, H - Math.min(0, cam.y)); // the camera may look above the top of the world
+    landPath(ctx);
     ctx.clip("evenodd");
     for (const s of stars) {
       const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * s.f + s.p));
@@ -346,10 +985,8 @@ export function createLoyKrathongScene(): Scene {
       ctx.stroke();
     }
 
-    // full moon, with the rabbit of Thai folklore faintly on its face
-    glow(ctx, M.x, M.y, M.r * 6, "190,200,255", 0.18);
-    glow(ctx, M.x, M.y, M.r * 2.6, "255,240,215", 0.26);
-    glow(ctx, M.x, M.y, M.r * 1.8, "255,246,225", 0.38 + Math.sin(t * 0.5) * 0.04);
+    // full moon, a few faint craters
+    ctx.drawImage(moonHalo(), M.x - M.r * 6, M.y - M.r * 6, M.r * 12, M.r * 12);
     const g = ctx.createRadialGradient(M.x - 24, M.y - 24, 8, M.x, M.y, M.r);
     g.addColorStop(0, "#fffdf6");
     g.addColorStop(0.75, "#fff3d6");
@@ -360,12 +997,13 @@ export function createLoyKrathongScene(): Scene {
     ctx.fill();
     ctx.fillStyle = "rgba(220,190,150,0.28)";
     ctx.beginPath();
-    ctx.ellipse(M.x + 6, M.y + 14, 22, 16, -0.2, 0, Math.PI * 2);
-    ctx.ellipse(M.x - 16, M.y - 4, 11, 10, 0, 0, Math.PI * 2);
-    ctx.ellipse(M.x - 14, M.y - 30, 4.5, 15, -0.3, 0, Math.PI * 2);
-    ctx.ellipse(M.x - 4, M.y - 30, 4.5, 15, 0.2, 0, Math.PI * 2);
-    ctx.ellipse(M.x + 28, M.y + 22, 6, 5, 0, 0, Math.PI * 2);
+    for (const [dx, dy, rx, ry] of [[-26, 18, 7, 6], [24, 24, 6, 5], [12, -28, 5, 4]]) {
+      ctx.moveTo(M.x + dx + rx, M.y + dy); // start each crater at its own edge, so they are not joined by lines
+      ctx.ellipse(M.x + dx, M.y + dy, rx, ry, 0, 0, Math.PI * 2);
+    }
     ctx.fill();
+
+    if (plane) drawPlane(ctx, plane);
 
     for (const s of sparks) {
       if (s.front) continue;
@@ -373,6 +1011,17 @@ export function createLoyKrathongScene(): Scene {
       if (s.flash) {
         glow(ctx, s.x, s.y, 120, s.rgb, 0.35 * k);
         glow(ctx, s.x, HORIZON + (HORIZON - s.y) * 0.25, 90, s.rgb, 0.14 * k);
+        continue;
+      }
+      if (s.trail) {
+        // a firework streak: a short line back along where the spark came from, fading as it falls
+        ctx.strokeStyle = `rgba(${s.rgb},${k})`;
+        ctx.lineWidth = 1.6 + 2.6 * k;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(s.x - s.vx * 0.1, s.y - s.vy * 0.1);
+        ctx.lineTo(s.x, s.y);
+        ctx.stroke();
         continue;
       }
       ctx.fillStyle = `rgba(${s.rgb},${k})`;
@@ -383,14 +1032,16 @@ export function createLoyKrathongScene(): Scene {
 
     // water
     ctx.lineWidth = 1.2;
-    for (let i = 0; i < 40; i++) {
-      const y = HORIZON + 6 + Math.pow(i / 40, 1.5) * (SHORE - HORIZON - 10);
+    for (let i = 0; i < 28; i++) {
+      const y = HORIZON + 6 + Math.pow(i / 28, 1.5) * (SHORE - HORIZON - 10);
       const depth = (y - HORIZON) / (SHORE - HORIZON);
-      ctx.strokeStyle = `rgba(190,200,255,${0.06 + depth * 0.07})`;
+      ctx.strokeStyle = `rgba(190,200,255,${0.07 + depth * 0.08})`;
       ctx.beginPath();
-      for (let x = 0; x <= W; x += 30) {
+      // only the stretch of sea that is on screen
+      const xa = Math.max(0, Math.floor(cam.x / 40) * 40), xb = Math.min(W, cam.x + cam.w + 40);
+      for (let x = xa; x <= xb; x += 40) {
         const yy = y + Math.sin(x * 0.012 + t * (0.6 + depth) + i) * (1 + depth * 3);
-        x ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy);
+        x > xa ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy);
       }
       ctx.stroke();
     }
@@ -450,11 +1101,24 @@ export function createLoyKrathongScene(): Scene {
       ctx.fillStyle = `rgba(255,200,120,${0.28 * flick})`;
       ctx.fillRect(k.x - 1.5 * s, k.y + 4 * s, 3 * s, 18 * s);
       glow(ctx, k.x, k.y - 16 * s, 34 * s * (k.mine ? 1.6 : 1), "255,200,120", 0.55 * flick);
-      drawKrathong(ctx, k.x, k.y + bob, s, k.lotus);
+      if (k.style === "moon") glow(ctx, k.x, k.y - 8 * s, 70 * s, "201,190,255", 0.5 + 0.15 * Math.sin(t * 1.5 + k.p));
+      if (k.style === "gold") glow(ctx, k.x, k.y - 6 * s, 52 * s, "255,214,110", 0.4);
+      drawKrathongCached(ctx, k.x, k.y + bob, s, k.lotus, k.style);
       ctx.fillStyle = `rgba(255,240,180,${flick})`;
       ctx.beginPath();
       ctx.ellipse(k.x, k.y + bob - 29 * s, 2 * s, 4 * s, 0, 0, Math.PI * 2);
       ctx.fill();
+      if ((k.wish || k.mine) && depth > 0.35) {
+        // a small folded note: tap this krathong to read its wish
+        const ny = k.y + bob - 40 * s - Math.sin(t * 2 + k.p) * 2;
+        ctx.fillStyle = k.mine ? "rgba(255,168,194,0.95)" : "rgba(255,246,225,0.9)";
+        ctx.strokeStyle = OUTLINE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(k.x - 6 * s, ny - 4 * s, 12 * s, 8 * s, 2);
+        ctx.fill();
+        ctx.stroke();
+      }
       if (k.mine && k.life < 3) {
         ctx.strokeStyle = `rgba(255,246,225,${0.6 * (1 - k.life / 3)})`;
         ctx.lineWidth = 1.5;
@@ -463,6 +1127,24 @@ export function createLoyKrathongScene(): Scene {
         ctx.stroke();
       }
     }
+    // foam where the waves meet the beach: drawn behind the sand and the stalls, so it only shows at the water's edge
+    for (let j = 0; j < 2; j++) {
+      const phase = t * 0.7 + j * Math.PI;
+      const reach = (Math.sin(phase) * 0.5 + 0.5) * 12;
+      ctx.strokeStyle = `rgba(235,238,255,${0.3 + 0.15 * Math.cos(phase)})`;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      let pen = false;
+      for (let x = Math.max(0, Math.floor(cam.x / 20) * 20); x <= Math.min(W, cam.x + cam.w + 20); x += 20) {
+        if (x > PIER.x0 - 26 && x < PIER.x1 + 26) { pen = false; continue; }
+        const y = shoreY(x) - 3 - reach * 0.7 + Math.sin(x * 0.031 + t) * 1.5;
+        pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        pen = true;
+      }
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
@@ -517,25 +1199,96 @@ export function createLoyKrathongScene(): Scene {
     return { x: tx, y: ty + 18 };
   }
 
-  function drawGround(ctx: CanvasRenderingContext2D, t: number, highlight: string | null) {
-    // foam at the waterline
-    for (let j = 0; j < 2; j++) {
-      const phase = t * 0.7 + j * Math.PI;
-      const reach = (Math.sin(phase) * 0.5 + 0.5) * 12;
-      ctx.strokeStyle = `rgba(235,238,255,${0.3 + 0.15 * Math.cos(phase)})`;
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
+  function cabinPos(i: number) {
+    const a = wheelA + (i / WHEEL.cabins) * Math.PI * 2;
+    return { x: WHEEL.x + Math.cos(a) * WHEEL.r, y: WHEEL.hubY + Math.sin(a) * WHEEL.r };
+  }
+
+  function drawWheel(ctx: CanvasRenderingContext2D, t: number) {
+    if (ride.active && ride.t > 1.6) return; // you're riding it: the view from the cabin doesn't show the wheel
+    wheelStand(ctx);
+    const { x, hubY, r: R, cabins } = WHEEL;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#cfc6ef";
+    for (let i = 0; i < cabins; i++) {
+      const a = wheelA + (i / cabins) * Math.PI * 2;
       ctx.beginPath();
-      let pen = false;
-      for (let x = 0; x <= W; x += 20) {
-        if (x > PIER.x0 - 26 && x < PIER.x1 + 26) { pen = false; continue; }
-        const y = shoreY(x) - 3 + reach + Math.sin(x * 0.031 + t) * 2;
-        pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-        pen = true;
-      }
+      ctx.moveTo(x, hubY);
+      ctx.lineTo(x + Math.cos(a) * R, hubY + Math.sin(a) * R);
       ctx.stroke();
     }
+    for (const rr of [R, R - 14]) {
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(x, hubY, rr, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "#f0e6ff";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    // chasing lights round the rim
+    const bulbs = 36;
+    for (let i = 0; i < bulbs; i++) {
+      const a = wheelA * 0.5 + (i / bulbs) * Math.PI * 2;
+      const on = (Math.floor(t * 6) + i) % 3 === 0 ? 1 : 0.35;
+      const hue = ["255,207,110", "255,168,194", "143,216,200"][i % 3];
+      const bx = x + Math.cos(a) * (R - 7), by = hubY + Math.sin(a) * (R - 7);
+      glow(ctx, bx, by, 10, hue, 0.6 * on);
+      ctx.fillStyle = `rgba(${hue},${0.5 + on * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(bx, by, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#ffcf6e";
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, hubY, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // cabins hang level as the wheel turns
+    const cols = ["#ef6f8e", "#8fd8c8", "#ffcf6e", "#c9b6ff", "#5aa0ef"];
+    for (let i = 0; i < cabins; i++) {
+      const c = cabinPos(i);
+      const sw = Math.sin(t * 1.5 + i) * 0.04;
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(sw);
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 8);
+      ctx.stroke();
+      const mine = ride.active && i === ride.cabin;
+      if (mine && ride.t > 1.9) { ctx.restore(); continue; } // you're inside it: the view from the cabin is shown instead
+      if (mine) {
+        drawPerson(ctx, -2, 31, 0.42, 1, 0, 0, t, rider.look, { sit: 1 });
+        glow(ctx, 0, 14, 30, "255,214,140", 0.4);
+      }
+      // roof
+      ctx.fillStyle = cols[i % cols.length];
+      ctx.beginPath();
+      ctx.moveTo(-15, 12);
+      ctx.quadraticCurveTo(0, 2, 15, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // basket
+      ctx.beginPath();
+      ctx.roundRect(-14, 18, 28, 14, [2, 2, 7, 7]);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-11, 12); ctx.lineTo(-11, 18);
+      ctx.moveTo(11, 12); ctx.lineTo(11, 18);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
 
+  function drawGround(ctx: CanvasRenderingContext2D, t: number, highlight: string | null) {
     // place highlight: a warm glow over the selected stall
     if (highlight) {
       const p = config.places.find((q) => q.id === highlight);
@@ -543,6 +1296,36 @@ export function createLoyKrathongScene(): Scene {
         const cx = (p.hitArea.x0 + p.hitArea.x1) / 2, cy = (p.hitArea.y0 + p.hitArea.y1) / 2;
         const a = 0.22 + Math.sin(t * 3) * 0.06;
         glow(ctx, cx, cy, Math.max(p.hitArea.x1 - p.hitArea.x0, 160) * 0.75, "255,214,140", a);
+      }
+    }
+
+    drawWheel(ctx, t);
+
+    // stage bulbs blink in a running pattern
+    const bulbHues = ["255,207,110", "255,120,150", "120,220,255", "160,255,170"];
+    lights.bulbs.forEach((b, i) => {
+      const on = (Math.floor(t * 5) + i) % 4 === 0 ? 1 : 0.45;
+      glow(ctx, b.x, b.y, 12, bulbHues[b.hue], 0.6 * on);
+      ctx.fillStyle = `rgba(${bulbHues[b.hue]},${0.55 + on * 0.45})`;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // coloured spotlights sweeping from the stage
+    if (!calm) {
+      for (const [k, hue] of [[0, "255,120,200"], [1, "120,200,255"]] as const) {
+        const a = -Math.PI / 2 + Math.sin(t * 0.7 + k * 2) * 0.5;
+        const sx = k ? STAGE.x1 - 20 : STAGE.x0 + 20, sy = STAGE.floor - 140;
+        const g = ctx.createLinearGradient(sx, sy, sx + Math.cos(a) * 400, sy + Math.sin(a) * 400);
+        g.addColorStop(0, `rgba(${hue},0.22)`);
+        g.addColorStop(1, `rgba(${hue},0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + Math.cos(a - 0.12) * 400, sy + Math.sin(a - 0.12) * 400);
+        ctx.lineTo(sx + Math.cos(a + 0.12) * 400, sy + Math.sin(a + 0.12) * 400);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 
@@ -577,16 +1360,33 @@ export function createLoyKrathongScene(): Scene {
       const a = 0.82 + 0.18 * Math.sin(t * 9 + i * 2.1) * Math.sin(t * 4.1 + i);
       glow(ctx, l.x, l.y, l.r, "255,190,110", (l.kind === "window" ? 0.2 : 0.48) * a);
       if (l.kind === "lantern") {
-        ctx.fillStyle = `rgba(239,90,90,${0.95 * a})`;
+        // a Lanna-style paper lantern: warm mulberry paper (never red, which reads as Chinese New Year), a band of tiny flowers, a tassel
+        const [paper, band] = LANTERN_PAPERS[i % LANTERN_PAPERS.length];
+        ctx.fillStyle = paper;
+        ctx.globalAlpha = 0.95 * a;
         ctx.strokeStyle = OUTLINE;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.ellipse(l.x, l.y, 6.5, 8, 0, 0, Math.PI * 2);
+        ctx.moveTo(l.x - 5, l.y - 9);
+        ctx.lineTo(l.x + 5, l.y - 9);
+        ctx.quadraticCurveTo(l.x + 9, l.y, l.x + 4.5, l.y + 9);
+        ctx.lineTo(l.x - 4.5, l.y + 9);
+        ctx.quadraticCurveTo(l.x - 9, l.y, l.x - 5, l.y - 9);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#ffcf6e";
-        ctx.fillRect(l.x - 4, l.y - 9.5, 8, 2.2);
-        ctx.fillRect(l.x - 4, l.y + 7.5, 8, 2.2);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = band;
+        ctx.fillRect(l.x - 7, l.y - 1, 14, 1.8);
+        for (const dx of [-4.5, 0, 4.5]) { ctx.beginPath(); ctx.arc(l.x + dx, l.y - 4.2, 0.9, 0, Math.PI * 2); ctx.arc(l.x + dx, l.y + 5, 0.9, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = "#8a6a4a";
+        ctx.fillRect(l.x - 5, l.y - 10.5, 10, 1.8);
+        ctx.strokeStyle = band;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(l.x, l.y + 9);
+        ctx.lineTo(l.x, l.y + 14);
+        ctx.stroke();
       } else if (l.kind === "lamp") {
         ctx.fillStyle = `rgba(255,236,190,${a})`;
         ctx.beginPath();
@@ -602,8 +1402,123 @@ export function createLoyKrathongScene(): Scene {
     }
   }
 
+  /** Walking out on the pier: wishes on nearby krathongs show up as little paper notes. */
+  function drawPierWishes(ctx: CanvasRenderingContext2D) {
+    if (pierFade < 0.02) return;
+    ctx.save();
+    ctx.font = "500 12px Mitr, sans-serif";
+    ctx.textBaseline = "middle";
+    const near = floaters
+      .filter((k) => k.wish && !k.mine && k.y > HORIZON + 30)
+      .map((k) => ({ k, d: dist(k.x, k.y, you.x, you.y - 80) }))
+      .filter((e) => e.d < 380)
+      .sort((a, b) => a.d - b.d);
+    // keep the notes from covering each other or the visitor
+    const boxes: { x0: number; y0: number; x1: number; y1: number }[] = [{ x0: you.x - 26, y0: you.y - 90, x1: you.x + 26, y1: you.y }];
+    const picked: Floater[] = [];
+    const most = lastCam.w < 500 ? 2 : 4; // fewer notes on a phone
+    for (const { k } of near) {
+      if (picked.length >= most) break;
+      const depth = clamp((k.y - HORIZON) / (SHORE - HORIZON), 0, 1);
+      const w = Math.min(ctx.measureText(k.wish).width, 150) + 20;
+      const top = k.y - 46 * (0.25 + depth * 0.8) - 58;
+      const bx = clamp(k.x - w / 2, lastCam.x + 6, lastCam.x + lastCam.w - w - 6);
+      const box = { x0: bx - 6, y0: top - 4, x1: bx + w + 6, y1: top + 50 };
+      if (boxes.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue;
+      boxes.push(box);
+      picked.push(k);
+    }
+    for (const k of picked) {
+      const depth = clamp((k.y - HORIZON) / (SHORE - HORIZON), 0, 1);
+      const s = 0.25 + depth * 0.8;
+      const a = pierFade * clamp(1.3 - dist(k.x, k.y, you.x, you.y - 80) / 380, 0.35, 1);
+      // split long wishes over two lines at the space nearest the middle
+      let lines = [k.wish];
+      if (ctx.measureText(k.wish).width > 150) {
+        const sp = [...k.wish.matchAll(/ /g)].map((m) => m.index ?? 0);
+        if (sp.length) {
+          const mid = k.wish.length / 2;
+          const cut = sp.reduce((b, i) => (Math.abs(i - mid) < Math.abs(b - mid) ? i : b), sp[0]);
+          lines = [k.wish.slice(0, cut), k.wish.slice(cut + 1)];
+        }
+      }
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
+      const h = lines.length * 16 + 16;
+      // keep the note on screen; its little tail still points at the krathong
+      const x = clamp(k.x - w / 2, lastCam.x + 6, lastCam.x + lastCam.w - w - 6), y = k.y - 46 * s - h - 8;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "rgba(255,246,225,0.95)";
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 7);
+      const tx = clamp(k.x, x + 12, x + w - 12);
+      ctx.moveTo(tx - 5, y + h);
+      ctx.lineTo(tx, y + h + 6);
+      ctx.lineTo(tx + 5, y + h);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = OUTLINE;
+      ctx.textAlign = "center";
+      lines.forEach((l, i) => ctx.fillText(l, x + w / 2, y + 11 + i * 16));
+      ctx.font = "400 9px Mitr, sans-serif";
+      ctx.fillStyle = "#c0506e";
+      ctx.fillText(config.ui.sampleTag, x + w / 2, y + h - 6);
+      ctx.font = "500 12px Mitr, sans-serif";
+    }
+    ctx.restore();
+  }
+
+  /** When you walk near something on the sand that you haven't picked up yet, a small tag says what it is and to tap it. */
+  function drawCurioHints(ctx: CanvasRenderingContext2D, t: number) {
+    if (still || ride.active || stageGuest.active) return;
+    for (const c of config.curios) {
+      if (found.has(c.id)) continue;
+      const d = dist(you.x, you.y, c.at.x, c.at.y);
+      if (d > 220) continue;
+      const a = clamp((220 - d) / 60, 0, 1);
+      const text = `แตะเก็บ${c.label}`;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = "500 13px Mitr, sans-serif";
+      const w = ctx.measureText(text).width + 34;
+      const x = clamp(c.at.x, lastCam.x + w / 2 + 8, lastCam.x + lastCam.w - w / 2 - 8);
+      const y = c.at.y - 52 + Math.sin(t * 2.4) * 2;
+      ctx.fillStyle = "rgba(255,248,232,0.96)";
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - 13, w, 26, 13);
+      const px = clamp(c.at.x, x - w / 2 + 12, x + w / 2 - 12);
+      ctx.moveTo(px - 5, y + 13);
+      ctx.lineTo(px, y + 19);
+      ctx.lineTo(px + 5, y + 13);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#e0a020";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("✦", x - w / 2 + 14, y + 1);
+      ctx.fillStyle = "#2a1d4a";
+      ctx.fillText(text, x + 8, y + 1);
+      ctx.restore();
+    }
+  }
+
+  /** Your own lantern: bigger, in the colour and shape you chose, drawn the same way as the one in your hands. */
+  function drawMyLantern(ctx: CanvasRenderingContext2D, l: Lantern, t: number) {
+    const flick = 0.88 + 0.12 * Math.sin(t * 9 + l.p * 5);
+    glow(ctx, l.x, l.y + 4 * l.s, 64 * l.s, l.style === "heart" ? "255,150,190" : "255,190,110", 0.6 * flick);
+    // released at s = 0.4 · LANTERN_UP · person scale, so this starts exactly the size it was in your hands
+    const k = l.s / 0.4;
+    drawPaperLantern(ctx, l.x, l.y, k, l.color ?? "#ffb35c", t + l.p, l.style, l.color2, OUTLINE, Math.max(0.8, (0.9 * k) / LANTERN_UP));
+  }
+
   function drawTop(ctx: CanvasRenderingContext2D, t: number) {
+    drawPierWishes(ctx);
+    drawCurioHints(ctx, t);
     for (const l of lanterns) {
+      if (l.mine) { drawMyLantern(ctx, l, t); continue; }
       const s = l.s;
       const flick = 0.85 + 0.15 * Math.sin(t * 8 + l.p * 5);
       glow(ctx, l.x, l.y, 40 * s, "255,180,100", 0.55 * flick);
@@ -629,6 +1544,14 @@ export function createLoyKrathongScene(): Scene {
       ctx.restore();
     }
     ctx.globalAlpha = 1;
+    // music notes drifting up from the stage speakers
+    ctx.font = "bold 18px Mitr, sans-serif";
+    ctx.textAlign = "center";
+    for (const n of notes) {
+      const k = Math.min(1, n.life * 2, 3 - n.life);
+      ctx.fillStyle = `rgba(${n.c},${k})`;
+      ctx.fillText(n.life % 2 > 1 ? "♪" : "♫", n.x, n.y);
+    }
     for (const s of sparks) {
       if (!s.front) continue;
       const k = 1 - s.life / s.max;
@@ -639,36 +1562,146 @@ export function createLoyKrathongScene(): Scene {
   return {
     paintBack,
     paintFront,
+    addShared,
+    setStill(on) { still = on; },
     update,
     drawMiddle,
     drawGround,
-    actors: [...folkActors, shellActor, starActor],
+    events,
+    actors: [...folkActors, shellActor, starActor, conchActor, bottleActor, altarActor, cartActor, tableActor, gateActor, ringActor],
+    camera() {
+      if (ride.active) {
+        const c = cabinPos(ride.cabin);
+        // stepping into the cabin, then the view from inside it covers the screen (see RideView),
+        // so the fair itself needn't be drawn until you are nearly back down
+        const inside = ride.t > 2.8 && ride.turned < Math.PI * 2 - 0.35;
+        return { x: c.x, y: c.y + 30, zoom: 1.6, cover: inside };
+      }
+      // out on the pier: come in close, with the water and the krathongs ahead
+      if (pierFade > 0.6 && you.y < GROUND - 6) return { x: you.x, y: you.y - 110, zoom: 1.6 };
+      if (stageGuest.active) return { x: (STAGE.x0 + STAGE.x1) / 2, y: STAGE.floor - 70, zoom: 1.45 };
+      return null;
+    },
     drawTop,
-    runAction(placeId, actionId, visitor) {
+    runAction(placeId, actionId, visitor, input) {
       if (placeId === "shore" && actionId === "float") {
-        spawnFloater(visitor.x, PIER.y0 - 4, true);
+        // set down just past the end of the pier, then it drifts out towards the moon
+        spawnFloater(PIER.x1 + 8, PIER.y0 - 10, true, input?.wish ?? "", input?.style, input?.flower);
         mineCount++;
-        burst(visitor.x, PIER.y0 - 20, "255,214,140", 14);
+        burst(PIER.x1 + 8, PIER.y0 - 24, "255,214,140", 14);
         return true;
       }
-      if (placeId === "flowers" && actionId === "jasmine") {
-        for (let i = 0; i < (calm ? 10 : 28); i++) {
-          petals.push({ x: rand(660, 1050), y: rand(720, 790), vx: rand(-12, 12), vy: -rand(18, 40), rot: rand(0, 6), spin: rand(-2, 2), life: 0, color: ["#fff6f0", "#ffd0dc", "#ffe7a3"][i % 3] });
+      if (placeId === "lanterns" && actionId === "release") {
+        // it leaves your raised hands exactly where you were holding it (see the raised pose in person.ts)
+        const ps = depthScale(visitor.y) * 1.08;
+        const ly = visitor.y + (-50.5 - 21.5 - 6 * LANTERN_UP) * ps;
+        lanterns.push({ x: visitor.x + ps, y: ly, vy: -rand(22, 26), sway: rand(10, 16), p: rand(0, 6.28), s: 0.4 * LANTERN_UP * ps, mine: true, color: input?.flower, color2: input?.color2, style: input?.style, wish: input?.wish ?? "", age: 0, trail: 0 });
+        lanternCount++;
+        burst(visitor.x, ly + 10 * ps, "255,214,140", 12);
+        events.push({ name: "chime", x: visitor.x, y: visitor.y });
+        return true;
+      }
+      if (placeId === "temple" && actionId === "incense") {
+        altar.lit = clock;
+        return true;
+      }
+      if (placeId === "temple" && actionId === "offer") {
+        if (input?.hold) altar.offered = [...altar.offered, input.hold as Hold].slice(-4);
+        return true;
+      }
+      if (placeId === "temple" && actionId === "blessing") {
+        altar.glow = 1;
+        for (let i = 0; i < 40; i++) {
+          sparks.push({ x: TEMPLE.chediX + rand(-50, 50), y: GROUND - rand(60, 200), vx: rand(-10, 10), vy: -rand(20, 55), life: 0, max: rand(2, 3.5), rgb: "255,214,140", g: -2, size: 2, front: true });
         }
+        return true;
+      }
+      if (placeId === "flowers" && actionId === "petals") {
+        for (let i = 0; i < (calm ? 10 : 24); i++) {
+          petals.push({ x: visitor.x + rand(-40, 40), y: visitor.y - rand(30, 80), vx: rand(-12, 12), vy: -rand(18, 40), rot: rand(0, 6), spin: rand(-2, 2), life: 0, color: ["#fff6f0", "#ffd0dc", "#ffe7a3"][i % 3] });
+        }
+        return true;
+      }
+      if (placeId === "wheel" && actionId === "ride") {
+        if (ride.active) return true;
+        // board the cabin closest to the bottom of the wheel
+        let best = 0, bestY = -Infinity;
+        for (let i = 0; i < WHEEL.cabins; i++) { const c = cabinPos(i); if (c.y > bestY) { bestY = c.y; best = i; } }
+        Object.assign(ride, { active: true, cabin: best, turned: 0, t: 0 });
+        rider.look = visitor.look;
+        return true;
+      }
+      if (placeId === "stage" && actionId === "dance") {
+        Object.assign(stageGuest, { active: true, until: clock + 14, look: visitor.look });
+        for (let i = 0; i < 6; i++) notes.push({ x: (STAGE.x0 + STAGE.x1) / 2 + rand(-60, 60), y: STAGE.floor - 90, life: 0, vx: rand(-15, 15), c: "255,168,194" });
         return true;
       }
       return false;
     },
-    pokeCurio(id) {
-      pokes++;
-      if (id === "shell") {
-        shell.openUntil = clock + 4;
-        burst(shell.x, shell.y - 14, "255,246,220", 10);
-      } else if (id === "starfish" && star.hop === 0) {
-        star.hop = 0.001;
-        burst(star.x, star.y - 20, "255,207,110", 8);
+    tap(p): TapResult | null {
+      for (const c of config.curios) {
+        if (dist(p.x, p.y, c.at.x, c.at.y - 12) > c.radius) continue;
+        pokes++;
+        if (c.id === "shell") {
+          shell.openUntil = clock + 4;
+          burst(shell.x, shell.y - 14, "255,246,220", 10);
+        } else if (c.id === "starfish" && star.hop === 0) {
+          star.hop = 0.001;
+          burst(star.x, star.y - 20, "255,207,110", 8);
+        } else if (c.id === "conch") {
+          conch.wiggle = 1;
+          burst(conch.x, conch.y - 14, "255,224,200", 8);
+        } else if (c.id === "bottle" && bottle.open === 0) {
+          bottle.open = 0.01;
+          burst(bottle.x, bottle.y - 14, "170,230,210", 8);
+        }
+        if (found.has(c.id)) return { found: { id: c.id, label: c.label, text: c.found, again: true } };
+        found.add(c.id);
+        return { found: { id: c.id, label: c.label, text: c.found } };
       }
+      // your own sky lantern, while it's still low enough to tap
+      for (const l of lanterns) {
+        if (!l.mine || dist(p.x, p.y, l.x, l.y) > 34 * l.s + 14) continue;
+        burst(l.x, l.y, "255,246,225", 6);
+        return { bubble: { title: "คำอธิษฐานบนโคมของคุณ", text: l.wish || "โคมของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag } };
+      }
+      // a krathong on the water: read its wish
+      let best: Floater | null = null, bestD = Infinity;
+      for (const k of floaters) {
+        if (!k.wish && !k.mine && !k.shared) continue;
+        const depth = clamp((k.y - HORIZON) / (SHORE - HORIZON), 0, 1);
+        const s = 0.25 + depth * 0.8;
+        const d = dist(p.x, p.y, k.x, k.y - 16 * s);
+        if (d < 22 + 26 * s && d < bestD) { bestD = d; best = k; }
+      }
+      if (!best) return null;
+      burst(best.x, best.y - 20, "255,246,225", 6);
+      return {
+        bubble: best.shared
+          ? best.wish
+            ? { title: config.ui.wishTitle, text: best.wish, tag: "จากผู้ร่วมงานจริง · ไม่ระบุตัวตน" }
+            : { title: "กระทงของใครสักคน", text: "มีคนมาลอยกระทงในงานนี้เหมือนกัน ไม่ระบุว่าเป็นของใคร ขอให้ทุกคำอธิษฐานเป็นจริงนะ", tag: "ผู้ร่วมงานจริง" }
+          : best.mine
+          ? { title: config.ui.wishTitle, text: best.wish || "กระทงของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag }
+          : { title: config.ui.wishTitle, text: best.wish, tag: config.ui.sampleTag },
+      };
     },
-    stats: () => ({ krathongsFloated: mineCount, curioTaps: pokes }),
+    visitorAway: () => ride.active || stageGuest.active,
+    debug: () => ({
+      floaters: floaters.map((k) => ({ x: k.x, y: k.y, wish: k.wish, mine: k.mine, shared: !!k.shared, style: k.style, lotus: k.lotus })),
+      lanterns: lanterns.map((l) => ({ x: l.x, y: l.y, mine: !!l.mine })),
+      plane: plane ? { x: Math.round(plane.x), y: Math.round(plane.y), dir: plane.dir } : null,
+      sparks: sparks.length,
+      sendPlane, // for the browser tests: call the aeroplane now
+    }),
+    stats: () => ({
+      krathongsFloated: mineCount, lanternsReleased: lanternCount, curioTaps: pokes, riding: ride.active ? 1 : 0,
+      rideView: ride.active && ride.t > 1.6 ? 1 : 0, rideProgress: ride.turned / (Math.PI * 2),
+      // where your cabin is: 0 at the bottom of the wheel, 1 at the top, and its place along the beach
+      rideHigh: ride.active ? clamp((WHEEL.hubY + WHEEL.r - cabinPos(ride.cabin).y) / (WHEEL.r * 2), 0, 1) : 0,
+      rideX: ride.active ? cabinPos(ride.cabin).x : WHEEL.x,
+      dancing: stageGuest.active ? 1 : 0, treasures: found.size,
+      focus: ride.active || stageGuest.active || (pierFade > 0.6 && you.y < GROUND - 6) ? 1 : 0,
+    }),
   };
 }
