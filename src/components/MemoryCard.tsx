@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { VisitorLook } from "../festivals/types";
 import { drawPerson, type Hold } from "../engine/person";
-import { SupportSlip } from "./SupportSlip";
 
 export type Memories = {
   wishes: string[];
@@ -110,7 +109,6 @@ export function MemoryCard({ memories: m, look, hand, brand, treasureTotal, supp
           {support.url && (
             <a className="panel-action secondary" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
           )}
-          {support.qr && <SupportSlip />}
         </aside>
       )}
     </div>
