@@ -38,16 +38,13 @@ export function SupportSlip() {
   return (
     <div className="slip">
       {!open ? (
-        <button type="button" className="panel-action secondary" onClick={() => setOpen(true)}>โอนแล้ว? แนบหลักฐานการโอน</button>
+        <button type="button" className="panel-action secondary" onClick={() => setOpen(true)}>ส่งสลิปโกโก้ได้ที่นี่ ☕</button>
       ) : (
         <form className="slip-form" name={SLIP_FORM} onSubmit={submit} encType="multipart/form-data">
-          <p className="slip-lead">แนบสลิปเพื่อให้ผู้สร้างรู้ว่าเป็นกำลังใจจากใคร และได้ขอบคุณถึงคุณค่ะ (ไม่บังคับให้กรอกชื่อ)</p>
+          <p className="slip-lead">แนบสลิปได้เลยค่ะ ผู้สร้างจะได้รับและขอบคุณถึงคุณ</p>
           {/* a field only robots fill in; real visitors never see it */}
           <p className="slip-bot" aria-hidden="true"><label>อย่ากรอกช่องนี้ <input name="bot-field" tabIndex={-1} autoComplete="off" /></label></p>
-          <label>ชื่อหรือชื่อเล่น<input name="name" maxLength={60} autoComplete="nickname" /></label>
-          <label>ช่องทางติดต่อ (LINE / IG / อีเมล)<input name="contact" maxLength={80} /></label>
-          <label>จำนวนเงินที่โอน (บาท)<input name="amount" inputMode="decimal" maxLength={12} /></label>
-          <label>ข้อความถึงผู้สร้าง<textarea name="message" rows={2} maxLength={200} /></label>
+          <label>ข้อความถึงผู้สร้าง (ไม่จำเป็น)<textarea name="message" rows={2} maxLength={200} /></label>
           <label>แนบสลิป<input name="slip" type="file" accept="image/*" required /></label>
           <p className="privacy">รูปสลิปมีข้อมูลบัญชีของคุณ จะถูกส่งถึงผู้สร้างคนเดียว ไม่แสดงให้ใครเห็นในงาน คุณสามารถปิดบังเลขบัญชีบนรูปก่อนส่งได้</p>
           {problem && <p className="slip-problem" role="alert">{problem}</p>}

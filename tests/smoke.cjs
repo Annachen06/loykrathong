@@ -243,8 +243,9 @@ async function desktopSuite(browser) {
     if (req.method() === "POST") { posted = req.postDataBuffer()?.toString("latin1") ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
     return route.continue();
   });
-  await p.click('.slip button:has-text("แนบหลักฐานการโอน")');
-  await p.fill('.slip-form input[name="name"]', "ผู้ใจดี");
+  await p.click('.slip button:has-text("ส่งสลิปโกโก้ได้ที่นี่")');
+  await p.fill('.slip-form textarea[name="message"]', "ขอบคุณค่ะ");
+  check("slip form has only a message and the slip picture", (await p.locator('.slip-form input[name="name"], .slip-form input[name="contact"], .slip-form input[name="amount"]').count()) === 0);
   await p.setInputFiles('.slip-form input[name="slip"]', { name: "note.txt", mimeType: "text/plain", buffer: Buffer.from("hi") });
   await p.click('.slip-form button[type="submit"]');
   check("slip form refuses a file that is not a picture", (await p.isVisible(".slip-problem")) && posted === null);
@@ -252,7 +253,7 @@ async function desktopSuite(browser) {
   await p.setInputFiles('.slip-form input[name="slip"]', { name: "slip.png", mimeType: "image/png", buffer: png });
   await p.click('.slip-form button[type="submit"]');
   await p.waitForSelector(".slip-thanks", { timeout: 5000 }).catch(() => {});
-  check("slip form sends the Netlify form name, the nickname and the picture, then says thanks", !!posted && posted.includes('name="form-name"') && posted.includes("support-slip") && posted.includes('filename="slip.png"') && (await p.isVisible(".slip-thanks")), String(posted).slice(0, 80));
+  check("slip form sends the Netlify form name, the message and the picture, then says thanks", !!posted && posted.includes('name="form-name"') && posted.includes("support-slip") && posted.includes('filename="slip.png"') && (await p.isVisible(".slip-thanks")), String(posted).slice(0, 80));
   await p.unroute("**/");
   check("the site ships a hidden form for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1);
 
