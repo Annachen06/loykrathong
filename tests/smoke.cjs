@@ -255,7 +255,7 @@ async function desktopSuite(browser) {
   await p.waitForSelector(".slip-thanks", { timeout: 5000 }).catch(() => {});
   check("slip form sends the Netlify form name, the message and the picture, then says thanks", !!posted && posted.includes('name="form-name"') && posted.includes("support-slip") && posted.includes('filename="slip.png"') && (await p.isVisible(".slip-thanks")), String(posted).slice(0, 80));
   await p.unroute("**/");
-  check("the site ships a hidden form for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1);
+  check("the site ships hidden forms for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1 && (await p.locator('form[name="creator-note"][data-netlify="true"]').count()) === 1);
 
   // The souvenir card: a 9:16 picture of the real fair with you in it; the preview is the very file that downloads.
   await p.waitForSelector(".memory-card img", { timeout: 20000 });
@@ -273,6 +273,30 @@ async function desktopSuite(browser) {
   // Escape closes the card.
   await p.keyboard.press("Escape");
   check("Escape closes the card", !(await p.$(".panel")));
+
+  // A small icon in the bottom-right corner opens a note to the creator: only a message, sent to the Netlify form "creator-note".
+  let notePosted = null;
+  await p.route("**/", async (route) => {
+    const req = route.request();
+    if (req.method() === "POST") { notePosted = req.postData() ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
+    return route.continue();
+  });
+  await p.waitForSelector(".note-fab", { state: "visible", timeout: 5000 });
+  const fab = await p.locator(".note-fab").boundingBox();
+  const vp = p.viewportSize();
+  check("note icon sits small in the bottom-right corner", fab.width <= 48 && fab.x + fab.width > vp.width - 80 && fab.y + fab.height > vp.height - 100, JSON.stringify(fab));
+  await p.click(".note-fab");
+  await p.click('.note-form button[type="submit"]');
+  check("note to the creator: an empty message is not sent", (await p.isVisible(".note-form .slip-problem")) && notePosted === null);
+  check("note form asks only for a message", (await p.locator(".note-form input:not([name='bot-field']), .note-form [type=file]").count()) === 0 && (await p.locator('.note-form textarea[name="message"]').count()) === 1);
+  await p.fill('.note-form textarea[name="message"]', "ชอบมากเลยค่ะ ขอบคุณที่ทำให้");
+  await p.click('.note-form button[type="submit"]');
+  await p.waitForSelector(".note-pop .slip-thanks", { timeout: 5000 }).catch(() => {});
+  check("note to the creator is posted to the Netlify form and says thanks", !!notePosted && notePosted.includes("form-name=creator-note") && notePosted.includes("message=") && (await p.isVisible(".note-pop .slip-thanks")), String(notePosted).slice(0, 100));
+  await p.screenshot({ path: path.join(SHOTS, "desktop-note.png") });
+  await p.unroute("**/");
+  await p.click(".note-fab");
+  check("the note icon closes the note again", !(await p.$(".note-pop")));
 
   // Clicking the stall artwork itself (not the marker) visits it.
   const boutique = (await places(p)).find((x) => x.id === "boutique");

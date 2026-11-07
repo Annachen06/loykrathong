@@ -11,6 +11,7 @@ import { PlacePanel } from "./components/PlacePanel";
 import { MapMenu } from "./components/MapMenu";
 import { StartChoice } from "./components/StartChoice";
 import { Joystick } from "./components/Joystick";
+import { NoteButton } from "./components/NoteButton";
 import { Hint } from "./components/Hint";
 import { WishBubble, type Bubble } from "./components/WishBubble";
 import { FloatForm } from "./components/FloatForm";
@@ -508,6 +509,7 @@ export default function App() {
         ui={config.ui}
       />
       <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view} />
+      <NoteButton hidden={!entered || asking || !!openPlace || ride.view} />
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 
       {openPlace && (
