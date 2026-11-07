@@ -473,8 +473,8 @@ export default function App() {
           type="button"
           className={`story-toggle ${entered ? "" : "is-hidden"}`}
           tabIndex={entered ? 0 : -1}
-          aria-label="เรื่องราวของลอยกัน"
-          title="เรื่องราวของลอยกัน"
+          aria-label="แตะตรงนี้เพื่ออ่านเรื่องราวของลอยริมเล"
+          title="แตะตรงนี้เพื่ออ่านเรื่องราวของลอยริมเล"
           onClick={() => setStory(true)}
         >
           <span aria-hidden="true">🌙</span>
@@ -527,7 +527,7 @@ export default function App() {
         ui={config.ui}
       />
       <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view || story} />
-      <NoteButton hidden={!entered || asking || !!openPlace || ride.view || story} />
+      <NoteButton support={config.support} hidden={!entered || asking || !!openPlace || ride.view || story} />
       {config.story && <StorySheet story={config.story} open={story} onClose={() => setStory(false)} />}
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 

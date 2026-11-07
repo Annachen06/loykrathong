@@ -159,7 +159,7 @@ export function Intro({ config, onEnter, hidden, onStory }: Props) {
           {config.intro.enterLabel}
         </button>
         <p className="intro-help">{config.intro.help}</p>
-        {onStory && <button type="button" className="intro-story" tabIndex={tab} onClick={onStory}>🌙 เรื่องราวของลอยกัน</button>}
+        {onStory && <button type="button" className="intro-story" tabIndex={tab} onClick={onStory}>🌙 แตะตรงนี้เพื่ออ่านเรื่องราวของลอยริมเล</button>}
       </div>
     </section>
   );

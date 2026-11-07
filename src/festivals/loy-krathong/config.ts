@@ -2,6 +2,7 @@
 // The name of the fair (brand) also appears on the arch over the way onto the pier.
 // Text, places, layout and colours are plain data so they're easy to edit.
 import type { FestivalConfig } from "../types";
+import supportQr from "../../assets/support-qr.png?inline";
 
 export const loyKrathongConfig: FestivalConfig = {
   id: "loy-krathong",
@@ -25,13 +26,22 @@ export const loyKrathongConfig: FestivalConfig = {
     yourWishTag: "ของคุณ · เห็นแค่คุณ",
   },
   story: {
-    title: "เรื่องราวของลอยกัน 🌙",
+    title: "เรื่องราวของลอยริมเล 🌙",
     subtitle: "จากความทรงจำในวัยเด็ก สู่ลอยกระทงริมทะเล",
     paragraphs: [
-      "ธีมลอยกระทงริมทะเลของเว็บลอยกัน เกิดจากความทรงจำในวัยเด็กของเราที่เกาะสมุย",
+      "ธีมลอยกระทงริมทะเลของเว็บลอยริมเล เกิดจากความทรงจำในวัยเด็กของเราที่เกาะสมุย",
       "ตอนเด็ก ๆ เราชอบไปลอยกระทงที่ชายหาดกับครอบครัว ระหว่างทางจะมีร้านขายของกิน พอถึงชายหาดก็จะเห็นแสงเทียนจากกระทงที่ลอยอยู่ในทะเล มีเครื่องบินเที่ยวดึกบินผ่านบนท้องฟ้า มีเวทีร้องเพลง เต้นรำ และผู้คนออกมาเดินเที่ยวงานกัน",
-      "พอโตขึ้น เราแทบไม่ได้ไปลอยกระทงอีกเลย แต่ก็ยังคิดถึงบรรยากาศเหล่านั้น เลยอยากสร้างลอยกันขึ้นมา เพื่อเก็บความทรงจำเล็ก ๆ ในวัยเด็กเอาไว้ และแบ่งปันบรรยากาศที่เราคิดถึงให้ทุกคนได้สัมผัส",
+      "พอโตขึ้น เราแทบไม่ได้ไปลอยกระทงอีกเลย แต่ก็ยังคิดถึงบรรยากาศเหล่านั้น เลยอยากสร้างลอยริมเลขึ้นมา เพื่อเก็บความทรงจำเล็ก ๆ ในวัยเด็กเอาไว้ และแบ่งปันบรรยากาศที่เราคิดถึงให้ทุกคนได้สัมผัส",
     ],
+  },
+  // The owner's own tip page or PromptPay QR goes here (nothing is shown until one is set).
+  support: {
+    title: "☕ Buy Me a Cocoa",
+    // blank lines separate paragraphs
+    text: "พื้นที่เล็ก ๆ แห่งนี้สร้างขึ้นด้วยความตั้งใจ เพื่อแบ่งปันความสุขให้ทุกคนได้เข้ามาสนุกกัน\n\nหากคุณชอบผลงานและอยากเป็นส่วนหนึ่งในการสนับสนุนให้พื้นที่แห่งนี้เติบโตต่อไป สามารถส่งกำลังใจเล็ก ๆ น้อย ๆ ให้ผู้สร้างได้ตามความสะดวกนะคะ\n\nแต่แค่คุณแวะเข้ามาเที่ยว เราก็ดีใจมากแล้ว\nขอให้ทุกวันเป็นวันที่ดีค่ะ ♡",
+    linkLabel: "ให้กำลังใจ",
+    // the owner's PromptPay QR: scan with any banking app and type any amount
+    qr: supportQr,
   },
   mapGroups: [
     { id: "merit", label: "ทำบุญ", icon: "🙏" },

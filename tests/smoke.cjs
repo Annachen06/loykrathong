@@ -62,7 +62,7 @@ async function desktopSuite(browser) {
   // The maker's story can be read from the welcome screen, word for word, and closed again.
   await p.click(".intro-story");
   const storyText = await p.textContent(".story");
-  check("welcome screen: the story opens with the owner's own words", storyText.includes("เรื่องราวของลอยกัน 🌙") && storyText.includes("จากความทรงจำในวัยเด็ก สู่ลอยกระทงริมทะเล") && storyText.includes("ธีมลอยกระทงริมทะเลของเว็บลอยกัน เกิดจากความทรงจำในวัยเด็กของเราที่เกาะสมุย") && storyText.includes("มีเครื่องบินเที่ยวดึกบินผ่านบนท้องฟ้า มีเวทีร้องเพลง เต้นรำ และผู้คนออกมาเดินเที่ยวงานกัน") && storyText.includes("แบ่งปันบรรยากาศที่เราคิดถึงให้ทุกคนได้สัมผัส"));
+  check("welcome screen: the story opens with the owner's own words", storyText.includes("เรื่องราวของลอยริมเล 🌙") && storyText.includes("จากความทรงจำในวัยเด็ก สู่ลอยกระทงริมทะเล") && storyText.includes("ธีมลอยกระทงริมทะเลของเว็บลอยริมเล เกิดจากความทรงจำในวัยเด็กของเราที่เกาะสมุย") && storyText.includes("มีเครื่องบินเที่ยวดึกบินผ่านบนท้องฟ้า มีเวทีร้องเพลง เต้นรำ และผู้คนออกมาเดินเที่ยวงานกัน") && storyText.includes("แบ่งปันบรรยากาศที่เราคิดถึงให้ทุกคนได้สัมผัส"));
   await p.keyboard.press("Escape");
   check("the story closes with Escape", !(await p.$(".story")));
 
@@ -265,8 +265,29 @@ async function desktopSuite(browser) {
   const vp = p.viewportSize();
   check("note icon sits small in the bottom-right corner", fab.width <= 48 && fab.x + fab.width > vp.width - 80 && fab.y + fab.height > vp.height - 100, JSON.stringify(fab));
   await p.click(".note-fab");
-  check("the site ships the hidden note form for Netlify to find, and no slip form", (await p.locator('form[name="creator-note"][data-netlify="true"]').count()) === 1 && (await p.locator('form[name="support-slip"]').count()) === 0);
-  check("no tip corner, QR or slip form is left anywhere", (await p.locator(".support, .support-qr, .slip, input[type=file]").count()) === 0 && !(await p.content()).includes("Buy Me a Cocoa"));
+  check("the corner popup has the Buy Me a Cocoa tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
+  // the tip corner's slip form: only images are accepted, and the post carries the Netlify form name and the file
+  check("tip corner no longer carries the 'scan with bank app' caption", !(await p.textContent(".support")).includes("สแกนด้วยแอปธนาคาร"));
+  let posted = null;
+  await p.route("**/", async (route) => {
+    const req = route.request();
+    if (req.method() === "POST") { posted = req.postDataBuffer()?.toString("latin1") ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
+    return route.continue();
+  });
+  await p.click('.slip button:has-text("ส่งสลิปโกโก้ได้ที่นี่")');
+  await p.fill('.slip .slip-form textarea[name="message"]', "ขอบคุณค่ะ");
+  check("slip form has only a message and the slip picture", (await p.locator('.slip .slip-form input[name="name"], .slip .slip-form input[name="contact"], .slip .slip-form input[name="amount"]').count()) === 0);
+  await p.setInputFiles('.slip .slip-form input[name="slip"]', { name: "note.txt", mimeType: "text/plain", buffer: Buffer.from("hi") });
+  await p.click('.slip .slip-form button[type="submit"]');
+  check("slip form refuses a file that is not a picture", (await p.isVisible(".slip .slip-problem")) && posted === null);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await p.setInputFiles('.slip .slip-form input[name="slip"]', { name: "slip.png", mimeType: "image/png", buffer: png });
+  await p.click('.slip .slip-form button[type="submit"]');
+  await p.waitForSelector(".support .slip-thanks", { timeout: 5000 }).catch(() => {});
+  check("slip form sends the Netlify form name, the message and the picture, then says thanks", !!posted && posted.includes('name="form-name"') && posted.includes("support-slip") && posted.includes('filename="slip.png"') && (await p.isVisible(".support .slip-thanks")), String(posted).slice(0, 80));
+  await p.unroute("**/");
+  check("the site ships hidden forms for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1 && (await p.locator('form[name="creator-note"][data-netlify="true"]').count()) === 1);
+
   await p.route("**/", async (route) => {
     const req = route.request();
     if (req.method() === "POST") { notePosted = req.postData() ?? ""; return route.fulfill({ status: 200, body: "ok" }); }
