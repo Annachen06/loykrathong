@@ -256,10 +256,17 @@ async function desktopSuite(browser) {
   await p.unroute("**/");
   check("the site ships a hidden form for Netlify to find", (await p.locator('form[name="support-slip"][data-netlify="true"]').count()) === 1);
 
-  await p.click('.memory .panel-action:has-text("สร้างการ์ด")');
-  await p.waitForSelector(".memory-card img");
-  const card = await p.getAttribute(".memory-card img", "src");
-  check("Memory Corner makes a souvenir card you can save", card.startsWith("data:image/png") && (await p.getAttribute(".memory-card a", "download")).endsWith(".png"));
+  // The souvenir card: a 9:16 picture of the real fair with you in it; the preview is the very file that downloads.
+  await p.waitForSelector(".memory-card img", { timeout: 20000 });
+  await p.waitForFunction(() => { const i = document.querySelector(".memory-card img"); return i && i.complete && i.naturalWidth > 0; });
+  const cardSize = await p.evaluate(() => { const i = document.querySelector(".memory-card img"); return [i.naturalWidth, i.naturalHeight]; });
+  check("souvenir card preview is 1080 x 1920", cardSize[0] === 1080 && cardSize[1] === 1920, cardSize.join("x"));
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.click('.memory .panel-action:has-text("บันทึกการ์ดของฉัน")')]);
+  const cardPath = path.join(SHOTS, "memory-card-download.png");
+  await dl.saveAs(cardPath);
+  const bytes = require("node:fs").readFileSync(cardPath);
+  const previewBytes = await p.evaluate(async () => { const r = await fetch(document.querySelector(".memory-card img").src); return (await r.arrayBuffer()).byteLength; });
+  check("saved card is a PNG of 1080 x 1920, byte-for-byte what the preview shows", dl.suggestedFilename().endsWith(".png") && bytes.readUInt32BE(16) === 1080 && bytes.readUInt32BE(20) === 1920 && bytes.length === previewBytes, `${dl.suggestedFilename()} ${bytes.length} vs ${previewBytes}`);
   await p.screenshot({ path: path.join(SHOTS, "desktop-memory.png") });
 
   // Escape closes the card.

@@ -134,6 +134,15 @@ export function createVisitor(layout: WorldLayout, look: VisitorLook) {
       v.pose.bow = lerp(v.pose.bow, bow, Math.min(1, dt * 4));
     },
 
+    /** Standing still at a spot, holding `held` (for the souvenir card): no ring, no walking, no pose. */
+    drawStill(ctx: CanvasRenderingContext2D, x: number, y: number, held?: { hold?: Hold; color?: string; color2?: string; style?: string }) {
+      const d = layout.depth;
+      const s = lerp(d.scaleBack, d.scaleFront, clamp((y - d.yBack) / (d.yFront - d.yBack), 0, 1));
+      drawPerson(ctx, x, y, s * 1.08, v.facing, 0, 0, 1, v.look, {
+        hold: held?.hold, holdColor: held?.color, holdColor2: held?.color2, holdStyle: held?.style,
+      });
+    },
+
     draw(ctx: CanvasRenderingContext2D, t: number) {
       const d = layout.depth;
       const k = clamp((v.y - d.yBack) / (d.yFront - d.yBack), 0, 1);

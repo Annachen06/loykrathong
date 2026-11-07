@@ -715,7 +715,7 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
 .memory-list li { padding: 7px 12px; border-radius: 12px; background: rgba(255, 207, 110, 0.22); font-size: 13.5px; line-height: 1.45; }
 .memory-list strong { font-weight: 500; margin-right: 4px; }
 .memory-card { margin-top: 12px; }
-.memory-card img { display: block; width: 100%; border-radius: 14px; border: 3px solid var(--ink); }
+.memory-card img { display: block; width: min(100%, 300px); height: auto; margin: 0 auto; border-radius: 14px; border: 3px solid var(--ink); }
 
 /* inside the Ferris wheel cabin */
 .ride-view { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.9s; }

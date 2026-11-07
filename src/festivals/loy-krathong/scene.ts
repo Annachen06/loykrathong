@@ -290,7 +290,10 @@ export function createLoyKrathongScene(): Scene {
   };
 
   /** A tiny twinkle now and then, so curious visitors notice they can tap it. */
+  /** True while a still picture of the fair is painted (the souvenir card): no tap hints or tap cues in it. */
+  let still = false;
   function cue(ctx: CanvasRenderingContext2D, x: number, y: number, t: number, offset: number) {
+    if (still) return;
     const k = Math.max(0, Math.sin((t + offset) * 1.3)) ** 6;
     if (k < 0.02) return;
     glow(ctx, x, y, 12, "255,246,220", 0.8 * k);
@@ -1361,7 +1364,7 @@ export function createLoyKrathongScene(): Scene {
 
   /** When you walk near something on the sand that you haven't picked up yet, a small tag says what it is and to tap it. */
   function drawCurioHints(ctx: CanvasRenderingContext2D, t: number) {
-    if (ride.active || stageGuest.active) return;
+    if (still || ride.active || stageGuest.active) return;
     for (const c of config.curios) {
       if (found.has(c.id)) continue;
       const d = dist(you.x, you.y, c.at.x, c.at.y);
@@ -1452,6 +1455,7 @@ export function createLoyKrathongScene(): Scene {
   return {
     paintBack,
     paintFront,
+    setStill(on) { still = on; },
     update,
     drawMiddle,
     drawGround,

@@ -235,6 +235,45 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
       const order = [...scene.actors].sort((p, q) => p.y - q.y);
       for (const act of order) act.draw(c, time);
     },
+    /**
+     * A still picture of the real fair for the souvenir card: the same scenery, lights, water and people as on screen,
+     * with no buttons or menus, painted afresh at the card's own size so it stays sharp. The window is 9:16, `zoom` times
+     * closer than the whole world, centred on `spot` with the ground in the lower part. `who` draws the visitor
+     * (standing still, holding what they chose) in place of the live one.
+     */
+    snapshot(out: HTMLCanvasElement, spot: Point, zoom: number, who: (c: CanvasRenderingContext2D, t: number) => void) {
+      const OW = out.width, OH = out.height;
+      const visH = H / zoom, visW = (visH * OW) / OH;
+      const s = OH / visH;
+      const x0 = clamp(spot.x - visW / 2, 0, Math.max(0, W - visW));
+      // a little of the world's bottom edge may fall below the picture: the card's dark gradient covers that part
+      const y0 = clamp(spot.y - visH * 0.74, 0, H - visH * 0.8);
+      const c = out.getContext("2d")!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.fillStyle = config.layout.skyTop ?? "#000";
+      c.fillRect(0, 0, OW, OH);
+      c.save();
+      c.setTransform(s, 0, 0, s, -x0 * s, -y0 * s);
+      scene.setStill?.(true);
+      scene.paintBack(c);
+      scene.drawMiddle(c, time, { x: x0, y: y0, w: visW, h: visH });
+      scene.paintFront(c);
+      scene.drawGround(c, time, null);
+      const order: { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[] = [...scene.actors];
+      order.push({ y: spot.y, draw: who });
+      order.sort((a, b) => a.y - b.y);
+      for (const a of order) a.draw(c, time);
+      scene.drawTop(c, time);
+      scene.setStill?.(false);
+      c.restore();
+      // below the world's edge: stretch the last bit of sand down (the card's shading covers it)
+      const edge = (H - y0) * s;
+      if (edge < OH - 1) {
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        const strip = Math.min(60, edge);
+        c.drawImage(out, 0, edge - strip, OW, strip, 0, edge, OW, OH - edge);
+      }
+    },
     setHighlight(id: string | null) { highlight = id; },
     ripple(p: Point) { ripples.push({ x: p.x, y: p.y, life: 0 }); },
     setOnFrame(fn: (() => void) | null) { onFrame = fn; },

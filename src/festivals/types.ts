@@ -194,6 +194,8 @@ export type Scene = {
   /** Animated layer over the front scenery but behind people (lights, palms, foam). */
   drawGround(ctx: CanvasRenderingContext2D, t: number, highlight: string | null): void;
   actors: Actor[];
+  /** Optional: while on, the scene leaves out tap hints and cues (used when a still picture of it is painted). */
+  setStill?(on: boolean): void;
   /** Drawn over everyone (sky lanterns, sparkles). */
   drawTop(ctx: CanvasRenderingContext2D, t: number): void;
   /** Runs a place's action. Returns false if the action is unknown. */

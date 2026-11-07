@@ -74,12 +74,18 @@ export default function App() {
   const [bag, setBag] = useState<FairItem[]>([]); // things you're carrying
   const [hand, setHand] = useState<FairItem | null>(null); // the one shown in your hand
   const [ritual, setRitual] = useState<FairItem | null>(null); // briefly held during an activity (the siamsi cup)
+  const cardHoldRef = useRef<FairItem | null>(null);
   const [look, setLook] = useState(config.visitors[0].look);
   const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
   const [muted, setMuted] = useState(false);
   const sfx = useCallback((name: SoundName) => engineRef.current?.sound.play(name), []);
-  const remember = useCallback((m: Partial<Memories> | ((prev: Memories) => Partial<Memories>)) =>
-    setMemories((prev) => ({ ...prev, ...(typeof m === "function" ? m(prev) : m) })), []);
+  // where the visitor last did something worth remembering: the souvenir card is "taken" there
+  const spotRef = useRef<{ x: number; y: number } | null>(null);
+  const remember = useCallback((m: Partial<Memories> | ((prev: Memories) => Partial<Memories>)) => {
+    const v = engineRef.current?.visitor;
+    if (v) spotRef.current = { x: v.x, y: v.y };
+    setMemories((prev) => ({ ...prev, ...(typeof m === "function" ? m(prev) : m) }));
+  }, []);
 
   const say = useCallback((text: string) => setHint({ text, key: Date.now() }), []);
   // what the Ferris wheel cabin view needs each frame: how high you are, where along the beach, and the fair to paint below
@@ -163,6 +169,7 @@ export default function App() {
   const pickUp = useCallback((item: FairItem) => {
     setBag((b) => [...b.filter((i) => i.id !== item.id && !(item.hold === "krathong" && i.hold === "krathong")), item]);
     if (item.hold) setHand(item);
+    if (item.hold === "krathong" || item.hold === "lantern") cardHoldRef.current = item; // the card shows the one you chose
   }, []);
   /** Use something up (a krathong floated, a garland offered). Your hand moves to the next thing you carry. */
   const consume = useCallback((item: FairItem) => {
@@ -171,6 +178,18 @@ export default function App() {
       setHand((h) => (h?.id === item.id ? [...rest].reverse().find((i) => i.hold) ?? null : h));
       return rest;
     });
+  }, []);
+
+  /** Paints the real fair onto the souvenir card: where you last did something, you standing there holding your krathong. */
+  const handRef = useRef(hand);
+  handRef.current = hand;
+  const paintCard = useCallback((canvas: HTMLCanvasElement) => {
+    const e = engineRef.current;
+    if (!e) return;
+    const spot = spotRef.current ?? { x: e.visitor.x, y: e.visitor.y };
+    const item = cardHoldRef.current ?? handRef.current;
+    const held = item?.hold ? { hold: item.hold, color: item.color, color2: item.color2, style: item.style } : undefined;
+    e.renderer.snapshot(canvas, spot, 1.5, (c) => e.visitor.drawStill(c, spot.x, spot.y, held));
   }, []);
 
   const awayMessage = () =>
@@ -523,8 +542,7 @@ export default function App() {
           {openPlace.panel === "memory" && (
             <MemoryCard
               memories={memories}
-              look={look}
-              hand={hand?.hold ? { hold: hand.hold, color: hand.color, color2: hand.color2, style: hand.style } : undefined}
+              paintScene={paintCard}
               brand={config.brand}
               treasureTotal={config.curios.length}
               support={config.support}
