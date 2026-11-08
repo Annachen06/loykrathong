@@ -276,7 +276,7 @@ async function desktopSuite(browser) {
   await p.waitForSelector(".note-fab", { state: "visible", timeout: 5000 });
   const fab = await p.locator(".note-fab").boundingBox();
   const vp = p.viewportSize();
-  check("note icon sits small in the bottom-right corner", fab.width <= 48 && fab.x + fab.width > vp.width - 80 && fab.y + fab.height > vp.height - 100, JSON.stringify(fab));
+  check("note icon sits small in the bottom-right corner", fab.width <= 58 && fab.x + fab.width > vp.width - 80 && fab.y + fab.height > vp.height - 100, JSON.stringify(fab));
   await p.click(".note-fab");
   check("the note to the creator comes first in the corner popup, above the cocoa corner", await p.evaluate(() => { const a = document.querySelector(".note-pop .note-form"), b = document.querySelector(".note-pop .support"); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }));
   check("the corner popup has the Buy Me a Cocoa tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));

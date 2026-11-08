@@ -6,7 +6,7 @@ type Props = {
   hidden: boolean;
 };
 
-const RADIUS = 46; // how far the knob can travel from the centre, in px
+const RADIUS = 36; // how far the knob can travel from the centre, in px
 const DEAD = 0.18; // ignore tiny nudges
 
 /** An on-screen stick for phones and tablets: drag it any way to walk that way; let go to stop. */
