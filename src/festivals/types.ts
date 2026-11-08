@@ -151,7 +151,7 @@ export type FestivalConfig = {
   /** The shared sea: krathongs floated by other visitors show up for everyone, with no names. Off until filled in. */
   shared?: { projectId: string; apiKey: string; collection?: string; pollMs?: number; minGapMs?: number; blocked?: string[]; databaseUrl?: string };
   /** Inviting a friend: the words that go with the link when it is shared. */
-  invite?: { label: string; title: string; text: string; copied: string; failed: string };
+  invite?: { label: string; title: string; text: string; copied: string; failed: string; /** words that go with a link that opens a room to walk together in */ roomText: string; /** the two choices when inviting */ menu: { link: string; linkHint: string; room: string; roomHint: string } };
   mapGroups: { id: string; label: string; icon: string }[];
   /** The "where first?" question shown on arrival. `go` is the place to walk to; leave it out to just start strolling. */
   startChoices: { id: string; icon: string; label: string; text: string; go?: string; hint: string }[];

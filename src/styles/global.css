@@ -828,3 +828,18 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
   background: rgba(20, 18, 70, 0.6); border: 1px solid rgba(255, 244, 226, 0.35); pointer-events: none; transition: opacity 0.4s;
 }
 .room-chip.is-hidden { opacity: 0; }
+
+/* ---------------------------------------------------------------- inviting: two ways */
+.invite-wrap { position: relative; }
+.invite-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; width: min(300px, calc(100vw - 28px)); display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border-radius: 18px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 6px 0 var(--ink); z-index: 8;
+}
+.invite-option {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--ink);
+  background: #fff; color: var(--ink); font: inherit; cursor: pointer; min-height: 48px;
+}
+.invite-option strong { font-size: 14.5px; font-weight: 500; }
+.invite-option span { font-size: 12.5px; opacity: 0.8; line-height: 1.35; }
+.invite-option:hover { background: #ffeef2; }
+.invite-option:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }

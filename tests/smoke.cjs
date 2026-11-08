@@ -338,10 +338,13 @@ async function desktopSuite(browser) {
   // Asking a friend along: the share sheet when there is one, otherwise the link and invitation are copied.
   await p.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
   await p.click(".invite-toggle");
+  check("inviting offers two ways: just share the link, or walk together", (await p.locator(".invite-option").count()) === 2 && (await p.textContent('.invite-option[data-mode="link"]')).includes("แชร์ลิงก์เว็บ") && (await p.textContent('.invite-option[data-mode="room"]')).includes("ชวนมาเดินด้วยกัน"));
+  await p.click('.invite-option[data-mode="link"]');
   const shared = await p.evaluate(() => window.__shared);
-  check("invite shares the link with a short invitation", !!shared && /^http:\/\/localhost:\d+\/\?room=[a-z0-9]{10}$/.test(shared.url) && shared.url.startsWith(BASE) && shared.text.includes("มาลอยกระทงริมทะเลด้วยกันนะ"), JSON.stringify(shared));
+  check("invite shares the plain link with a short invitation (no room)", !!shared && shared.url === BASE && !(await p.$(".invite-menu")) && (await p.locator(".room-chip").count()) === 0 && shared.text.includes("มาลอยกระทงริมทะเลด้วยกันนะ"), JSON.stringify(shared));
   await p.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "share", { value: undefined, configurable: true }); Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t) => { window.__copied = t; } }, configurable: true }); });
   await p.click(".invite-toggle");
+  await p.click('.invite-option[data-mode="link"]');
   await p.waitForSelector(".hint", { timeout: 3000 }).catch(() => {});
   const copied = await p.evaluate(() => window.__copied);
   check("without a share sheet, invite copies the invitation and link and says so", !!copied && copied.includes(BASE) && (await p.textContent(".hint")).includes("คัดลอกลิงก์แล้ว"), String(copied));
@@ -636,6 +639,7 @@ async function friendsSuite(browser) {
   await a.p.evaluate(() => { navigator.share = async (d) => { window.__shared = d; }; });
   check("friends: no room chip until a friend is invited", (await a.p.locator(".room-chip").count()) === 0);
   await a.p.click(".invite-toggle");
+  await a.p.click('.invite-option[data-mode="room"]');
   const link = await a.p.evaluate(() => window.__shared.url);
   check("friends: inviting opens a room and the chip waits for a friend", (await a.p.textContent(".room-chip")).includes("รอเพื่อน") && link.includes("?room="), link);
 

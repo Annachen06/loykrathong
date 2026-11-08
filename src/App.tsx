@@ -88,6 +88,7 @@ export default function App() {
   const friendsRef = useRef<ReturnType<typeof createFriends> | null>(null);
   const [creatorOpen, setCreatorOpen] = useState(false); // the creator's corner (note, cocoa, slip), opened from the map
   const closeCreator = useCallback(() => setCreatorOpen(false), []);
+  const [inviteMenu, setInviteMenu] = useState(false); // the two ways to invite a friend
   const [friendCount, setFriendCount] = useState<number | null>(null);
   const [totals, setTotals] = useState<FairTotals | null>(null); // how many krathongs and lanterns everyone has floated
   const seaMe = useRef({ nonce: Math.random().toString(36).slice(2, 14), last: 0, sent: 0 });
@@ -210,6 +211,15 @@ export default function App() {
     e.renderer.snapshot(canvas, spot, 1.5, (c) => e.visitor.drawStill(c, spot.x, spot.y, held));
   }, []);
 
+  useEffect(() => {
+    if (!inviteMenu) return;
+    const away = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest?.(".invite-wrap")) setInviteMenu(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setInviteMenu(false); };
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    return () => { window.removeEventListener("pointerdown", away); window.removeEventListener("keydown", esc); };
+  }, [inviteMenu]);
+
   /** Open the room (once): friends in it appear in the world, and we appear in theirs. */
   const startFriends = useCallback(() => {
     const e = engineRef.current, room = roomRef.current;
@@ -231,13 +241,17 @@ export default function App() {
   }, [entered, startFriends]);
   useEffect(() => () => { friendsRef.current?.stop(); friendsRef.current = null; }, []);
 
-  /** Ask a friend along: share the link with a short invitation (the share sheet on phones, copy to the clipboard elsewhere). */
-  const invite = useCallback(async () => {
+  /**
+   * Ask a friend along, in one of two ways: "link" just tells them the site exists; "room" opens a room where friends see each other walk.
+   * Either way the link is shared with a short invitation (the share sheet on phones, copy to the clipboard elsewhere).
+   */
+  const invite = useCallback(async (mode: "link" | "room" = "link") => {
     const cfg = config.invite;
     if (!cfg) return;
+    setInviteMenu(false);
     let url = window.location.origin + window.location.pathname;
-    // with a room database set up, the link opens a room where friends see each other walk
-    if (friendsEnabled(sharedCfg)) {
+    // with a room database set up, a room link opens a room where friends see each other walk
+    if (mode === "room" && friendsEnabled(sharedCfg)) {
       const code = roomRef.current ?? newRoomCode();
       roomRef.current = code;
       startFriends();
@@ -246,14 +260,14 @@ export default function App() {
     }
     try {
       if (typeof navigator.share === "function") {
-        await navigator.share({ title: cfg.title, text: cfg.text, url });
+        await navigator.share({ title: cfg.title, text: mode === "room" ? cfg.roomText : cfg.text, url });
         return;
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") return; // they closed the share sheet
     }
     try {
-      await navigator.clipboard.writeText(`${cfg.text} ${url}`);
+      await navigator.clipboard.writeText(`${mode === "room" ? cfg.roomText : cfg.text} ${url}`);
       say(cfg.copied);
     } catch {
       say(cfg.failed);
@@ -577,17 +591,32 @@ export default function App() {
 
       <div className="top-actions">
       {config.invite && (
-        <button
-          type="button"
-          className={`story-toggle invite-toggle ${entered ? "" : "is-hidden"}`}
-          tabIndex={entered ? 0 : -1}
-          aria-label={config.invite.label}
-          title={config.invite.label}
-          onClick={invite}
-        >
-          <span aria-hidden="true">👫</span>
-          <span className="story-toggle-text">ชวนเพื่อน</span>
-        </button>
+        <div className="invite-wrap">
+          <button
+            type="button"
+            className={`story-toggle invite-toggle ${entered ? "" : "is-hidden"}`}
+            tabIndex={entered ? 0 : -1}
+            aria-label={config.invite.label}
+            aria-expanded={friendsEnabled(sharedCfg) ? inviteMenu : undefined}
+            title={config.invite.label}
+            onClick={() => (friendsEnabled(sharedCfg) ? setInviteMenu((o) => !o) : invite("link"))}
+          >
+            <span aria-hidden="true">👫</span>
+            <span className="story-toggle-text">ชวนเพื่อน</span>
+          </button>
+          {inviteMenu && entered && (
+            <div className="invite-menu" role="menu">
+              <button type="button" role="menuitem" className="invite-option" data-mode="link" onClick={() => invite("link")}>
+                <strong>🔗 {config.invite.menu.link}</strong>
+                <span>{config.invite.menu.linkHint}</span>
+              </button>
+              <button type="button" role="menuitem" className="invite-option" data-mode="room" onClick={() => invite("room")}>
+                <strong>👫 {config.invite.menu.room}</strong>
+                <span>{config.invite.menu.roomHint}</span>
+              </button>
+            </div>
+          )}
+        </div>
       )}
       {config.story && (
         <button
@@ -697,7 +726,7 @@ export default function App() {
               memories={memories}
               paintScene={paintCard}
               brand={config.brand}
-              onInvite={config.invite ? invite : undefined}
+              onInvite={config.invite ? () => invite("link") : undefined}
               treasureTotal={config.curios.length}
             />
           )}

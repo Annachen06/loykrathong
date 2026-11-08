@@ -71,9 +71,9 @@ export function createFriends({ cfg, room, layout, me, onCount, onRefused }: Opt
     if (!alive || refused || !joined) return;
     const m = me(), now = Date.now();
     const key = `${Math.round(m.x)},${Math.round(m.y)},${m.f},${m.m}`;
-    // standing still: only a heartbeat now and then
-    if (!force && key === lastSent && now - lastSentAt < (document.hidden ? 5000 : 3000)) return;
-    if (document.hidden && now - lastSentAt < 5000) return;
+    const beat = Math.min(3000, staleMs / 3); // standing still: a heartbeat well inside the time others wait before deciding we left
+    if (!force && key === lastSent && now - lastSentAt < (document.hidden ? beat * 1.5 : beat)) return;
+    if (document.hidden && now - lastSentAt < beat * 1.5) return;
     lastSent = key; lastSentAt = now;
     try {
       const res = await fetch(meUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ x: Math.round(m.x), y: Math.round(m.y), f: m.f, m: m.m, t: now, l: JSON.stringify(m.look) }) });
