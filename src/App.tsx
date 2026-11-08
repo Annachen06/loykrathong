@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { activeFestival } from "./festivals";
 import type { FairItem, Scene, VisitorLook } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
-import { cleanWish, createSharedSea, sharedEnabled, type SharedConfig } from "./engine/sharedSea";
+import { cleanWish, createSharedSea, sharedEnabled, type FairTotals, type SharedConfig } from "./engine/sharedSea";
 import { createVisitor, type Visitor } from "./engine/visitor";
 import { createSound, type Sound, type SoundName } from "./engine/sound";
 import { dist } from "./engine/math";
@@ -82,6 +82,7 @@ export default function App() {
   const sharedCfg: SharedConfig | undefined = { ...config.shared, ...(window as unknown as { __FAIR_SHARED__?: SharedConfig }).__FAIR_SHARED__ };
   const sharedOn = sharedEnabled(sharedCfg);
   const seaRef = useRef<ReturnType<typeof createSharedSea> | null>(null);
+  const [totals, setTotals] = useState<FairTotals | null>(null); // how many krathongs and lanterns everyone has floated
   const seaMe = useRef({ nonce: Math.random().toString(36).slice(2, 14), last: 0, sent: 0 });
   const [look, setLook] = useState(config.visitors[0].look);
   const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
@@ -229,13 +230,16 @@ export default function App() {
     seaRef.current = sea;
     let latest = 0, alive = true;
     const scene = engineRef.current?.scene;
-    sea.latest(40).then((items) => {
+    const loadTotals = () => sea.totals().then((t) => alive && setTotals((old) => (old ? { k: Math.max(old.k, t.k), l: Math.max(old.l, t.l) } : t))).catch(() => {});
+    loadTotals();
+    sea.latest(100).then((items) => {
       if (!alive) return;
       for (const k of items) latest = Math.max(latest, k.t);
       scene?.addShared?.(items.filter((k) => k.c !== seaMe.current.nonce).map((k) => ({ style: k.s, color: k.l, wish: k.w })), false);
     }).catch(() => {});
     const timer = window.setInterval(() => {
       if (document.hidden || !latest) return;
+      loadTotals();
       sea.since(latest).then((items) => {
         if (!alive || !items.length) return;
         for (const k of items) latest = Math.max(latest, k.t);
@@ -460,6 +464,8 @@ export default function App() {
         // the wish goes out only if its owner agreed AND it is plain kind words (no contact details, no blocked words)
         const shown = share && wish ? cleanWish(wish, sharedCfg?.blocked) : "";
         if (share && wish && !shown) window.setTimeout(() => say("คำอธิษฐานนี้มีข้อมูลที่อาจบอกตัวตนได้ จึงเก็บไว้แค่ในเครื่องคุณ"), 3800);
+        seaRef.current.count("k").catch(() => {});
+        setTotals((t) => (t ? { ...t, k: t.k + 1 } : t));
         seaRef.current.publish({ s: k.id, l: k.color ?? "#ffcf4a", t: now, c: me.nonce, ...(shown ? { w: shown } : {}) }).catch(() => {});
       }
       remember((m) => ({ wishes: [...m.wishes, wish] }));
@@ -480,6 +486,10 @@ export default function App() {
       setRitual(null);
       e.scene.runAction("lanterns", "release", e.visitor, { wish, flower: lantern.color, style: lantern.style, color2: lantern.color2 });
       remember((m) => ({ lanterns: [...m.lanterns, wish] }));
+      if (seaRef.current) {
+        seaRef.current.count("l").catch(() => {});
+        setTotals((t) => (t ? { ...t, l: t.l + 1 } : t));
+      }
       say(`ปล่อย${lantern.name}ลอยขึ้นฟ้าแล้ว แตะที่โคมเพื่ออ่านคำอธิษฐานได้นะ`);
     }, 2700);
   };
@@ -600,6 +610,11 @@ export default function App() {
         hidden={!entered || asking || ride.view}
         ui={config.ui}
       />
+      {totals && entered && !ride.view && (
+        <p className={`fair-count${asking || openPlace || story ? " is-hidden" : ""}`} aria-label="จำนวนกระทงและโคมที่ทุกคนลอยแล้ว">
+          <span>🪷 กระทง {totals.k.toLocaleString("th-TH")}</span><span>🏮 โคม {totals.l.toLocaleString("th-TH")}</span>
+        </p>
+      )}
       <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view || story} />
       <NoteButton support={config.support} inbox={sharedCfg} hidden={!entered || asking || !!openPlace || ride.view || story} />
       {config.story && <StorySheet story={config.story} open={story} onClose={() => setStory(false)} />}

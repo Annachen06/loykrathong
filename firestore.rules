@@ -5,7 +5,7 @@ service cloud.firestore {
     // A krathong is a kind, a colour, a time, a throwaway tag, and (only if its owner agreed) a short wish.
     // There is never a name or anything that says whose it is.
     match /krathongs/{id} {
-      allow read: if request.query.limit <= 60;
+      allow read: if request.query.limit <= 120;
       allow create: if request.resource.data.keys().hasOnly(['s', 'l', 't', 'c', 'w'])
         && request.resource.data.keys().hasAll(['s', 'l', 't', 'c'])
         && request.resource.data.s in ['banana', 'lotus', 'bread', 'coconut', 'gold', 'moon', 'swan']
@@ -45,6 +45,21 @@ service cloud.firestore {
         && request.resource.data.t < request.time.toMillis() + 600000;
       allow read, delete: if isCreator();
       allow update: if false;
+    }
+
+    // How many krathongs (k) and lanterns (l) everyone has floated. Anyone may add one at a time; nobody can lower it or set it.
+    function step(field) {
+      return request.resource.data.get(field, 0) is int
+        && request.resource.data.get(field, 0) - resource.data.get(field, 0) >= 0
+        && request.resource.data.get(field, 0) - resource.data.get(field, 0) <= 1;
+    }
+    match /stats/total {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['k', 'l'])
+        && request.resource.data.get('k', 0) is int && request.resource.data.get('k', 0) >= 0 && request.resource.data.get('k', 0) <= 1
+        && request.resource.data.get('l', 0) is int && request.resource.data.get('l', 0) >= 0 && request.resource.data.get('l', 0) <= 1;
+      allow update: if request.resource.data.keys().hasOnly(['k', 'l']) && step('k') && step('l');
+      allow delete: if false;
     }
   }
 }

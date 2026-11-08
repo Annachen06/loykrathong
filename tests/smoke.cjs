@@ -48,8 +48,21 @@ async function panelTitle(p) {
   return el ? el.textContent() : null;
 }
 
+// The real database is out of reach from here: answer politely (an empty sea, no totals yet) so nothing logs errors.
+async function quietDatabase(ctx) {
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, POST, OPTIONS" };
+  await ctx.route("https://firestore.googleapis.com/**", (route) => {
+    const req = route.request(), url = req.url();
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    if (url.includes(":runQuery")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify([{ readTime: "x" }]) });
+    if (url.includes(":batchGet")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify([{ missing: "x" }]) });
+    return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: "{}" });
+  });
+}
+
 async function desktopSuite(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await quietDatabase(ctx);
   const p = await ctx.newPage();
   const errors = [];
   p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -276,7 +289,7 @@ async function desktopSuite(browser) {
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: inboxCors });
     const m = req.url().match(/\/documents\/(slips|notes)\?/);
     if (req.method() === "POST" && m) { sent[m[1]] = JSON.parse(req.postData() || "{}"); return route.fulfill({ status: 200, headers: inboxCors, contentType: "application/json", body: "{}" }); }
-    return route.continue();
+    return route.fallback();
   });
   await p.click('.slip button:has-text("ส่งสลิปโกโก้ได้ที่นี่")');
   await p.fill('.slip .slip-form textarea[name="message"]', "ขอบคุณค่ะ");
@@ -476,15 +489,18 @@ async function sharedSuite(browser) {
   const doc = (st, lo, t, c = "other", w) => ({ document: { fields: { s: { stringValue: st }, l: { stringValue: lo }, t: { integerValue: String(t) }, c: { stringValue: c }, ...(w ? { w: { stringValue: w } } : {}) } } });
   const now = Date.now();
   const older = [doc("gold", "#fff1b0", now - 5000, "o1", "ขอให้ทุกคนมีความสุข"), doc("moon", "#e8e0ff", now - 4000, "o2", "ติดต่อฉันที่ line:abc123 หรือ 0812345678"), doc("lotus", "#ff9ec0", now - 3000, "o3", "ไอ้เหี้ยทั้งหลาย"), doc("evil<script>", "#ff9ec0", now - 2000), doc("lotus", "javascript:1", now - 1000)];
-  let created = null, later = [], queries = 0;
-  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
+  let created = null, later = [], queries = 0, bumps = [], totalsNow = { k: 120, l: 45 }, limits = [];
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, POST, OPTIONS" };
   await p.route("https://firestore.googleapis.com/**", async (route) => {
     const req = route.request();
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     const url = req.url(), body = JSON.parse(req.postData() || "{}");
+    if (url.includes(":batchGet")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify([{ found: { fields: { k: { integerValue: String(totalsNow.k) }, l: { integerValue: String(totalsNow.l) } } } }]) });
+    if (url.includes(":commit")) { bumps.push(body.writes?.[0]?.transform?.fieldTransforms?.[0]); return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: "{}" }); }
     if (url.includes(":runQuery")) {
       queries++;
       const sq = body.structuredQuery;
+      if (sq.limit) limits.push(sq.limit);
       const rows = sq.where ? later : older;
       return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(rows.length ? rows : [{ readTime: "x" }]) });
     }
@@ -501,6 +517,9 @@ async function sharedSuite(browser) {
   check("shared sea: krathongs others floated appear on the water", fl.length === 3 && fl.some((k) => k.style === "gold") && fl.some((k) => k.style === "moon"), JSON.stringify(fl.map((k) => k.style)));
   check("shared sea: odd or unsafe data from outside is ignored", !fl.some((k) => !/^#[0-9a-f]{6}$/i.test(k.lotus)) && !fl.some((k) => String(k.style).includes("<")));
   check("shared sea: a shared wish can be read, but one with contact details or a blocked word is dropped (the krathong stays)", fl.find((k) => k.style === "gold").wish === "ขอให้ทุกคนมีความสุข" && fl.find((k) => k.style === "moon").wish === "" && fl.filter((k) => k.style === "lotus")[0].wish === "" && fl.every((k) => !k.mine));
+  check("shared sea: arriving fills the water from the latest 100 floated", limits.includes(100), JSON.stringify(limits));
+  const chip = await p.textContent(".fair-count").catch(() => "");
+  check("everyone's totals show: krathongs and lanterns floated so far", chip.includes("120") && chip.includes("45"), chip);
   // a new krathong arrives from someone else while you are here
   later = [doc("coconut", "#fffaf0", Date.now() + 100)];
   await p.waitForFunction(() => window.__fair.scene.debug().floaters.filter((k) => k.shared).length >= 4, null, { timeout: 8000 }).catch(() => {});
@@ -529,11 +548,18 @@ async function sharedSuite(browser) {
   await p.waitForTimeout(2600);
   let keys = created ? Object.keys(created.fields).sort().join(",") : "";
   check("shared sea: a shared wish goes out with only kind, colour, time, throwaway tag and the wish", keys === "c,l,s,t,w" && created.fields.w.stringValue === "ขอให้ฝนไม่ตกวันลอยกระทง" && created.fields.s.stringValue === "banana", JSON.stringify(created));
+  check("floating a krathong adds one to the krathong count, on screen and in the database", bumps.some((b) => b?.fieldPath === "k" && b.increment?.integerValue === "1") && (await p.textContent(".fair-count")).includes("121"), JSON.stringify(bumps));
   let c2 = await floatOnce("ขอให้เป็นความลับ", false);
   check("shared sea: with the box unticked the wish never leaves the device", !!c2 && Object.keys(c2.fields).sort().join(",") === "c,l,s,t" && !JSON.stringify(c2).includes("ความลับ"), JSON.stringify(c2));
   let c3 = await floatOnce("โทรหาฉัน 0812345678", true);
   check("shared sea: a wish with a phone number is kept private even if ticked", !!c3 && !c3.fields.w, JSON.stringify(c3));
   check("shared sea: …and the person is told why", (await p.textContent(".hint").catch(() => "")).length >= 0 && (await p.waitForFunction(() => document.querySelector(".hint")?.textContent.includes("เก็บไว้แค่ในเครื่องคุณ"), null, { timeout: 6000 }).then(() => true).catch(() => false)));
+  await viaMap(p, "ลานปล่อยโคม");
+  await p.waitForSelector(".lantern-colors", { timeout: 20000 });
+  await p.fill("#lantern-wish", "ขอให้ทุกคนสบายดี");
+  await p.click(".float-form .panel-action");
+  await p.waitForTimeout(3800);
+  check("releasing a lantern adds one to the lantern count, on screen and in the database", bumps.some((b) => b?.fieldPath === "l") && (await p.textContent(".fair-count")).includes("46"), JSON.stringify(bumps));
   const before = queries;
   await p.waitForTimeout(3200);
   fl = await p.evaluate(() => window.__fair.scene.debug().floaters);
@@ -560,6 +586,7 @@ async function sharedSuite(browser) {
 
 async function phoneSuite(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  await quietDatabase(ctx);
   const p = await ctx.newPage();
   const errors = [];
   p.on("pageerror", (e) => errors.push(String(e)));
@@ -633,6 +660,7 @@ async function phoneSuite(browser) {
 
 async function reducedMotionSuite(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, reducedMotion: "reduce" });
+  await quietDatabase(ctx);
   const p = await ctx.newPage();
   const errors = [];
   p.on("pageerror", (e) => errors.push(String(e)));
