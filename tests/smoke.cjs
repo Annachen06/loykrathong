@@ -667,9 +667,11 @@ async function friendsSuite(browser) {
 
   // a full room refuses a seventh
   for (let i = 0; i < 6; i++) rooms.fullroom1 = { ...(rooms.fullroom1 ?? {}), [`p${i}xxxxxx`]: { x: 500, y: 800, f: 1, m: false, t: Date.now() + i, l: JSON.stringify({ skin: "#eec1a0", hair: "#000", top: "#fff", bottom: "#fff", accent: "#fff", outline: "#000", figure: "neutral", outfit: "dress", hairStyle: "bun" }) } };
+  const busy = setInterval(() => { for (const k of Object.keys(rooms.fullroom1 ?? {})) rooms.fullroom1[k].t = Date.now(); }, 200); // six people still here
   const c = await open(`${BASE}?room=fullroom1`);
-  await c.p.waitForFunction(() => document.querySelector(".room-chip")?.textContent.includes("เต็ม"), null, { timeout: 6000 }).catch(() => {});
+  await c.p.waitForFunction(() => document.querySelector(".room-chip")?.textContent.includes("เต็ม"), null, { timeout: 9000 }).catch(() => {});
   check("friends: a full room says so and nobody is shown", (await c.p.textContent(".room-chip").catch(() => "")).includes("ห้องนี้เต็มแล้ว") && (await c.p.evaluate(() => window.__fair.friends().length)) === 0, JSON.stringify({ chip: await c.p.textContent(".room-chip").catch(() => "none"), url: c.p.url(), room: Object.keys(rooms.fullroom1 ?? {}).length }));
+  clearInterval(busy);
   await c.ctx.close();
 }
 

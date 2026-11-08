@@ -60,7 +60,7 @@ export function createFriends({ cfg, room, layout, me, onCount, onRefused }: Opt
   const meUrl = `${base}/rooms/${room}/${id}.json`;
   const pollMs = cfg.friendPollMs ?? 700, sendMs = cfg.friendSendMs ?? 600, staleMs = cfg.friendStaleMs ?? 15000;
   const friends = new Map<string, Friend>();
-  let timers: number[] = [], alive = false, refused = false, counted = -1, lastSent = "", lastSentAt = 0, lastFrame = 0;
+  let timers: number[] = [], alive = false, refused = false, joined = false, startedAt = 0, counted = -1, lastSent = "", lastSentAt = 0, lastFrame = 0;
 
   const report = () => {
     if (refused) return;
@@ -68,7 +68,7 @@ export function createFriends({ cfg, room, layout, me, onCount, onRefused }: Opt
   };
 
   const send = async (force = false) => {
-    if (!alive || refused) return;
+    if (!alive || refused || !joined) return;
     const m = me(), now = Date.now();
     const key = `${Math.round(m.x)},${Math.round(m.y)},${m.f},${m.m}`;
     // standing still: only a heartbeat now and then
@@ -90,8 +90,10 @@ export function createFriends({ cfg, room, layout, me, onCount, onRefused }: Opt
       if (refused || !alive) return; // turned away (or left) while asking
       const now = performance.now();
       const here = new Set<string>();
+      let occupied = 0;
       for (const [pid, p] of Object.entries(data ?? {})) {
         if (pid === id || !p || typeof p !== "object") continue;
+        occupied++;
         const x = Number(p.x), y = Number(p.y), t = Number(p.t);
         const look = cleanLook(p.l);
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(t) || !look || (p.f !== 1 && p.f !== -1)) continue;
@@ -100,10 +102,15 @@ export function createFriends({ cfg, room, layout, me, onCount, onRefused }: Opt
         if (t !== fr.last) { fr.last = t; fr.seen = now; }
         fr.tx = clamp(x, 0, layout.width); fr.ty = clamp(y, 0, layout.height); fr.f = p.f; fr.m = p.m === true; fr.look = look;
         // someone who stopped sending (closed the tab) is gone after a while, and their slot is freed
-        if (now - fr.seen > staleMs) { friends.delete(pid); fetch(`${base}/rooms/${room}/${pid}.json`, { method: "DELETE" }).catch(() => {}); continue; }
+        if (now - fr.seen > staleMs) { occupied--; friends.delete(pid); fetch(`${base}/rooms/${room}/${pid}.json`, { method: "DELETE" }).catch(() => {}); continue; }
         here.add(pid);
       }
       for (const pid of [...friends.keys()]) if (!here.has(pid)) friends.delete(pid);
+      // the room holds only so many people: wait a moment for the ones who left without a goodbye to clear, then give up
+      if (!joined) {
+        if (occupied < MAX_IN_ROOM) { joined = true; send(true); }
+        else if (performance.now() - startedAt > staleMs + pollMs * 3) { refused = true; timers.forEach((t) => window.clearInterval(t)); timers = []; friends.clear(); onRefused?.(); return; }
+      }
       report();
     } catch { /* offline for a moment */ }
   };
@@ -115,7 +122,7 @@ export function createFriends({ cfg, room, layout, me, onCount, onRefused }: Opt
     start() {
       if (alive) return;
       alive = true;
-      send(true);
+      startedAt = performance.now();
       poll();
       timers = [window.setInterval(send, sendMs), window.setInterval(poll, pollMs)];
       window.addEventListener("pagehide", leave);
