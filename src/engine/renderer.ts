@@ -53,6 +53,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   let last = 0;
   let time = 0;
   let onFrame: (() => void) | null = null;
+  let crowd: (() => { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[]) | null = null;
 
   function cameraTarget() {
     // the scene can take over the camera, e.g. to ride along in a Ferris wheel cabin
@@ -198,6 +199,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     // Draw people and creatures back-to-front so nearer ones overlap farther ones.
     const order: { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[] = [...scene.actors];
     if (!scene.visitorAway()) order.push({ y: visitor.y, draw: (c, tt) => visitor.draw(c, tt) });
+    if (crowd && !scene.visitorAway()) order.push(...crowd());
     order.sort((a, b) => a.y - b.y);
     for (const a of order) a.draw(ctx, time);
 
@@ -277,6 +279,8 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
     setHighlight(id: string | null) { highlight = id; },
     ripple(p: Point) { ripples.push({ x: p.x, y: p.y, life: 0 }); },
     setOnFrame(fn: (() => void) | null) { onFrame = fn; },
+    /** Extra people to draw with the visitor, such as friends who joined the same room. */
+    setCrowd(fn: (() => { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[]) | null) { crowd = fn; },
     toWorld: (sx: number, sy: number): Point => ({ x: sx / (view.scale * view.zoom) + cam.x, y: sy / (view.scale * view.zoom) + cam.y }),
     toScreen: (wx: number, wy: number): Point => ({ x: (wx - cam.x) * view.scale * view.zoom, y: (wy - cam.y) * view.scale * view.zoom }),
     view,

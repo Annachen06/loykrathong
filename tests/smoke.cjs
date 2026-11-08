@@ -51,6 +51,11 @@ async function panelTitle(p) {
 // The real database is out of reach from here: answer politely (an empty sea, no totals yet) so nothing logs errors.
 async function quietDatabase(ctx) {
   const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, POST, OPTIONS" };
+  await ctx.route("https://*.firebasedatabase.app/**", (route) => {
+    const req = route.request();
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: req.method() === "GET" ? "null" : "{}" });
+  });
   await ctx.route("https://firestore.googleapis.com/**", (route) => {
     const req = route.request(), url = req.url();
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
@@ -123,7 +128,7 @@ async function desktopSuite(browser) {
   check("map button is large and alone (no extra shortcut buttons)", (await p.locator(".dock-row button:visible").count()) === 1 && (await p.locator(".map-toggle").boundingBox()).height >= 48);
   check("no on-screen stick on a desktop with a mouse", !(await p.isVisible(".joystick")));
   await p.click(".map-toggle");
-  check("map lists every place as a tile, in sections", (await p.locator(".map-sheet ul button").count()) === (await places(p)).length && (await p.locator(".map-sheet h3").count()) === 3);
+  check("map lists every place as a tile, in sections", (await p.locator(".map-sheet section:not(.map-extra) ul button").count()) === (await places(p)).length && (await p.locator(".map-sheet section:not(.map-extra) h3").count()) === 3);
   // tap the sand just beside the visitor (the sky would send them out onto the pier)
   const beside = await p.evaluate(() => { const v = window.__fair.visitor; return window.__fair.renderer.toScreen(v.x - 80, v.y + 10); });
   await p.mouse.click(beside.x, beside.y);
@@ -271,13 +276,14 @@ async function desktopSuite(browser) {
   await p.keyboard.press("Escape");
   check("Escape closes the card", !(await p.$(".panel")));
 
-  // A small icon in the bottom-right corner opens a note to the creator: only a message, saved to the creator's inbox.
+  // The map's last section opens the creator's corner: only a message, saved to the creator's inbox.
   let notePosted = null;
-  await p.waitForSelector(".note-fab", { state: "visible", timeout: 5000 });
-  const fab = await p.locator(".note-fab").boundingBox();
-  const vp = p.viewportSize();
-  check("note icon sits small in the bottom-right corner", fab.width <= 58 && fab.x + fab.width > vp.width - 80 && fab.y + fab.height > vp.height - 100, JSON.stringify(fab));
-  await p.click(".note-fab");
+  check("no floating cup button any more", (await p.locator(".note-fab").count()) === 0);
+  await p.click(".map-toggle");
+  check("the map has a 'send encouragement to the creator' section", (await p.textContent(".map-extra h3")).includes("ส่งกำลังใจให้ผู้สร้าง"));
+  await p.click(".map-extra .tile");
+  await p.waitForSelector(".note-pop", { timeout: 3000 }).catch(() => {});
+  check("its tile opens the creator's corner and closes the map", (await p.isVisible(".note-pop")) && !(await p.$(".dock.is-open")) && (await p.textContent(".note-title")).includes("ส่งกำลังใจให้ผู้สร้าง"));
   check("the note to the creator comes first in the corner popup, above the cocoa corner", await p.evaluate(() => { const a = document.querySelector(".note-pop .note-form"), b = document.querySelector(".note-pop .support"); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }));
   check("the corner popup has the Buy Me a Cocoa tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
   // the tip corner's slip form: only images are accepted, and the picture is shrunk and saved to the inbox
@@ -315,8 +321,8 @@ async function desktopSuite(browser) {
   check("note to the creator is saved to the creator's inbox and says thanks", !!noteDoc && noteDoc.m?.stringValue === "ชอบมากเลยค่ะ ขอบคุณที่ทำให้" && Object.keys(noteDoc).sort().join() === "m,t" && (await p.isVisible(".note-pop > .slip-thanks")), JSON.stringify(noteDoc)?.slice(0, 100));
   await p.screenshot({ path: path.join(SHOTS, "desktop-note.png") });
   await p.unroute("https://firestore.googleapis.com/**");
-  await p.click(".note-fab");
-  check("the note icon closes the note again", !(await p.$(".note-pop")));
+  await p.click(".note-close");
+  check("the close button closes the creator's corner", !(await p.$(".note-pop")));
 
   // The story button in the top corner opens the story over the world and the world keeps working underneath.
   await p.click(".story-toggle:not(.invite-toggle)");
@@ -333,7 +339,7 @@ async function desktopSuite(browser) {
   await p.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
   await p.click(".invite-toggle");
   const shared = await p.evaluate(() => window.__shared);
-  check("invite shares the link with a short invitation", !!shared && shared.url === BASE && shared.text.includes("มาลอยกระทงริมทะเลด้วยกันนะ"), JSON.stringify(shared));
+  check("invite shares the link with a short invitation", !!shared && /^http:\/\/localhost:\d+\/\?room=[a-z0-9]{10}$/.test(shared.url) && shared.url.startsWith(BASE) && shared.text.includes("มาลอยกระทงริมทะเลด้วยกันนะ"), JSON.stringify(shared));
   await p.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "share", { value: undefined, configurable: true }); Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t) => { window.__copied = t; } }, configurable: true }); });
   await p.click(".invite-toggle");
   await p.waitForSelector(".hint", { timeout: 3000 }).catch(() => {});
@@ -356,7 +362,7 @@ async function desktopSuite(browser) {
   await p.waitForTimeout(300);
   sp = await toScreen(p, (boutique.hitArea.x0 + boutique.hitArea.x1) / 2, boutique.hitArea.y1 - 30);
   await p.mouse.click(sp.x, sp.y);
-  await p.waitForSelector(".panel h2", { timeout: 15000 });
+  await p.waitForSelector(".panel h2", { timeout: 15000 }).catch(async () => { await p.screenshot({ path: path.join(SHOTS, "debug-boutique.png") }); });
   check("clicking the boutique artwork walks there and opens it", (await panelTitle(p)) === "ร้านกระทง");
 
   // Clicking the glowing marker visits too.
@@ -584,6 +590,89 @@ async function sharedSuite(browser) {
   await ctx2.close();
 }
 
+// Walking together: two visitors who open the same room link see each other's characters.
+async function friendsSuite(browser) {
+  const DB = "https://test-rtdb.firebasedatabase.app";
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, PUT, DELETE, OPTIONS" };
+  const rooms = {}; // room → peer → data, shared by both browsers like the real database
+  let puts = 0;
+  const route = async (ctx) => {
+    await ctx.addInitScript((db) => { window.__FAIR_SHARED__ = { projectId: "", apiKey: "", databaseUrl: db, friendPollMs: 300, friendSendMs: 250, friendStaleMs: 2500 }; }, DB);
+    await ctx.route(`${DB}/**`, async (r) => {
+      const req = r.request();
+      if (req.method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      const m = new URL(req.url()).pathname.match(/^\/rooms\/([^/]+?)(?:\/([^/]+?))?\.json$/);
+      if (!m) return r.fulfill({ status: 404, headers: cors, body: "" });
+      const [, room, peer] = m;
+      const json = (o, status = 200) => r.fulfill({ status, headers: cors, contentType: "application/json", body: JSON.stringify(o) });
+      if (req.method() === "GET") return json(rooms[room] ?? null);
+      if (!peer) return json({ error: "Permission denied" }, 401);
+      if (req.method() === "PUT") {
+        const there = rooms[room] ?? {};
+        if (!there[peer] && Object.keys(there).length >= 6) return json({ error: "Permission denied" }, 401);
+        puts++;
+        rooms[room] = { ...there, [peer]: JSON.parse(req.postData() || "{}") };
+        return json({});
+      }
+      if (req.method() === "DELETE") { if (rooms[room]) delete rooms[room][peer]; return json(null); }
+      return json({});
+    });
+  };
+  const open = async (url) => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await route(ctx);
+    const p = await ctx.newPage();
+    p.__errors = [];
+    p.on("pageerror", (e) => p.__errors.push(String(e)));
+    await p.goto(url);
+    await p.waitForFunction(() => !!window.__fair);
+    await p.click(".intro-enter");
+    await p.waitForTimeout(800);
+    await p.click('.start-option[data-start="stroll"]');
+    return { ctx, p };
+  };
+
+  const a = await open(BASE);
+  await a.p.evaluate(() => { navigator.share = async (d) => { window.__shared = d; }; });
+  check("friends: no room chip until a friend is invited", (await a.p.locator(".room-chip").count()) === 0);
+  await a.p.click(".invite-toggle");
+  const link = await a.p.evaluate(() => window.__shared.url);
+  check("friends: inviting opens a room and the chip waits for a friend", (await a.p.textContent(".room-chip")).includes("รอเพื่อน") && link.includes("?room="), link);
+
+  const b = await open(link);
+  await a.p.waitForFunction(() => document.querySelector(".room-chip")?.textContent.includes("1 คน"), null, { timeout: 8000 }).catch(() => {});
+  await b.p.waitForFunction(() => document.querySelector(".room-chip")?.textContent.includes("1 คน"), null, { timeout: 8000 }).catch(() => {});
+  check("friends: both see one friend", (await a.p.textContent(".room-chip")).includes("1 คน") && (await b.p.textContent(".room-chip")).includes("1 คน"));
+  const room = Object.keys(rooms)[0];
+  const sent = Object.values(rooms[room] ?? {})[0] ?? {};
+  check("friends: only position, facing, walking, time and look are sent", Object.keys(sent).sort().join() === "f,l,m,t,x,y" && sent.l.length < 700, Object.keys(sent).join());
+
+  // A walks; B sees A's character follow
+  const target = await a.p.evaluate(() => { const v = window.__fair.visitor; v.walkTo({ x: v.x - 260, y: v.y }); return { x: v.x - 260 }; });
+  await a.p.waitForTimeout(3500);
+  const aState = await a.p.evaluate(() => window.__fair.visitor.x);
+  const seen = await b.p.evaluate(() => window.__fair.friends());
+  check("friends: when one walks, the other sees them move to the same place", seen.length === 1 && Math.abs(seen[0].x - aState) < 12, JSON.stringify({ aState, seen }));
+  await b.p.screenshot({ path: path.join(SHOTS, "desktop-friends.png") });
+
+  // odd data from outside is ignored; someone who stops sending disappears
+  rooms[room].evil = { x: 100, y: 800, f: 1, m: false, t: 1, l: JSON.stringify({ skin: "red;}", hair: "#000", top: "#fff", bottom: "#fff", accent: "#fff", outline: "#000", figure: "neutral", outfit: "dress", hairStyle: "bun" }) };
+  await b.p.waitForTimeout(900);
+  check("friends: a character with odd colours is ignored", (await b.p.evaluate(() => window.__fair.friends().length)) === 1);
+  await a.ctx.close();
+  await b.p.waitForFunction(() => window.__fair.friends().length === 0, null, { timeout: 8000 }).catch(() => {});
+  check("friends: when a friend leaves, their character disappears", (await b.p.evaluate(() => window.__fair.friends().length)) === 0 && (await b.p.textContent(".room-chip")).includes("รอเพื่อน"));
+  check("friends: no errors", a.p.__errors.length === 0 && b.p.__errors.length === 0, [...a.p.__errors, ...b.p.__errors].join(" | "));
+  await b.ctx.close();
+
+  // a full room refuses a seventh
+  for (let i = 0; i < 6; i++) rooms.fullroom1 = { ...(rooms.fullroom1 ?? {}), [`p${i}xxxxxx`]: { x: 500, y: 800, f: 1, m: false, t: Date.now() + i, l: JSON.stringify({ skin: "#eec1a0", hair: "#000", top: "#fff", bottom: "#fff", accent: "#fff", outline: "#000", figure: "neutral", outfit: "dress", hairStyle: "bun" }) } };
+  const c = await open(`${BASE}?room=fullroom1`);
+  await c.p.waitForFunction(() => document.querySelector(".room-chip")?.textContent.includes("เต็ม"), null, { timeout: 6000 }).catch(() => {});
+  check("friends: a full room says so and nobody is shown", (await c.p.textContent(".room-chip").catch(() => "")).includes("ห้องนี้เต็มแล้ว") && (await c.p.evaluate(() => window.__fair.friends().length)) === 0, JSON.stringify({ chip: await c.p.textContent(".room-chip").catch(() => "none"), url: c.p.url(), room: Object.keys(rooms.fullroom1 ?? {}).length }));
+  await c.ctx.close();
+}
+
 async function phoneSuite(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   await quietDatabase(ctx);
@@ -682,10 +771,15 @@ async function reducedMotionSuite(browser) {
   const server = await startServer();
   const browser = await chromium.launch();
   try {
-    await desktopSuite(browser);
-    await sharedSuite(browser);
-    await phoneSuite(browser);
-    await reducedMotionSuite(browser);
+    if (process.env.ONLY !== "friends") {
+      await desktopSuite(browser);
+      await sharedSuite(browser);
+    }
+    await friendsSuite(browser);
+    if (process.env.ONLY !== "friends") {
+      await phoneSuite(browser);
+      await reducedMotionSuite(browser);
+    }
   } catch (e) {
     check("test run finished without crashing", false, String(e));
   } finally {

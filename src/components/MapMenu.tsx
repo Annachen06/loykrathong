@@ -10,13 +10,15 @@ type Props = {
   onOpen?: () => void;
   hidden: boolean;
   ui: FestivalConfig["ui"];
+  /** A last section that is not a place (such as the creator's corner): a heading and a tile that does something. */
+  extra?: { heading: string; icon: string; label: string; onClick: () => void };
 };
 
 /**
  * The map: a big, always-visible "แผนที่งาน" button.
  * It opens a sheet of everywhere in the fair, in sections (merit, stroll, float), each place a large tile with a picture.
  */
-export function MapMenu({ places, groups, active, onVisit, onOpen, hidden, ui }: Props) {
+export function MapMenu({ places, groups, active, onVisit, onOpen, hidden, ui, extra }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLElement>(null);
 
@@ -57,6 +59,19 @@ export function MapMenu({ places, groups, active, onVisit, onOpen, hidden, ui }:
               </section>
             );
           })}
+          {extra && (
+            <section className="map-extra">
+              <h3><span aria-hidden="true">{extra.icon}</span> {extra.heading}</h3>
+              <ul>
+                <li>
+                  <button type="button" className="tile tile-extra" onClick={() => { setOpen(false); extra.onClick(); }}>
+                    <span className="tile-icon" aria-hidden="true">{extra.icon}</span>
+                    <span className="tile-name">{extra.label}</span>
+                  </button>
+                </li>
+              </ul>
+            </section>
+          )}
         </div>
       )}
       <div className="dock-row">

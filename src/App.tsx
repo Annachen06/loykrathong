@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { activeFestival } from "./festivals";
 import type { FairItem, Scene, VisitorLook } from "./festivals/types";
 import { createRenderer, type Renderer } from "./engine/renderer";
+import { createFriends, friendsEnabled, newRoomCode, validRoom } from "./engine/friends";
 import { cleanWish, createSharedSea, sharedEnabled, type FairTotals, type SharedConfig } from "./engine/sharedSea";
 import { createVisitor, type Visitor } from "./engine/visitor";
 import { createSound, type Sound, type SoundName } from "./engine/sound";
@@ -82,6 +83,12 @@ export default function App() {
   const sharedCfg: SharedConfig | undefined = { ...config.shared, ...(window as unknown as { __FAIR_SHARED__?: SharedConfig }).__FAIR_SHARED__ };
   const sharedOn = sharedEnabled(sharedCfg);
   const seaRef = useRef<ReturnType<typeof createSharedSea> | null>(null);
+  // walking together: the room from an invitation link (or one made when inviting), and how many friends are in it
+  const roomRef = useRef<string | null>((() => { try { const r = new URLSearchParams(window.location.search).get("room"); return validRoom(r) ? r : null; } catch { return null; } })());
+  const friendsRef = useRef<ReturnType<typeof createFriends> | null>(null);
+  const [creatorOpen, setCreatorOpen] = useState(false); // the creator's corner (note, cocoa, slip), opened from the map
+  const closeCreator = useCallback(() => setCreatorOpen(false), []);
+  const [friendCount, setFriendCount] = useState<number | null>(null);
   const [totals, setTotals] = useState<FairTotals | null>(null); // how many krathongs and lanterns everyone has floated
   const seaMe = useRef({ nonce: Math.random().toString(36).slice(2, 14), last: 0, sent: 0 });
   const [look, setLook] = useState(config.visitors[0].look);
@@ -155,6 +162,7 @@ export default function App() {
       places: config.places.map((p) => ({ id: p.id, name: p.name, anchor: p.anchor, marker: p.marker, hitArea: p.hitArea })),
       curios: config.curios,
       scene,
+      friends: () => friendsRef.current?.peers() ?? [],
       state: () => ({ sound: { running: sound.running, muted: sound.muted }, look: visitor.look.figure, hold: visitor.hold ?? null, act: visitor.act?.kind ?? null, x: Math.round(visitor.x), y: Math.round(visitor.y), moving: visitor.moving, cam: { ...renderer.cam }, view: { ...renderer.view }, stats: scene.stats() }),
     };
     return () => { renderer.stop(); sound.stop(); };
@@ -202,11 +210,40 @@ export default function App() {
     e.renderer.snapshot(canvas, spot, 1.5, (c) => e.visitor.drawStill(c, spot.x, spot.y, held));
   }, []);
 
+  /** Open the room (once): friends in it appear in the world, and we appear in theirs. */
+  const startFriends = useCallback(() => {
+    const e = engineRef.current, room = roomRef.current;
+    if (friendsRef.current || !e || !room || !friendsEnabled(sharedCfg)) return;
+    const f = createFriends({
+      cfg: sharedCfg, room, layout: config.layout,
+      me: () => ({ x: e.visitor.x, y: e.visitor.y, f: e.visitor.facing, m: e.visitor.moving, look: e.visitor.look }),
+      onCount: setFriendCount,
+      onRefused: () => { setFriendCount(-1); say("เข้าห้องนี้ไม่ได้ ห้องอาจเต็มแล้ว (อยู่ด้วยกันได้ไม่เกิน 6 คน)"); },
+    });
+    friendsRef.current = f;
+    e.renderer.setCrowd(() => f.actors());
+    setFriendCount(0);
+    f.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [say]);
+  useEffect(() => {
+    if (entered && roomRef.current) startFriends();
+  }, [entered, startFriends]);
+  useEffect(() => () => { friendsRef.current?.stop(); friendsRef.current = null; }, []);
+
   /** Ask a friend along: share the link with a short invitation (the share sheet on phones, copy to the clipboard elsewhere). */
   const invite = useCallback(async () => {
     const cfg = config.invite;
     if (!cfg) return;
-    const url = window.location.origin + window.location.pathname;
+    let url = window.location.origin + window.location.pathname;
+    // with a room database set up, the link opens a room where friends see each other walk
+    if (friendsEnabled(sharedCfg)) {
+      const code = roomRef.current ?? newRoomCode();
+      roomRef.current = code;
+      startFriends();
+      url += `?room=${code}`;
+      try { window.history.replaceState(null, "", url); } catch { /* fine */ }
+    }
     try {
       if (typeof navigator.share === "function") {
         await navigator.share({ title: cfg.title, text: cfg.text, url });
@@ -221,7 +258,7 @@ export default function App() {
     } catch {
       say(cfg.failed);
     }
-  }, [say]);
+  }, [say, startFriends]);
 
   // ---- the shared sea: fill the water with the krathongs others floated, then keep an eye out for new ones
   useEffect(() => {
@@ -609,14 +646,20 @@ export default function App() {
         onOpen={() => setOpenId(null)}
         hidden={!entered || asking || ride.view}
         ui={config.ui}
+        extra={{ heading: "ส่งกำลังใจให้ผู้สร้าง", icon: "☕", label: "ฝากข้อความ / โกโก้", onClick: () => { setOpenId(null); setCreatorOpen(true); } }}
       />
       {totals && entered && !ride.view && (
         <p className={`fair-count${asking || openPlace || story ? " is-hidden" : ""}`} aria-label="จำนวนกระทงและโคมที่ทุกคนลอยแล้ว">
           <span>🪷 กระทง {totals.k.toLocaleString("th-TH")}</span><span>🏮 โคม {totals.l.toLocaleString("th-TH")}</span>
         </p>
       )}
+      {friendCount !== null && entered && !ride.view && (
+        <p className={`room-chip${asking || openPlace || story ? " is-hidden" : ""}`} role="status">
+          {friendCount < 0 ? "👫 ห้องนี้เต็มแล้ว (ไม่เกิน 6 คน)" : friendCount ? `👫 เพื่อนอยู่ด้วย ${friendCount} คน` : "👫 รอเพื่อนเข้ามา…"}
+        </p>
+      )}
       <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view || story} />
-      <NoteButton support={config.support} inbox={sharedCfg} hidden={!entered || asking || !!openPlace || ride.view || story} />
+      <NoteButton open={creatorOpen} onClose={closeCreator} support={config.support} inbox={sharedCfg} hidden={!entered || asking || !!openPlace || ride.view || story} />
       {config.story && <StorySheet story={config.story} open={story} onClose={() => setStory(false)} />}
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
 

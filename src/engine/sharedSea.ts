@@ -5,7 +5,7 @@
 // It talks to a Firebase Firestore database through its plain web API (no extra library), and it stays completely
 // switched off until the owner fills in `shared` in the festival config.
 
-export type SharedConfig = { projectId?: string; apiKey?: string; collection?: string; pollMs?: number; /** least time between two krathongs sent from one visit (milliseconds) */ minGapMs?: number; /** words that keep a wish from being shared or shown */ blocked?: string[] };
+export type SharedConfig = { projectId?: string; apiKey?: string; collection?: string; pollMs?: number; /** least time between two krathongs sent from one visit (milliseconds) */ minGapMs?: number; /** words that keep a wish from being shared or shown */ blocked?: string[]; /** Realtime Database address, for walking together with friends */ databaseUrl?: string; friendPollMs?: number; friendSendMs?: number; friendStaleMs?: number };
 /** `w` is the wish, only when its owner chose to share it. */
 /** How many krathongs and lanterns have been floated, by everyone, ever. */
 export type FairTotals = { k: number; l: number };

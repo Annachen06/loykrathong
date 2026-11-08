@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { FestivalConfig } from "../festivals/types";
 import type { SharedConfig } from "../engine/sharedSea";
 import { CreatorNote } from "./CreatorNote";
 import { SupportSlip } from "./SupportSlip";
 
-/** A small cup icon in the bottom-right corner. Tap it for the creator's corner: a note of encouragement first, then a thank-you, the PromptPay QR and a place to send the slip. */
-export function NoteButton({ hidden, support, inbox }: { hidden: boolean; support?: FestivalConfig["support"]; inbox?: SharedConfig }) {
-  const [open, setOpen] = useState(false);
+/** The creator's corner, opened from the map: a note of encouragement first, then a thank-you, the PromptPay QR and a place to send the slip. */
+export function NoteButton({ hidden, open, onClose, support, inbox }: { hidden: boolean; open: boolean; onClose: () => void; support?: FestivalConfig["support"]; inbox?: SharedConfig }) {
+  const setOpen = (o: boolean) => { if (!o) onClose(); };
   useEffect(() => {
-    if (hidden) setOpen(false);
-  }, [hidden]);
+    if (hidden && open) onClose();
+  }, [hidden, open, onClose]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -20,8 +20,9 @@ export function NoteButton({ hidden, support, inbox }: { hidden: boolean; suppor
   return (
     <div className={`note${hidden ? " is-hidden" : ""}`}>
       {open && (
-        <div className="note-pop" role="dialog" aria-label={support?.title ?? "ฝากข้อความให้กำลังใจผู้สร้าง"}>
+        <div className="note-pop" role="dialog" aria-label="ส่งกำลังใจให้ผู้สร้าง">
           <button type="button" className="note-close" aria-label="ปิด" onClick={() => setOpen(false)}>✕</button>
+          <h2 className="note-title">☕ ส่งกำลังใจให้ผู้สร้าง</h2>
           <CreatorNote inbox={inbox} />
           {support && (
             <section className="support">
@@ -36,16 +37,6 @@ export function NoteButton({ hidden, support, inbox }: { hidden: boolean; suppor
           )}
         </div>
       )}
-      <button
-        type="button"
-        className="note-fab"
-        aria-expanded={open}
-        aria-label="Buy Me a Cocoa และฝากข้อความให้กำลังใจผู้สร้าง"
-        title="Buy Me a Cocoa · ฝากข้อความถึงผู้สร้าง"
-        onClick={() => setOpen((o) => !o)}
-      >
-        ☕
-      </button>
     </div>
   );
 }

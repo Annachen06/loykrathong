@@ -46,7 +46,8 @@ export const loyKrathongConfig: FestivalConfig = {
   // The shared sea (see src/engine/sharedSea.ts and SHARED_SEA.md). Fill in your own Firebase project to switch it on.
   shared: {
     projectId: "lloyrimlay",
-    apiKey: "AIzaSyAR4YlbAK74KkXLe_2mu-IaaFHsLZr-OIA", // a public web key (it only names the project; the database rules decide what is allowed)
+    apiKey: "AIzaSyAR4YlbAK74KkXLe_2mu-IaaFHsLZr-OIA",
+    databaseUrl: "https://lloyrimlay-default-rtdb.asia-southeast1.firebasedatabase.app", // a public web key (it only names the project; the database rules decide what is allowed)
     // wishes holding any of these words are never shared or shown (add more any time)
     blocked: ["ควย", "เหี้ย", "สัส", "เย็ด", "fuck", "shit"],
   },

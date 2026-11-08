@@ -149,7 +149,7 @@ export type FestivalConfig = {
   /** The maker's story, told in a sheet that opens from a small button (kept word for word as the owner wrote it). */
   story?: { title: string; subtitle: string; paragraphs: string[] };
   /** The shared sea: krathongs floated by other visitors show up for everyone, with no names. Off until filled in. */
-  shared?: { projectId: string; apiKey: string; collection?: string; pollMs?: number; minGapMs?: number; blocked?: string[] };
+  shared?: { projectId: string; apiKey: string; collection?: string; pollMs?: number; minGapMs?: number; blocked?: string[]; databaseUrl?: string };
   /** Inviting a friend: the words that go with the link when it is shared. */
   invite?: { label: string; title: string; text: string; copied: string; failed: string };
   mapGroups: { id: string; label: string; icon: string }[];
