@@ -503,17 +503,18 @@ export default function App() {
     e.visitor.perform("float", 3.4, 1, () => {});
     window.setTimeout(() => {
       if (e.visitor.act?.kind !== "float") { setRitual(null); return; } // walked away: keep the krathong
-      e.scene.runAction("shore", "float", e.visitor, { wish, style: k.id, flower: k.color });
+      // everyone else sees it float too: only its look goes out, plus the wish if its owner agreed
+      const me = seaMe.current, now = Date.now();
+      const sending = !!seaRef.current && now - me.last > (sharedCfg?.minGapMs ?? 15000) && me.sent < 12;
+      // the wish goes out only if its owner agreed AND it is plain kind words (no contact details, no blocked words)
+      const shown = sending && share && wish ? cleanWish(wish, sharedCfg?.blocked) : "";
+      e.scene.runAction("shore", "float", e.visitor, { wish, style: k.id, flower: k.color, shared: !!shown });
       sfx("splash");
       setRitual(null);
       if (krathong) consume(krathong);
-      // everyone else sees it float too: only its look goes out, never the wish
-      const me = seaMe.current, now = Date.now();
-      if (seaRef.current && now - me.last > (sharedCfg?.minGapMs ?? 15000) && me.sent < 12) {
+      if (sending && seaRef.current) {
         me.last = now;
         me.sent++;
-        // the wish goes out only if its owner agreed AND it is plain kind words (no contact details, no blocked words)
-        const shown = share && wish ? cleanWish(wish, sharedCfg?.blocked) : "";
         if (share && wish && !shown) window.setTimeout(() => say("คำอธิษฐานนี้มีข้อมูลที่อาจบอกตัวตนได้ จึงเก็บไว้แค่ในเครื่องคุณ"), 3800);
         seaRef.current.count("k").catch(() => {});
         setTotals((t) => (t ? { ...t, k: t.k + 1 } : t));

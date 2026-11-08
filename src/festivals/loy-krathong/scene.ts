@@ -7,7 +7,7 @@ import { loyKrathongConfig as config } from "./config";
 import { boothSign, drawGate, drawKrathongCached, GATE, landPath, lights, paintBack, paintFront, shoreY, wheelStand } from "./scenery";
 import { GROUND, H, HORIZON, LIGHT_STRINGS, MOON, OUTLINE, PALMS, PIER, SHORE, STAGE, TEMPLE, W, WHEEL } from "./world";
 
-type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string; shared?: boolean };
+type Floater = { x: number; y: number; vx: number; vy: number; p: number; life: number; mine: boolean; lotus: string; style: string; wish: string; shared?: boolean; /** yours, and its wish was shared with everyone */ wishShared?: boolean };
 const STYLES = ["banana", "banana", "lotus", "bread", "coconut"];
 /** A sky lantern (khom loi). Yours carry your colour and wish and can be tapped while they are still low enough to reach. */
 type Lantern = { x: number; y: number; vy: number; sway: number; p: number; s: number; mine?: boolean; color?: string; color2?: string; style?: string; wish?: string; age?: number; trail?: number };
@@ -1587,6 +1587,7 @@ export function createLoyKrathongScene(): Scene {
       if (placeId === "shore" && actionId === "float") {
         // set down just past the end of the pier, then it drifts out towards the moon
         spawnFloater(PIER.x1 + 8, PIER.y0 - 10, true, input?.wish ?? "", input?.style, input?.flower);
+        floaters[floaters.length - 1].wishShared = !!input?.shared;
         mineCount++;
         burst(PIER.x1 + 8, PIER.y0 - 24, "255,214,140", 14);
         return true;
@@ -1682,7 +1683,7 @@ export function createLoyKrathongScene(): Scene {
             ? { title: config.ui.wishTitle, text: best.wish, tag: "จากผู้ร่วมงานจริง · ไม่ระบุตัวตน" }
             : { title: "กระทงของใครสักคน", text: "มีคนมาลอยกระทงในงานนี้เหมือนกัน ไม่ระบุว่าเป็นของใคร ขอให้ทุกคำอธิษฐานเป็นจริงนะ", tag: "ผู้ร่วมงานจริง" }
           : best.mine
-          ? { title: config.ui.wishTitle, text: best.wish || "กระทงของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag }
+          ? { title: config.ui.wishTitle, text: best.wish || "กระทงของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: best.wishShared ? config.ui.yourWishSharedTag : config.ui.yourWishTag }
           : { title: config.ui.wishTitle, text: best.wish, tag: config.ui.sampleTag },
       };
     },

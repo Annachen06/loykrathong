@@ -142,6 +142,8 @@ export type FestivalConfig = {
     wishTitle: string;
     sampleTag: string;
     yourWishTag: string;
+    /** the tag on your own wish when you chose to let everyone read it */
+    yourWishSharedTag: string;
   };
   /** An optional "buy me a coffee" corner in the Memory Corner. The fair takes no payments itself: it only links to the owner's own page or shows their QR. Hidden while neither is set. */
   support?: { title: string; text: string; url?: string; linkLabel?: string; qr?: string };
@@ -209,7 +211,7 @@ export type Scene = {
   /** Runs a place's action. Returns false if the action is unknown. */
   runAction(
     placeId: string, actionId: string, visitor: Point & { look: VisitorLook },
-    input?: { wish?: string; style?: string; flower?: string; color2?: string; hold?: HeldThing },
+    input?: { wish?: string; style?: string; flower?: string; color2?: string; hold?: HeldThing; shared?: boolean },
   ): boolean;
   /** A tap on the world that isn't a place: krathongs on the water, creatures... null if nothing there. */
   tap(p: Point): TapResult | null;

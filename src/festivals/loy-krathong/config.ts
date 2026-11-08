@@ -24,6 +24,7 @@ export const loyKrathongConfig: FestivalConfig = {
     wishTitle: "คำอธิษฐาน",
     sampleTag: "ตัวอย่าง",
     yourWishTag: "ของคุณ · เห็นแค่คุณ",
+    yourWishSharedTag: "ของคุณ · คนอื่นในงานอ่านได้ ไม่ระบุตัวตน",
   },
   story: {
     title: "เรื่องราวของลอยริมเล 🌙",

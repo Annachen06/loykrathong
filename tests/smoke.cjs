@@ -558,7 +558,19 @@ async function sharedSuite(browser) {
   let keys = created ? Object.keys(created.fields).sort().join(",") : "";
   check("shared sea: a shared wish goes out with only kind, colour, time, throwaway tag and the wish", keys === "c,l,s,t,w" && created.fields.w.stringValue === "ขอให้ฝนไม่ตกวันลอยกระทง" && created.fields.s.stringValue === "banana", JSON.stringify(created));
   check("floating a krathong adds one to the krathong count, on screen and in the database", bumps.some((b) => b?.fieldPath === "k" && b.increment?.integerValue === "1") && (await p.textContent(".fair-count")).includes("121"), JSON.stringify(bumps));
+  const tapMine = async () => {
+    const mine = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.mine).slice(-1)[0]);
+    if (!mine) return "";
+    const q = await toScreen(p, mine.x, mine.y - 12);
+    await p.mouse.click(q.x, q.y);
+    await p.waitForSelector(".wish-bubble.show", { timeout: 3000 }).catch(() => {});
+    return (await p.$(".wish-bubble.show")) ? await p.textContent(".wish-bubble") : "";
+  };
+  const mineShared = await tapMine();
+  check("your own shared wish can be read by you, tagged as readable by everyone (not 'only you')", mineShared.includes("ขอให้ฝนไม่ตกวันลอยกระทง") && mineShared.includes("คนอื่นในงานอ่านได้") && !mineShared.includes("เห็นแค่คุณ"), mineShared);
   let c2 = await floatOnce("ขอให้เป็นความลับ", false);
+  const minePrivate = await tapMine();
+  check("your own private wish is tagged 'only you'", minePrivate.includes("ขอให้เป็นความลับ") && minePrivate.includes("เห็นแค่คุณ"), minePrivate);
   check("shared sea: with the box unticked the wish never leaves the device", !!c2 && Object.keys(c2.fields).sort().join(",") === "c,l,s,t" && !JSON.stringify(c2).includes("ความลับ"), JSON.stringify(c2));
   let c3 = await floatOnce("โทรหาฉัน 0812345678", true);
   check("shared sea: a wish with a phone number is kept private even if ticked", !!c3 && !c3.fields.w, JSON.stringify(c3));
