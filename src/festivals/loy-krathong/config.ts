@@ -6,7 +6,7 @@ import supportQr from "../../assets/support-qr.png?inline";
 
 export const loyKrathongConfig: FestivalConfig = {
   id: "loy-krathong",
-  brand: "ลอยกระทงริมทะเล",
+  brand: "ลอยริมเล",
   tagline: "งานวัดเล็กๆ ริมทะเล",
   edition: "ไหว้พระ เล่นเกม รำวง แล้วไปลอยกระทงกัน",
   intro: {
@@ -54,7 +54,7 @@ export const loyKrathongConfig: FestivalConfig = {
   },
   invite: {
     label: "ชวนเพื่อนมาลอยกระทงด้วยกัน",
-    title: "ลอยกระทงริมทะเล",
+    title: "ลอยริมเล",
     text: "มาลอยกระทงริมทะเลด้วยกันนะ 🌕 งานวัดเล็กๆ ริมทะเล ไหว้พระ เล่นเกม ปล่อยโคม แล้วลอยกระทงใต้พระจันทร์เต็มดวง",
     copied: "คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย",
     failed: "คัดลอกไม่ได้ ลองคัดลอกที่อยู่เว็บจากแถบด้านบนส่งให้เพื่อนนะ",
