@@ -47,7 +47,7 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // How many krathongs (k) and lanterns (l) everyone has floated. Anyone may add one at a time; nobody can lower it or set it.
+    // How many krathongs (k) and lanterns (l) everyone has floated, and how many people (v) have come to the fair. Anyone may add one at a time; nobody can lower it or set it.
     function step(field) {
       return request.resource.data.get(field, 0) is int
         && request.resource.data.get(field, 0) - resource.data.get(field, 0) >= 0
@@ -55,10 +55,11 @@ service cloud.firestore {
     }
     match /stats/total {
       allow get: if true;
-      allow create: if request.resource.data.keys().hasOnly(['k', 'l'])
+      allow create: if request.resource.data.keys().hasOnly(['k', 'l', 'v'])
         && request.resource.data.get('k', 0) is int && request.resource.data.get('k', 0) >= 0 && request.resource.data.get('k', 0) <= 1
-        && request.resource.data.get('l', 0) is int && request.resource.data.get('l', 0) >= 0 && request.resource.data.get('l', 0) <= 1;
-      allow update: if request.resource.data.keys().hasOnly(['k', 'l']) && step('k') && step('l');
+        && request.resource.data.get('l', 0) is int && request.resource.data.get('l', 0) >= 0 && request.resource.data.get('l', 0) <= 1
+        && request.resource.data.get('v', 0) is int && request.resource.data.get('v', 0) >= 0 && request.resource.data.get('v', 0) <= 1;
+      allow update: if request.resource.data.keys().hasOnly(['k', 'l', 'v']) && step('k') && step('l') && step('v');
       allow delete: if false;
     }
   }

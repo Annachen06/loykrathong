@@ -8,7 +8,7 @@
 export type SharedConfig = { projectId?: string; apiKey?: string; collection?: string; pollMs?: number; /** least time between two krathongs sent from one visit (milliseconds) */ minGapMs?: number; /** words that keep a wish from being shared or shown */ blocked?: string[]; /** Realtime Database address, for walking together with friends */ databaseUrl?: string; friendPollMs?: number; friendSendMs?: number; friendStaleMs?: number };
 /** `w` is the wish, only when its owner chose to share it. */
 /** How many krathongs and lanterns have been floated, by everyone, ever. */
-export type FairTotals = { k: number; l: number };
+export type FairTotals = { k: number; l: number; v: number };
 export type SharedKrathong = { s: string; l: string; t: number; c: string; w?: string };
 
 const MAX_WISH = 80;
@@ -85,10 +85,10 @@ export function createSharedSea(cfg: Required<Pick<SharedConfig, "projectId" | "
       const rows = (await post(`${base}:batchGet?${key}`, { documents: [`projects/${cfg.projectId}/databases/(default)/documents/stats/total`] })) as { found?: { fields?: Record<string, Field> } }[];
       const f = (Array.isArray(rows) ? rows[0]?.found?.fields : undefined) ?? {};
       const n = (x?: Field) => Math.max(0, Math.floor(Number(x?.integerValue ?? 0)) || 0);
-      return { k: n(f.k), l: n(f.l) };
+      return { k: n(f.k), l: n(f.l), v: n(f.v) };
     },
-    /** Add one to the krathong count (k) or the lantern count (l). Failing quietly is fine: it is only a number. */
-    async count(which: "k" | "l"): Promise<void> {
+    /** Add one to the krathong count (k), the lantern count (l) or the visitor count (v). Failing quietly is fine: it is only a number. */
+    async count(which: "k" | "l" | "v"): Promise<void> {
       await post(`${base}:commit?${key}`, {
         writes: [{ transform: { document: `projects/${cfg.projectId}/databases/(default)/documents/stats/total`, fieldTransforms: [{ fieldPath: which, increment: { integerValue: "1" } }] } }],
       });

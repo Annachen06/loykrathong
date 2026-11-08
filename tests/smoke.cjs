@@ -498,13 +498,13 @@ async function sharedSuite(browser) {
   const doc = (st, lo, t, c = "other", w) => ({ document: { fields: { s: { stringValue: st }, l: { stringValue: lo }, t: { integerValue: String(t) }, c: { stringValue: c }, ...(w ? { w: { stringValue: w } } : {}) } } });
   const now = Date.now();
   const older = [doc("gold", "#fff1b0", now - 5000, "o1", "ขอให้ทุกคนมีความสุข"), doc("moon", "#e8e0ff", now - 4000, "o2", "ติดต่อฉันที่ line:abc123 หรือ 0812345678"), doc("lotus", "#ff9ec0", now - 3000, "o3", "ไอ้เหี้ยทั้งหลาย"), doc("evil<script>", "#ff9ec0", now - 2000), doc("lotus", "javascript:1", now - 1000)];
-  let created = null, later = [], queries = 0, bumps = [], totalsNow = { k: 120, l: 45 }, limits = [];
+  let created = null, later = [], queries = 0, bumps = [], totalsNow = { k: 120, l: 45, v: 300 }, limits = [];
   const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, POST, OPTIONS" };
   await p.route("https://firestore.googleapis.com/**", async (route) => {
     const req = route.request();
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     const url = req.url(), body = JSON.parse(req.postData() || "{}");
-    if (url.includes(":batchGet")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify([{ found: { fields: { k: { integerValue: String(totalsNow.k) }, l: { integerValue: String(totalsNow.l) } } } }]) });
+    if (url.includes(":batchGet")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify([{ found: { fields: { k: { integerValue: String(totalsNow.k) }, l: { integerValue: String(totalsNow.l) }, v: { integerValue: String(totalsNow.v) } } } }]) });
     if (url.includes(":commit")) { bumps.push(body.writes?.[0]?.transform?.fieldTransforms?.[0]); return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: "{}" }); }
     if (url.includes(":runQuery")) {
       queries++;
@@ -529,6 +529,10 @@ async function sharedSuite(browser) {
   check("shared sea: arriving fills the water from the latest 100 floated", limits.includes(100), JSON.stringify(limits));
   const chip = await p.textContent(".fair-count").catch(() => "");
   check("everyone's totals show: krathongs and lanterns floated so far", chip.includes("120") && chip.includes("45"), chip);
+  await p.waitForFunction(() => document.querySelector(".fair-count")?.textContent.includes("301"), null, { timeout: 5000 }).catch(() => {});
+  const chip2 = await p.textContent(".fair-count").catch(() => "");
+  check("a visit is counted once, and the number of visits shows", bumps.filter((b) => b?.fieldPath === "v").length === 1 && chip2.includes("301"), chip2 + JSON.stringify(bumps));
+  check("a reload in the same tab is not counted again", await p.evaluate(() => sessionStorage.getItem("loyrimlay-visited") === "1"));
   // a new krathong arrives from someone else while you are here
   later = [doc("coconut", "#fffaf0", Date.now() + 100)];
   await p.waitForFunction(() => window.__fair.scene.debug().floaters.filter((k) => k.shared).length >= 4, null, { timeout: 8000 }).catch(() => {});

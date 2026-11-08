@@ -281,7 +281,21 @@ export default function App() {
     seaRef.current = sea;
     let latest = 0, alive = true;
     const scene = engineRef.current?.scene;
-    const loadTotals = () => sea.totals().then((t) => alive && setTotals((old) => (old ? { k: Math.max(old.k, t.k), l: Math.max(old.l, t.l) } : t))).catch(() => {});
+    let visitDone = false; // our own visit has been added to the database
+    const loadTotals = () => {
+      const countedBefore = visitDone; // if it was, the answer already includes us
+      return sea.totals().then((t) => alive && setTotals((old) => (old ? { k: Math.max(old.k, t.k), l: Math.max(old.l, t.l), v: Math.max(old.v, t.v) } : { ...t, v: t.v + (visitDone && !countedBefore ? 1 : 0) }))).catch(() => {});
+    };
+    // every visit counts once (opening the site again later counts again; reloading in the same tab does not)
+    let first = true;
+    try { first = !sessionStorage.getItem("loyrimlay-visited"); } catch { /* private mode: counted every time at worst */ }
+    if (first) {
+      sea.count("v").then(() => {
+        try { sessionStorage.setItem("loyrimlay-visited", "1"); } catch { /* fine */ }
+        visitDone = true;
+        if (alive) setTotals((t) => (t ? { ...t, v: t.v + 1 } : t));
+      }).catch(() => {});
+    }
     loadTotals();
     sea.latest(100).then((items) => {
       if (!alive) return;
@@ -679,8 +693,8 @@ export default function App() {
         extra={{ heading: "ส่งกำลังใจให้ผู้สร้าง", icon: "☕", label: "ฝากข้อความ / โกโก้", onClick: () => { setOpenId(null); setCreatorOpen(true); } }}
       />
       {totals && entered && !ride.view && (
-        <p className={`fair-count${asking || openPlace || story ? " is-hidden" : ""}`} aria-label="จำนวนกระทงและโคมที่ทุกคนลอยแล้ว">
-          <span>🪷 กระทง {totals.k.toLocaleString("th-TH")}</span><span>🏮 โคม {totals.l.toLocaleString("th-TH")}</span>
+        <p className={`fair-count${asking || openPlace || story ? " is-hidden" : ""}`} aria-label="จำนวนครั้งที่มีคนมาเที่ยวงาน กระทง และโคมที่ทุกคนลอยแล้ว">
+          <span>👥 มาเที่ยว {totals.v.toLocaleString("th-TH")} ครั้ง</span><span>🪷 กระทง {totals.k.toLocaleString("th-TH")}</span><span>🏮 โคม {totals.l.toLocaleString("th-TH")}</span>
         </p>
       )}
       {friendCount !== null && entered && !ride.view && (
