@@ -707,6 +707,11 @@ async function phoneSuite(browser) {
 
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   check("phone: no horizontal page overflow", !overflow);
+  await p.tap(".invite-toggle");
+  const menuBox = await p.locator(".invite-menu").boundingBox();
+  check("phone: the invite menu stays fully on screen", !!menuBox && menuBox.x >= 8 && menuBox.x + menuBox.width <= 390 - 8, JSON.stringify(menuBox));
+  await p.screenshot({ path: path.join(SHOTS, "phone-invite-menu.png") });
+  await p.tap(".invite-toggle");
 
   const v = await p.evaluate(() => window.__fair.state().view);
   check("phone: scene is recomposed, not shrunk", v.visW < 400 && v.scale > 1, `shows ${Math.round(v.visW)}×${Math.round(v.visH)} world units at ${v.scale.toFixed(2)}×`);
