@@ -58,6 +58,12 @@ const previewItem = (ctx: CanvasRenderingContext2D, item: FairItem) => {
   if (item.hold) drawHeldThing(ctx, item.hold, 30, item.hold === "garland" ? 12 : 42, 2.8, item.color, item.color2);
 };
 
+/** Counts in the top-left chip: written out in full while short, then shortened in Thai units (e.g. 1.2 หมื่น) so they never crowd a small phone. */
+const fmtCount = (n: number) => {
+  const short = (d: number, unit: string) => `${(Math.floor((n / d) * 10) / 10).toLocaleString("th-TH")} ${unit}`;
+  return n >= 1e6 ? short(1e6, "ล้าน") : n >= 1e5 ? short(1e5, "แสน") : n >= 1e4 ? short(1e4, "หมื่น") : n.toLocaleString("th-TH");
+};
+
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -91,6 +97,17 @@ export default function App() {
   const [inviteMenu, setInviteMenu] = useState(false); // the two ways to invite a friend
   const [friendCount, setFriendCount] = useState<number | null>(null);
   const [totals, setTotals] = useState<FairTotals | null>(null); // how many krathongs and lanterns everyone has floated
+  // the numbers show for a few seconds (when you arrive, and when you float something), then fade so they never sit in the way
+  const [countShown, setCountShown] = useState(false);
+  const countTimer = useRef(0);
+  const showCount = useCallback(() => {
+    setCountShown(true);
+    window.clearTimeout(countTimer.current);
+    countTimer.current = window.setTimeout(() => setCountShown(false), 6000);
+  }, []);
+  useEffect(() => () => window.clearTimeout(countTimer.current), []);
+  const haveTotals = totals !== null;
+  useEffect(() => { if (haveTotals) showCount(); }, [haveTotals, showCount]);
   const seaMe = useRef({ nonce: Math.random().toString(36).slice(2, 14), last: 0, sent: 0 });
   const [look, setLook] = useState(config.visitors[0].look);
   const [ride, setRide] = useState({ view: false, progress: 0, focus: false });
@@ -532,6 +549,7 @@ export default function App() {
         if (share && wish && !shown) window.setTimeout(() => say("คำอธิษฐานนี้มีข้อมูลที่อาจบอกตัวตนได้ จึงเก็บไว้แค่ในเครื่องคุณ"), 3800);
         seaRef.current.count("k").catch(() => {});
         setTotals((t) => (t ? { ...t, k: t.k + 1 } : t));
+        showCount();
         seaRef.current.publish({ s: k.id, l: k.color ?? "#ffcf4a", t: now, c: me.nonce, ...(shown ? { w: shown } : {}) }).catch(() => {});
       }
       remember((m) => ({ wishes: [...m.wishes, wish] }));
@@ -555,6 +573,7 @@ export default function App() {
       if (seaRef.current) {
         seaRef.current.count("l").catch(() => {});
         setTotals((t) => (t ? { ...t, l: t.l + 1 } : t));
+        showCount();
       }
       say(`ปล่อย${lantern.name}ลอยขึ้นฟ้าแล้ว แตะที่โคมเพื่ออ่านคำอธิษฐานได้นะ`);
     }, 2700);
@@ -693,8 +712,8 @@ export default function App() {
         extra={{ heading: "ส่งกำลังใจให้ผู้สร้าง", icon: "☕", label: "ฝากข้อความ / โกโก้", onClick: () => { setOpenId(null); setCreatorOpen(true); } }}
       />
       {totals && entered && !ride.view && (
-        <p className={`fair-count${asking || openPlace || story ? " is-hidden" : ""}`} aria-label="จำนวนครั้งที่มีคนมาเที่ยวงาน กระทง และโคมที่ทุกคนลอยแล้ว">
-          <span>👥 มาเที่ยว {totals.v.toLocaleString("th-TH")} ครั้ง</span><span>🪷 กระทง {totals.k.toLocaleString("th-TH")}</span><span>🏮 โคม {totals.l.toLocaleString("th-TH")}</span>
+        <p className={`fair-count${asking || openPlace || story || !countShown ? " is-hidden" : ""}`} aria-label="จำนวนครั้งที่มีคนมาเที่ยวงาน กระทง และโคมที่ทุกคนลอยแล้ว">
+          <span>👥 มาเที่ยว {fmtCount(totals.v)} ครั้ง</span><span>🪷 กระทง {fmtCount(totals.k)}</span><span>🏮 โคม {fmtCount(totals.l)}</span>
         </p>
       )}
       {friendCount !== null && entered && !ride.view && (

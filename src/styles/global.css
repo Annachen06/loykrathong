@@ -816,14 +816,16 @@ button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; col
 /* ---------------------------------------------------------------- how many have floated, everywhere */
 .fair-count {
   position: absolute; top: calc(var(--safe-top) + 74px); left: calc(var(--safe-left) + 16px); margin: 0; z-index: 2;
-  display: flex; gap: 10px; padding: 5px 12px; border-radius: 999px; font-size: 12px; color: var(--moonlight);
+  display: flex; gap: 8px; padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--moonlight); white-space: nowrap;
+  max-width: calc(100% - var(--safe-left) - var(--safe-right) - 24px);
   background: rgba(20, 18, 70, 0.6); border: 1px solid rgba(255, 244, 226, 0.35); pointer-events: none; transition: opacity 0.4s;
 }
+@media (max-width: 360px) { .fair-count { font-size: 11px; gap: 6px; padding: 5px 8px; } }
 .fair-count.is-hidden { opacity: 0; }
 
 /* ---------------------------------------------------------------- friends in the same room */
 .room-chip {
-  position: absolute; top: calc(var(--safe-top) + 104px); left: calc(var(--safe-left) + 16px); margin: 0; z-index: 2;
+  position: absolute; top: calc(var(--safe-top) + 112px); left: calc(var(--safe-left) + 16px); margin: 0; z-index: 2;
   padding: 5px 12px; border-radius: 999px; font-size: 12px; color: var(--moonlight);
   background: rgba(20, 18, 70, 0.6); border: 1px solid rgba(255, 244, 226, 0.35); pointer-events: none; transition: opacity 0.4s;
 }

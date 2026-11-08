@@ -533,6 +533,9 @@ async function sharedSuite(browser) {
   const chip2 = await p.textContent(".fair-count").catch(() => "");
   check("a visit is counted once, and the number of visits shows", bumps.filter((b) => b?.fieldPath === "v").length === 1 && chip2.includes("301"), chip2 + JSON.stringify(bumps));
   check("a reload in the same tab is not counted again", await p.evaluate(() => sessionStorage.getItem("loyrimlay-visited") === "1"));
+  check("the numbers show when you arrive", !(await p.getAttribute(".fair-count", "class")).includes("is-hidden"));
+  await p.waitForFunction(() => document.querySelector(".fair-count")?.classList.contains("is-hidden"), null, { timeout: 9000 }).catch(() => {});
+  check("then they fade away by themselves so they never sit in the way", (await p.getAttribute(".fair-count", "class")).includes("is-hidden"));
   // a new krathong arrives from someone else while you are here
   later = [doc("coconut", "#fffaf0", Date.now() + 100)];
   await p.waitForFunction(() => window.__fair.scene.debug().floaters.filter((k) => k.shared).length >= 4, null, { timeout: 8000 }).catch(() => {});
