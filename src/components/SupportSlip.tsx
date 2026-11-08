@@ -34,7 +34,7 @@ export function SupportSlip({ inbox }: { inbox?: SharedConfig }) {
     }
   };
 
-  if (state === "sent") return <p className="slip-thanks" role="status">ขอบคุณมากค่ะ ได้รับหลักฐานการโอนแล้ว ♡</p>;
+  if (state === "sent") return <p className="slip-thanks" role="status">ขอบคุณสำหรับกำลังใจนะคะ เราจะนำไปพัฒนาเว็บแอปนี้ให้ดียิ่งขึ้นและพัฒนาเว็บแอปใหม่ๆขึ้นมาให้ทุกคนได้ร่วมสนุกกันค่ะ ♡</p>;
 
   return (
     <div className="slip">
