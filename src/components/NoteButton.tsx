@@ -2,9 +2,8 @@ import { useEffect } from "react";
 import type { FestivalConfig } from "../festivals/types";
 import type { SharedConfig } from "../engine/sharedSea";
 import { CreatorNote } from "./CreatorNote";
-import { SupportSlip } from "./SupportSlip";
 
-/** The creator's corner, opened from the map: a note of encouragement first, then a thank-you, the PromptPay QR and a place to send the slip. */
+/** The creator's corner, opened from the map: a note of encouragement first, then a thank-you and a link to the owner's Ko-fi page. */
 export function NoteButton({ hidden, open, onClose, support, inbox }: { hidden: boolean; open: boolean; onClose: () => void; support?: FestivalConfig["support"]; inbox?: SharedConfig }) {
   const setOpen = (o: boolean) => { if (!o) onClose(); };
   useEffect(() => {
@@ -28,11 +27,12 @@ export function NoteButton({ hidden, open, onClose, support, inbox }: { hidden: 
             <section className="support">
               <h3>{support.title}</h3>
               {support.text.split("\n\n").map((para, i) => <p key={i}>{para}</p>)}
-              {support.qr && <img className="support-qr" src={support.qr} alt="QR PromptPay สำหรับให้กำลังใจ สแกนด้วยแอปธนาคารแล้วใส่จำนวนเงินเอง" />}
               {support.url && (
-                <a className="panel-action secondary" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
+                <>
+                  {support.linkHint && <p className="support-or">{support.linkHint}</p>}
+                  <a className="panel-action secondary support-link" href={support.url} target="_blank" rel="noopener noreferrer">{support.linkLabel ?? "ให้กำลังใจ"}</a>
+                </>
               )}
-              {support.qr && <SupportSlip inbox={inbox} />}
             </section>
           )}
         </div>

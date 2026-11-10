@@ -309,9 +309,10 @@ async function desktopSuite(browser) {
   await p.waitForSelector(".note-pop", { timeout: 3000 }).catch(() => {});
   check("its tile opens the creator's corner and closes the map", (await p.isVisible(".note-pop")) && !(await p.$(".dock.is-open")) && (await p.textContent(".note-title")).includes("ส่งกำลังใจให้ผู้สร้าง"));
   check("the note to the creator comes first in the corner popup, above the cocoa corner", await p.evaluate(() => { const a = document.querySelector(".note-pop .note-form"), b = document.querySelector(".note-pop .support"); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }));
-  check("the corner popup has the Buy Me a Cocoa tip corner with a scannable QR", (await p.locator(".support .support-qr").count()) === 1 && (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.textContent(".support")).includes("เข้ามาสนุกกัน") && !(await p.textContent(".support")).includes("ฟรี") && (await p.locator(".support-qr").evaluate((i) => i.complete && i.naturalWidth > 200)));
+  check("the corner popup has the Buy Me a Cocoa tip corner, with no QR and no slip form (tips go through Ko-fi)", (await p.textContent(".support")).includes("Buy Me a Cocoa") && (await p.locator(".support .support-qr, .support .slip-form, .support img").count()) === 0);
   // the tip corner's slip form: only images are accepted, and the picture is shrunk and saved to the inbox
-  check("tip corner no longer carries the 'scan with bank app' caption", !(await p.textContent(".support")).includes("สแกนด้วยแอปธนาคาร"));
+  const kofi = await p.evaluate(() => { const a = document.querySelector(".support a.support-link"); return a ? { href: a.href, target: a.target, rel: a.rel, text: a.textContent } : null; });
+  check("tip corner also links to Ko-fi, opening in a new tab safely", !!kofi && kofi.href === "https://ko-fi.com/annachen3412" && kofi.target === "_blank" && kofi.rel.includes("noopener") && kofi.text.includes("Ko-fi"), JSON.stringify(kofi));
   const inboxCors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
   const sent = { slips: null, notes: null };
   await p.route("https://firestore.googleapis.com/**", async (route) => {
@@ -321,18 +322,6 @@ async function desktopSuite(browser) {
     if (req.method() === "POST" && m) { sent[m[1]] = JSON.parse(req.postData() || "{}"); return route.fulfill({ status: 200, headers: inboxCors, contentType: "application/json", body: "{}" }); }
     return route.fallback();
   });
-  await p.click('.slip button:has-text("ส่งสลิปโกโก้ได้ที่นี่")');
-  await p.fill('.slip .slip-form textarea[name="message"]', "ขอบคุณค่ะ");
-  check("slip form has only a message and the slip picture", (await p.locator('.slip .slip-form input[name="name"], .slip .slip-form input[name="contact"], .slip .slip-form input[name="amount"]').count()) === 0);
-  await p.setInputFiles('.slip .slip-form input[name="slip"]', { name: "note.txt", mimeType: "text/plain", buffer: Buffer.from("hi") });
-  await p.click('.slip .slip-form button[type="submit"]');
-  check("slip form refuses a file that is not a picture", (await p.isVisible(".slip .slip-problem")) && sent.slips === null);
-  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
-  await p.setInputFiles('.slip .slip-form input[name="slip"]', { name: "slip.png", mimeType: "image/png", buffer: png });
-  await p.click('.slip .slip-form button[type="submit"]');
-  await p.waitForSelector(".support .slip-thanks", { timeout: 5000 }).catch(() => {});
-  const slipDoc = sent.slips?.fields;
-  check("slip form saves the message and a shrunken JPEG picture to the creator's inbox, then says thanks", !!slipDoc && slipDoc.m?.stringValue === "ขอบคุณค่ะ" && slipDoc.i?.stringValue.startsWith("data:image/jpeg;base64,") && Number.isFinite(Number(slipDoc.t?.integerValue)) && Object.keys(slipDoc).sort().join() === "i,m,t" && (await p.isVisible(".support .slip-thanks")), JSON.stringify(slipDoc)?.slice(0, 80));
   check("the site no longer ships Netlify forms", (await p.locator("form[data-netlify]").count()) === 0);
 
   await p.click('.note-form button[type="submit"]');
