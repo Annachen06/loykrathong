@@ -6,16 +6,14 @@ import type { HeldThing } from "../festivals/types";
 
 export type Prize = { name: string; hold?: HeldThing };
 export type OnPrize = (p: Prize) => void;
-export type GameId = "darts" | "rings" | "shoot" | "cans" | "fish" | "ducks" | "hammer";
+export type GameId = "darts" | "rings" | "shoot" | "cans" | "eggs";
 
 export const PRIZES: Record<GameId, (Prize | null)[]> = {
   darts: [null, { name: "ลูกอมรสมะม่วง" }, { name: "พวงกุญแจเปลือกหอย" }, { name: "ตุ๊กตาปลาดาวตัวใหญ่", hold: "plushStar" }],
   rings: [null, { name: "สายไหมหนึ่งไม้", hold: "cottonCandy" }, { name: "ตุ๊กตาแมงกะพรุน", hold: "plushJelly" }, { name: "ตุ๊กตากระต่ายส่องจันทร์", hold: "plushRabbit" }],
   shoot: [null, { name: "ลูกอมรสส้ม" }, { name: "พวงกุญแจตุ๊กตาจิ๋ว" }, { name: "ตุ๊กตากระต่ายส่องจันทร์", hold: "plushRabbit" }],
   cans: [null, { name: "ขนมข้าวโพดคั่ว" }, { name: "สายไหมหนึ่งไม้", hold: "cottonCandy" }, { name: "ตุ๊กตาปลาดาวตัวใหญ่", hold: "plushStar" }],
-  fish: [null, { name: "ปลาทองตัวน้อยในถุงน้ำ" }, { name: "พวงกุญแจปลาทอง" }, { name: "ตุ๊กตาแมงกะพรุน", hold: "plushJelly" }],
-  ducks: [null, { name: "ลูกอมรสมะนาว" }, { name: "พวงกุญแจเป็ดเหลือง" }, { name: "สายไหมหนึ่งไม้", hold: "cottonCandy" }],
-  hammer: [null, { name: "ขนมถั่วตัด" }, { name: "พวงกุญแจกระดิ่งทอง" }, { name: "ตุ๊กตาปลาดาวตัวใหญ่", hold: "plushStar" }],
+  eggs: [null, { name: "ลูกอมรสมะนาว" }, { name: "พวงกุญแจไข่ทองคำ" }, { name: "ตุ๊กตาแมงกะพรุน", hold: "plushJelly" }],
 };
 
 const MISSED: Record<GameId, string> = {
@@ -23,9 +21,7 @@ const MISSED: Record<GameId, string> = {
   rings: "ห่วงไม่ลงเลย ลองอีกทีนะ",
   shoot: "ตุ๊กตายังยืนอยู่ ลองอีกทีนะ",
   cans: "กระป๋องยังไม่ล้มเลย ลองอีกทีนะ",
-  fish: "ปลาหนีไปหมดเลย ลองอีกทีนะ",
-  ducks: "เป็ดตัวนี้ไม่มีรางวัล ลองอีกทีนะ",
-  hammer: "แรงยังไม่ถึงกระดิ่ง ลองอีกทีนะ",
+  eggs: "ไข่ใบนี้ว่างเปล่า ลองอีกใบนะ",
 };
 
 export const prizeFor = (game: GameId, tier: number) => PRIZES[game][Math.max(0, Math.min(tier, 3))];

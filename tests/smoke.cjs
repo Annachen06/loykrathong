@@ -50,6 +50,18 @@ async function takeKrathong(p, touch = false) {
   await p.click('.item-pick[data-item="lotus"]');
   await p.click(".panel-close");
 }
+// Click the centre of a (moving) element that is on screen inside a game board, like a person tapping it.
+async function clickVisible(p, boardSel, sel) {
+  const at = await p.evaluate(([b, s]) => {
+    const br = document.querySelector(b).getBoundingClientRect();
+    for (const el of document.querySelectorAll(`${b} ${s}`)) {
+      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      if (x > br.left + 20 && x < br.right - 20 && y > br.top && y < br.bottom) return { x, y };
+    }
+    return null;
+  }, [boardSel, sel]);
+  if (at) await p.mouse.click(at.x, at.y);
+}
 async function panelTitle(p) {
   const el = await p.$(".panel h2");
   return el ? el.textContent() : null;
@@ -428,52 +440,55 @@ async function desktopSuite(browser) {
   await p.click('.item-pick[data-item="ice-red"]');
   check("shaved ice stall: the cup is in your hand", (await state(p)).hold === "shavedIce");
 
-  // Balloon darts: three throws, then a result.
+  // Balloon darts: five darts fly from your hand to where you tap; a hit pops the balloon.
   await viaMap(p, "ซุ้มเกม");
   await p.waitForSelector(".dart-board", { timeout: 15000 });
-  for (let i = 0; i < 3; i++) {
+  check("booth: five games in the same stall (no bigger map)", (await p.locator(".tabs button").count()) === 5);
+  let sawDart = false;
+  for (let i = 0; i < 5; i++) {
     await p.locator(".balloon:not(.popped)").first().click({ force: true });
     await p.waitForTimeout(120);
+    sawDart = sawDart || (await p.locator(".dart-board .projectile.dart").count()) > 0;
+    await p.waitForTimeout(380);
   }
   const darts = await p.textContent(".game-status");
-  check("balloon darts: throw 3 darts and get a result", darts.includes("แตก") && darts.includes("เล่นอีกครั้ง"), darts);
-  if (darts.includes("แตก 3")) check("balloon darts: the big prize is carried by your character", (await state(p)).hold === "plushStar");
+  check("balloon darts: a dart really flies to the board", sawDart);
+  check("balloon darts: five darts pop balloons, then a result", darts.includes("แตก") && darts.includes("เล่นอีกครั้ง") && (await p.locator(".balloon.popped").count()) >= 1, darts);
   await p.screenshot({ path: path.join(SHOTS, "desktop-darts.png") });
 
-  // Ring toss: four throws, then a result.
+  // Shooting gallery: pick a gun, shoot at targets gliding past.
+  await p.click('.tabs button:has-text("ยิงปืน")');
+  check("shooting gallery: four guns to choose from", (await p.locator(".gun-pick button").count()) === 4);
+  await p.click('.gun-pick button:has-text("จุกน้ำปลา")');
+  for (let i = 0; i < 5; i++) { await clickVisible(p, ".gallery", ".target:not(.down)"); await p.waitForTimeout(420); }
+  const shoot = await p.textContent(".game-status");
+  check("shooting gallery: five corks knock targets down, then a result", shoot.includes("ยิงโดน") && shoot.includes("เล่นอีกครั้ง") && (await p.locator(".target.down").count()) >= 1, shoot);
+  await p.screenshot({ path: path.join(SHOTS, "desktop-gallery.png") });
+
+  // Ring toss: the ring sails over and drops on a bottle (or bounces off).
   await p.click('.tabs button:has-text("โยนห่วง")');
-  for (let i = 0; i < 4; i++) { await p.click(".toss"); await p.waitForTimeout(200); }
+  for (let i = 0; i < 4; i++) { await p.click(".toss"); await p.waitForTimeout(1100); }
   const rings = await p.textContent(".game-status");
   check("ring toss: throw 4 rings and get a result", rings.includes("คล้องได้") && rings.includes("เล่นอีกครั้ง"), rings);
 
-  // The other booth games: all in the same stall, as tabs.
-  check("booth: seven games in the same stall (no bigger map)", (await p.locator(".tabs button").count()) === 7);
-  await p.click('.tabs button:has-text("ยิงตุ๊กตา")');
-  for (let i = 0; i < 5; i++) { await p.locator(".doll:not(.down)").first().click({ force: true }); await p.waitForTimeout(120); }
-  const shoot = await p.textContent(".game-status");
-  check("shooting dolls: five corks, then a result", shoot.includes("ยิงล้ม") && shoot.includes("เล่นอีกครั้ง"), shoot);
-  await p.click('.tabs button:has-text("ล้มกระป๋อง")');
-  for (let i = 0; i < 3; i++) { await p.click(".toss"); await p.waitForTimeout(150); }
+  // Can pyramid: hit a can at the bottom and everything standing on it comes down too.
+  await p.click('.tabs button:has-text("ปากระป๋อง")');
+  await clickVisible(p, ".can-table", ".can:nth-of-type(2)");
+  await p.waitForTimeout(1000);
+  const afterOne = await p.locator(".can.down").count();
+  check("can pyramid: knocking the middle can at the bottom brings the cans above it down too", afterOne >= 4, String(afterOne));
+  for (let i = 0; i < 2; i++) { if (await p.$(".game-again")) break; await clickVisible(p, ".can-table", ".can:not(.down)"); await p.waitForTimeout(1000); }
   const cans = await p.textContent(".game-status");
-  check("knocking cans: three balls, then a result", cans.includes("ล้ม") && cans.includes("เล่นอีกครั้ง"), cans);
-  await p.click('.tabs button:has-text("ตักปลาทอง")');
-  await p.locator(".fish:not(.caught)").first().click({ force: true });
-  await p.waitForFunction(() => document.querySelector(".game-again"), null, { timeout: 15000 }).catch(() => {});
-  const fish = await p.textContent(".game-status");
-  check("goldfish: the paper wears out and the round ends with a result", fish.includes("ตักได้") && fish.includes("เล่นอีกครั้ง"), fish);
-  await p.click('.tabs button:has-text("ตกเป็ด")');
-  for (let i = 0; i < 3; i++) { await p.locator(".duck:not(.caught)").first().click({ force: true }); await p.waitForTimeout(120); }
-  const ducks = await p.textContent(".game-status");
-  check("duck fishing: three hooks show a mark under each duck, then a result", (await p.locator(".duck-mark").count()) === 3 && ducks.includes("เล่นอีกครั้ง"), ducks);
-  await p.click('.tabs button:has-text("ตีค้อน")');
-  for (let i = 0; i < 3; i++) {
-    await p.locator(".hammer-hold").dispatchEvent("pointerdown");
-    await p.waitForTimeout(900);
-    await p.locator(".hammer-hold").dispatchEvent("pointerup").catch(() => {});
-    await p.waitForTimeout(150);
-  }
-  const hammer = await p.textContent(".game-status");
-  check("strongman hammer: hold and let go three times, then a result", hammer.includes("แรงสุด") && hammer.includes("เล่นอีกครั้ง"), hammer);
+  check("can pyramid: three balls (or the whole pile down), then a result", cans.includes("ล้ม") && cans.includes("เล่นอีกครั้ง"), cans);
+
+  // Lucky eggs: scoop one out of the jar, tap it, see what is inside.
+  await p.click('.tabs button:has-text("ตักไข่พาโชค")');
+  await p.click('.toss:has-text("ตักไข่")');
+  await p.waitForSelector(".egg-out", { timeout: 3000 }).catch(() => {});
+  await p.click(".egg-out", { force: true });
+  await p.waitForTimeout(300);
+  const egg = await p.textContent(".game-status");
+  check("lucky eggs: an egg comes out of the jar, cracks open and always holds a prize", (await p.isVisible(".egg-prize")) && egg.includes("รางวัล") && egg.includes("เล่นอีกครั้ง") && !egg.includes("ว่างเปล่า"), egg);
   await p.click(".panel-close");
 
   // Ram wong: the visitor goes up on stage and dances in the ring.
@@ -569,6 +584,8 @@ async function sharedSuite(browser) {
   check("shared sea: odd or unsafe data from outside is ignored", !fl.some((k) => !/^#[0-9a-f]{6}$/i.test(k.lotus)) && !fl.some((k) => String(k.style).includes("<")));
   check("shared sea: a shared wish can be read, but one with contact details or a blocked word is dropped (the krathong stays)", fl.find((k) => k.style === "gold").wish === "ขอให้ทุกคนมีความสุข" && fl.find((k) => k.style === "moon").wish === "" && fl.filter((k) => k.style === "lotus")[0].wish === "" && fl.every((k) => !k.mine));
   check("shared sea: arriving fills the water from the latest 100 floated", limits.includes(100), JSON.stringify(limits));
+  const nearestWish = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.wish).sort((a, b) => (Math.abs(a.x - 1900) + Math.abs(a.y - 778) / 2) - (Math.abs(b.x - 1900) + Math.abs(b.y - 778) / 2))[0]);
+  check("shared sea: real visitors' wishes take the places nearest the pier, ahead of the samples", !!nearestWish && nearestWish.shared, JSON.stringify(nearestWish));
   const chip = await p.textContent(".fair-count").catch(() => "");
   check("everyone's totals show: krathongs and lanterns floated so far", chip.includes("120") && chip.includes("45"), chip);
   await p.waitForFunction(() => document.querySelector(".fair-count")?.textContent.includes("301"), null, { timeout: 5000 }).catch(() => {});
@@ -815,7 +832,7 @@ async function phoneSuite(browser) {
   // phone: play darts by tapping balloons
   await viaMap(p, "ซุ้มเกม", true);
   await p.waitForSelector(".dart-board", { timeout: 20000 });
-  for (let i = 0; i < 3; i++) { await p.locator(".balloon:not(.popped)").first().tap({ force: true }); await p.waitForTimeout(120); }
+  for (let i = 0; i < 5; i++) { await p.locator(".balloon:not(.popped)").first().tap({ force: true }); await p.waitForTimeout(500); }
   check("phone: balloon darts playable by tapping", (await p.textContent(".game-status")).includes("เล่นอีกครั้ง"));
   await p.screenshot({ path: path.join(SHOTS, "phone-darts.png") });
   check("no console errors on phone", errors.length === 0, errors.join(" | "));

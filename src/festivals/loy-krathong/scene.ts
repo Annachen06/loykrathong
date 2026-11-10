@@ -51,8 +51,13 @@ export function createLoyKrathongScene(): Scene {
   // Other people's krathongs: about half carry one of the clearly-labelled sample wishes.
   let wishIndex = Math.floor(Math.random() * config.sampleWishes.length);
   const nearPier = (x: number) => Math.abs(x - PIER.x0) < 260;
-  const nextSampleWish = (x: number) =>
-    (Math.random() < (nearPier(x) ? 0.85 : 0.5) ? config.sampleWishes[wishIndex++ % config.sampleWishes.length] : "");
+  // once real wishes from other visitors are on the water, the samples step back (and stop entirely when there are plenty of real ones)
+  const realWishes = () => floaters.reduce((n, k) => n + (k.shared && k.wish ? 1 : 0), 0);
+  const nextSampleWish = (x: number) => {
+    const real = realWishes();
+    if (real && nearPier(x)) return ""; // by the pier, real wishes only (they come round again and again)
+    return Math.random() < (nearPier(x) ? 0.85 : 0.5) * Math.max(0, 1 - real / 6) ? config.sampleWishes[wishIndex++ % config.sampleWishes.length] : "";
+  };
   const spawnFloater = (x: number, y: number, mine: boolean, wish = mine ? "" : nextSampleWish(x), style?: string, flower?: string) =>
     floaters.push({
       x, y, vx: rand(-6, 6), vy: -rand(5, 9) * (mine ? 1.2 : 1), p: rand(0, 6.28), life: 0, mine, wish,
@@ -61,9 +66,20 @@ export function createLoyKrathongScene(): Scene {
     });
   /** A krathong another visitor floated (only its look is known): out on the water already, or arriving from the shore. */
   const addShared = (items: { style: string; color: string; wish?: string }[], fresh: boolean) => {
-    for (const it of items) {
-      if (fresh) floaters.push({ x: rand(1820, 1990), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true });
-      else floaters.push({ x: rand(860, W - 40), y: rand(HORIZON + 40, SHORE - 20), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true });
+    // real ones with a wish go first, so they take the best spots (closest to the pier)
+    const ordered = [...items].sort((a, b) => Number(!!b.wish) - Number(!!a.wish));
+    for (const it of ordered) {
+      const real = { mine: false, wish: it.wish ?? "", style: it.style, lotus: it.color, shared: true };
+      if (fresh) { floaters.push({ x: rand(1820, 1990), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, ...real }); continue; }
+      // arriving: a sample krathong already on the water becomes the real one (the one nearest the pier first), so the water fills with real wishes
+      let swap: Floater | null = null, bestD = Infinity;
+      for (const k of floaters) {
+        if (k.mine || k.shared) continue;
+        const d = Math.abs(k.x - PIER.x1) + Math.abs(k.y - SHORE) * 0.5;
+        if (d < bestD) { bestD = d; swap = k; }
+      }
+      if (swap) Object.assign(swap, real);
+      else floaters.push({ x: rand(860, W - 40), y: rand(HORIZON + 40, SHORE - 20), vx: rand(-6, 6), vy: -rand(5, 9), p: rand(0, 6.28), life: 0, ...real });
     }
   };
   const spawnLantern = (x: number, y: number, s = rand(0.35, 0.9)) =>
@@ -773,7 +789,13 @@ export function createLoyKrathongScene(): Scene {
         sparks.push({ x: k.x + rand(-18, 18) * sc, y: k.y + rand(-2, 6) * sc, vx: rand(-3, 3), vy: -rand(2, 8), life: 0, max: rand(0.6, 1.1), rgb: "255,226,140", g: 0, size: 1.6 * sc + 0.4, front: false });
       }
     }
-    for (let i = floaters.length - 1; i >= 0; i--) if (floaters[i].y < HORIZON + 6) floaters.splice(i, 1);
+    for (let i = floaters.length - 1; i >= 0; i--) {
+      const k = floaters[i];
+      if (k.y >= HORIZON + 6) continue;
+      // other visitors' krathongs never vanish: past the horizon they come round again from the shore by the pier
+      if (k.shared) Object.assign(k, { x: rand(1800, 2020), y: SHORE - rand(4, 14), vx: rand(-6, 6), vy: -rand(5, 9), life: 0 });
+      else floaters.splice(i, 1);
+    }
 
     for (const l of lanterns) {
       l.p += dt;
@@ -1412,7 +1434,7 @@ export function createLoyKrathongScene(): Scene {
       .filter((k) => k.wish && !k.mine && k.y > HORIZON + 30)
       .map((k) => ({ k, d: dist(k.x, k.y, you.x, you.y - 80) }))
       .filter((e) => e.d < 380)
-      .sort((a, b) => a.d - b.d);
+      .sort((a, b) => Number(!!b.k.shared) - Number(!!a.k.shared) || a.d - b.d); // real visitors' wishes before the samples
     // keep the notes from covering each other or the visitor
     const boxes: { x0: number; y0: number; x1: number; y1: number }[] = [{ x0: you.x - 26, y0: you.y - 90, x1: you.x + 26, y1: you.y }];
     const picked: Floater[] = [];

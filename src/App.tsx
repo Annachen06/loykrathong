@@ -739,7 +739,7 @@ export default function App() {
             <FloatForm shared={sharedOn} label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} onLook={() => { closePanel(); say("เชิญเดินชมตามสบายเลยนะ ลมทะเลเย็นสบายมาก 🌊 ถ้าอยากลอยกระทงเมื่อไหร่ก็แวะร้านกระทงได้เสมอ"); }} />
           )}
           {openPlace.panel === "lantern" && openPlace.items && <LanternForm lanterns={openPlace.items} onRelease={releaseLantern} />}
-          {openPlace.panel === "games" && <FairGames onPrize={onPrize} onPop={() => sfx("pop")} />}
+          {openPlace.panel === "games" && <FairGames onPrize={onPrize} sfx={sfx} />}
           {openPlace.panel === "temple" && <TemplePanel offering={offering} fortune={memories.fortune} onPray={pray} onFortune={shakeFortune} />}
           {openPlace.panel === "krathongShop" && (
             <>

@@ -1,343 +1,283 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { prizeText, usePrize, type OnPrize } from "./gamePrizes";
+import { useRef, useState } from "react";
+import { GameStatus, type GameProps } from "./FairGames";
+import { usePrize } from "./gamePrizes";
+import { boardPoint, burst, centreOf, fly, hitAt, shout, tumble, wobble, type Pt } from "./throwKit";
 
-// More booth games for the same stall: shooting dolls, knocking down cans, scooping goldfish, duck fishing and the strongman hammer.
-// They all end the same way: a result line, a prize (maybe), and a button to play again.
+// The shooting gallery, the can pyramid and the lucky eggs. Same stall, same prizes (gamePrizes.ts).
 
-type Props = { onPrize: OnPrize; onHit?: () => void };
-
-/** Result line + "play again" shown when a round is over. */
-function Result({ done, tier, game, summary, onAgain, children }: { done: boolean; tier: number; game: Parameters<typeof prizeText>[1]; summary: string; onAgain: () => void; children: React.ReactNode }) {
-  return (
-    <div className="game-status" aria-live="polite">
-      {done ? (
-        <>
-          <strong>{summary} · {prizeText(tier, game)}</strong>
-          <button type="button" className="game-again" onClick={onAgain}>เล่นอีกครั้ง</button>
-        </>
-      ) : children}
-    </div>
-  );
-}
-
-/** A steady 0..1 sweep (back and forth) that the throwing games aim with. */
-function useSweep(running: boolean, period: number) {
-  const value = useRef(0.5);
-  const [el, setEl] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    if (!running) return;
-    let raf = 0;
-    const t0 = performance.now();
-    const tick = (now: number) => {
-      value.current = 0.5 + 0.5 * Math.sin((now - t0) / period);
-      if (el) el.style.left = `${value.current * 100}%`;
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [running, period, el]);
-  return { value, ref: setEl };
-}
-
-// ------------------------------------------------------------------------------------------------ shooting dolls
-const DOLLS = ["🧸", "🐰", "🐻", "🐱", "🐶", "🐼", "🦊", "🐥"];
-const tierShoot = (n: number) => (n >= 5 ? 3 : n >= 3 ? 2 : n >= 1 ? 1 : 0);
-
-/** Cork-gun shooting: dolls sit on two shelves sliding gently; tap one to shoot it. Five corks. */
-export function ShootDolls({ onPrize, onHit }: Props) {
-  const [shots, setShots] = useState(5);
-  const [down, setDown] = useState<number[]>([]);
-  const [misses, setMisses] = useState<{ x: number; y: number }[]>([]);
-  const [round, setRound] = useState(0);
-  const done = shots === 0;
-  usePrize(done, tierShoot(down.length), "shoot", onPrize);
-
-  const shoot = (i: number | null, miss?: { x: number; y: number }) => {
-    if (done) return;
-    setShots((n) => n - 1);
-    if (i !== null && !down.includes(i)) { setDown((d) => [...d, i]); onHit?.(); }
-    else if (miss) setMisses((m) => [...m, miss]);
-  };
-  const fire = (e: React.PointerEvent<HTMLDivElement>) => {
-    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-doll]");
-    const box = e.currentTarget.getBoundingClientRect();
-    shoot(t ? Number(t.dataset.doll) : null, { x: e.clientX - box.left, y: e.clientY - box.top });
-  };
-  const again = () => { setShots(5); setDown([]); setMisses([]); setRound((r) => r + 1); };
-
-  return (
-    <div className="game">
-      <p className="game-help">แตะตุ๊กตาบนชั้นเพื่อยิงจุกก๊อก มี 5 นัด</p>
-      <div className="doll-board" onPointerDown={fire} role="group" aria-label="ชั้นวางตุ๊กตา">
-        {[0, 1].map((shelf) => (
-          <div key={`${round}-${shelf}`} className={`doll-shelf shelf-${shelf}`}>
-            {DOLLS.slice(shelf * 4, shelf * 4 + 4).map((d, k) => {
-              const i = shelf * 4 + k;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  data-doll={i}
-                  className={`doll ${down.includes(i) ? "down" : ""}`}
-                  aria-label={`ตุ๊กตาตัวที่ ${i + 1}`}
-                  aria-disabled={done || down.includes(i)}
-                  onClick={(e) => { if (e.detail === 0) shoot(i); }}
-                >{d}</button>
-              );
-            })}
-          </div>
-        ))}
-        {misses.map((m, i) => <span key={i} className="dart-miss" style={{ left: m.x, top: m.y }} />)}
-      </div>
-      <Result done={done} tier={tierShoot(down.length)} game="shoot" summary={`ยิงล้ม ${down.length} ตัว`} onAgain={again}>
-        <span>จุกก๊อกเหลือ {shots} · ล้มแล้ว {down.length}</span>
-      </Result>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------------------------------------ knock down the cans
-const CANS = [
-  { x: 0.25, row: 0 }, { x: 0.5, row: 0 }, { x: 0.75, row: 0 },
-  { x: 0.375, row: 1 }, { x: 0.625, row: 1 },
-  { x: 0.5, row: 2 },
+// ------------------------------------------------------------------------------------------------ shooting gallery
+const GUNS = [
+  { id: "long", label: "ปืนยาว", shots: 6, ms: 110, sway: 3, reach: 0.62, ammo: "pellet" },
+  { id: "short", label: "ปืนสั้น", shots: 8, ms: 150, sway: 9, reach: 0.62, ammo: "pellet" },
+  { id: "cork", label: "จุกน้ำปลา", shots: 5, ms: 240, sway: 5, reach: 0.9, ammo: "cork" },
+  { id: "air", label: "อัดลม", shots: 7, ms: 90, sway: 6, reach: 0.56, ammo: "pellet" },
+] as const;
+type Gun = (typeof GUNS)[number];
+const ROWS = [
+  { id: "a", items: ["🦆", "🎯", "🦆", "🎯", "🦆", "🎯"], dur: 9 },
+  { id: "b", items: ["🧸", "🥫", "🐰", "🥫", "🐻", "🥫"], dur: 12 },
 ];
-const CAN_COLOURS = ["#ef5a5a", "#ffd84a", "#5aa0ef", "#ff8fc0", "#4fc08a", "#c9b6ff"];
-const tierCans = (n: number) => (n >= 5 ? 3 : n >= 3 ? 2 : n >= 1 ? 1 : 0);
+const tierShoot = (hit: number, shots: number) => { const r = hit / shots; return r >= 0.8 ? 3 : r >= 0.5 ? 2 : r >= 0.2 ? 1 : 0; };
 
-/** Throw a ball at a pyramid of cans: the aim sweeps across, press "ปา" when it is near the cans. Three balls. */
-export function KnockCans({ onPrize, onHit }: Props) {
-  const [balls, setBalls] = useState(3);
-  const [down, setDown] = useState<number[]>([]);
-  const [last, setLast] = useState("");
-  const done = balls === 0;
-  const sweep = useSweep(!done, 800);
-  const table = useRef<HTMLDivElement>(null);
-  usePrize(done, tierCans(down.length), "cans", onPrize);
-
-  // the cans the ball would knock glow, so it is easy to see when to throw
-  useEffect(() => {
-    if (done) return;
-    let raf = 0;
-    const tick = () => {
-      table.current?.querySelectorAll<HTMLElement>(".can").forEach((el, i) => el.classList.toggle("near", Math.abs(CANS[i].x - sweep.value.current) < 0.16));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [done, sweep.value]);
-
-  const throwBall = () => {
-    if (done) return;
-    const a = sweep.value.current;
-    const hit = CANS.map((_, i) => i).filter((i) => !down.includes(i) && Math.abs(CANS[i].x - a) < 0.16);
-    setBalls((b) => b - 1);
-    if (hit.length) { setDown((d) => [...d, ...hit]); setLast(hit.length > 1 ? `ล้ม ${hit.length} ใบ!` : "ล้มไปใบนึง!"); onHit?.(); }
-    else setLast("ลูกบอลลอดไปเฉยๆ");
-  };
-  const again = () => { setBalls(3); setDown([]); setLast(""); };
-
-  return (
-    <div className="game">
-      <p className="game-help">กด "ปา" ตอนเป้าใกล้กระป๋อง (เรืองแสง) มีบอล 3 ลูก</p>
-      <div className="can-table" ref={table}>
-        {CANS.map((c, i) => (
-          <span key={i} className={`can ${down.includes(i) ? "down" : ""}`} style={{ left: `${c.x * 100}%`, bottom: `${22 + c.row * 26}%`, background: CAN_COLOURS[i % CAN_COLOURS.length] }} />
-        ))}
-        {!done && <div ref={sweep.ref} className="ball-aim" aria-hidden="true" />}
-      </div>
-      <Result done={done} tier={tierCans(down.length)} game="cans" summary={`ล้ม ${down.length} ใบ`} onAgain={again}>
-        <>
-          <span>ลูกบอลเหลือ {balls}{last && ` · ${last}`}</span>
-          <button type="button" className="panel-action toss" onClick={throwBall}>ปา!</button>
-        </>
-      </Result>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------------------------------------ scooping goldfish
-const FISH = [
-  { top: 8, dur: 5.2, delay: -0.5 }, { top: 26, dur: 6.6, delay: -3.1 }, { top: 44, dur: 4.6, delay: -1.8 }, { top: 62, dur: 7.2, delay: -5 },
-  { top: 14, dur: 6, delay: -4.2 }, { top: 52, dur: 5.6, delay: -2.6 }, { top: 34, dur: 4.9, delay: -0.2 },
-];
-const tierFish = (n: number) => (n >= 5 ? 3 : n >= 3 ? 2 : n >= 1 ? 1 : 0);
-
-/** Goldfish scooping: the paper scoop gets soggy as time passes and with every scoop. Tap the fish before it tears. */
-export function ScoopFish({ onPrize, onHit }: Props) {
-  const [paper, setPaper] = useState(100);
-  const [caught, setCaught] = useState<number[]>([]);
+/** Shooting gallery: ducks, targets, dolls and cans glide past on two rails. Pick a gun, tap to shoot; a hit flips the target down. */
+export function ShootingGallery({ onPrize, sfx }: GameProps) {
+  const [gun, setGun] = useState<Gun>(GUNS[0]);
+  const [shots, setShots] = useState<number>(GUNS[0].shots);
+  const [down, setDown] = useState<string[]>([]);
   const [round, setRound] = useState(0);
-  const done = paper <= 0;
-  usePrize(done, tierFish(caught.length), "fish", onPrize);
+  const [flying, setFlying] = useState(false);
+  const board = useRef<HTMLDivElement>(null);
+  const sight = useRef<HTMLSpanElement>(null);
+  const done = shots === 0 && !flying;
+  const started = shots < gun.shots;
+  usePrize(done, tierShoot(down.length, gun.shots), "shoot", onPrize);
 
-  useEffect(() => {
-    if (done) return;
-    const t = window.setInterval(() => setPaper((p) => Math.max(0, p - 1.3)), 100);
-    return () => window.clearInterval(t);
-  }, [done, round]);
+  const aimAt = (p: Pt) => { if (sight.current) sight.current.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`; };
 
-  const scoop = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (done) return;
-    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-fish]");
-    const i = t ? Number(t.dataset.fish) : null;
-    if (i !== null && !caught.includes(i)) { setCaught((c) => [...c, i]); setPaper((p) => Math.max(0, p - 12)); onHit?.(); }
-    else if (i === null) setPaper((p) => Math.max(0, p - 4)); // dabbing at empty water
+  const shoot = async (to: Pt) => {
+    const b = board.current;
+    if (!b || shots === 0 || flying) return;
+    aimAt(to);
+    setFlying(true);
+    setShots((s) => s - 1);
+    b.classList.remove("kick"); void b.offsetWidth; b.classList.add("kick"); // the muzzle flash at the bottom of the board
+    const land = wobble(to, gun.sway);
+    await fly(b, { x: b.clientWidth / 2, y: b.clientHeight + 10 }, land, { ms: gun.ms, arc: 6, className: gun.ammo, startScale: 1.6, endScale: 0.6 });
+    const hit = hitAt(b, "[data-target]", land, gun.reach);
+    if (hit) {
+      const key = hit.dataset.target!;
+      setDown((d) => (d.includes(key) ? d : [...d, key]));
+      burst(b, land, ["#ffd84a", "#fff4e2", "#ef7a5a"], 10);
+      shout(b, land, "ปัง!");
+      sfx?.("pop");
+    } else {
+      burst(b, land, ["#c9b6a0", "#8a7a6a"], 5);
+    }
+    setFlying(false);
   };
-  const again = () => { setPaper(100); setCaught([]); setRound((r) => r + 1); };
+
+  const again = (g: Gun = gun) => { setGun(g); setShots(g.shots); setDown([]); setRound((r) => r + 1); };
 
   return (
     <div className="game">
-      <p className="game-help">แตะปลาทองเพื่อตัก กระดาษเปื่อยเร็ว ตักให้ได้มาก!</p>
-      <div className="fish-tank" onPointerDown={scoop} role="group" aria-label="ตู้ปลาทอง">
-        {FISH.map((f, i) => (
-          <button
-            key={`${round}-${i}`}
-            type="button"
-            data-fish={i}
-            className={`fish ${caught.includes(i) ? "caught" : ""}`}
-            style={{ top: `${f.top}%`, animationDuration: `${f.dur}s`, animationDelay: `${f.delay}s` }}
-            aria-label={`ปลาทองตัวที่ ${i + 1}`}
-            aria-disabled={done || caught.includes(i)}
-            onClick={(e) => { if (e.detail === 0 && !done && !caught.includes(i)) { setCaught((c) => [...c, i]); setPaper((p) => Math.max(0, p - 12)); onHit?.(); } }}
-          >🐠</button>
-        ))}
-      </div>
-      <div className="paper-bar" aria-hidden="true"><span style={{ width: `${paper}%` }} /></div>
-      <Result done={done} tier={tierFish(caught.length)} game="fish" summary={`ตักได้ ${caught.length} ตัว`} onAgain={again}>
-        <span>กระดาษเหลือ {Math.ceil(paper)}% · ตักได้ {caught.length} ตัว</span>
-      </Result>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------------------------------------ duck fishing
-const STARS = ["ไม่มีรางวัล", "★ รางวัลเล็ก", "★★ รางวัลกลาง", "★★★ รางวัลใหญ่"];
-
-/** Duck fishing: hook a duck, look at the mark underneath. Three hooks; the best mark wins. */
-export function DuckPond({ onPrize, onHit }: Props) {
-  const [hooks, setHooks] = useState(3);
-  const [caught, setCaught] = useState<number[]>([]);
-  const [round, setRound] = useState(0);
-  // what is written under each duck is decided when the round starts (and not changed by anything you do)
-  const marks = useMemo(() => {
-    const m = [0, 1, 1, 2, 2, 3];
-    for (let i = m.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [m[i], m[j]] = [m[j], m[i]]; }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round]);
-  const done = hooks === 0;
-  const best = caught.reduce((b, i) => Math.max(b, marks[i]), 0);
-  usePrize(done, best, "ducks", onPrize);
-
-  const hook = useCallback((i: number) => {
-    if (hooks === 0 || caught.includes(i)) return;
-    setHooks((h) => h - 1);
-    setCaught((c) => [...c, i]);
-    onHit?.();
-  }, [hooks, caught, onHit]);
-  const again = () => { setHooks(3); setCaught([]); setRound((r) => r + 1); };
-
-  return (
-    <div className="game">
-      <p className="game-help">แตะเป็ดเพื่อตก ดูดาวใต้ตัวเป็ด มีเบ็ด 3 อัน</p>
-      <div className="duck-pond" role="group" aria-label="บ่อเป็ด">
-        {marks.map((m, i) => (
-          <button
-            key={`${round}-${i}`}
-            type="button"
-            data-duck={i}
-            className={`duck ${caught.includes(i) ? "caught" : ""}`}
-            style={{ left: `${6 + (i % 3) * 31}%`, top: `${10 + Math.floor(i / 3) * 44}%`, animationDelay: `${-i * 0.7}s` }}
-            aria-label={`เป็ดตัวที่ ${i + 1}`}
-            aria-disabled={done || caught.includes(i)}
-            onClick={() => hook(i)}
-          >
-            <span className="duck-body">🦆</span>
-            {caught.includes(i) && <span className="duck-mark">{"★".repeat(m) || "–"}</span>}
+      <div className="gun-pick" role="radiogroup" aria-label="เลือกปืน">
+        {GUNS.map((g) => (
+          <button key={g.id} type="button" role="radio" aria-checked={gun.id === g.id} className={gun.id === g.id ? "on" : ""} disabled={started && !done} onClick={() => again(g)}>
+            {g.label} <small>{g.shots} นัด</small>
           </button>
         ))}
       </div>
-      <Result done={done} tier={best} game="ducks" summary={STARS[best]} onAgain={again}>
-        <span>เบ็ดเหลือ {hooks}{caught.length > 0 && ` · ตอนนี้ดีที่สุด: ${STARS[best]}`}</span>
-      </Result>
+      <div
+        ref={board}
+        className="gallery"
+        onPointerMove={(e) => e.pointerType === "mouse" && aimAt(boardPoint(e.currentTarget, e))}
+        onPointerDown={(e) => shoot(boardPoint(e.currentTarget, e))}
+        role="group"
+        aria-label="ซุ้มยิงปืน"
+      >
+        {ROWS.map((row, r) => (
+          <div key={`${round}-${row.id}`} className={`rail rail-${row.id}`} style={{ animationDuration: `${row.dur}s` }}>
+            {[0, 1].map((copy) => row.items.map((it, i) => {
+              const key = `${row.id}-${i}`;
+              return (
+                <button
+                  key={`${copy}-${i}`}
+                  type="button"
+                  data-target={key}
+                  className={`target ${down.includes(key) ? "down" : ""}`}
+                  tabIndex={copy ? -1 : 0}
+                  aria-hidden={copy ? true : undefined}
+                  aria-label={`เป้าแถว ${r + 1} ตัวที่ ${i + 1}`}
+                  onClick={(e) => { if (e.detail === 0 && board.current) shoot(centreOf(board.current, e.currentTarget)); }}
+                >{it}</button>
+              );
+            }))}
+          </div>
+        ))}
+        <span ref={sight} className="sight" aria-hidden="true" />
+      </div>
+      <GameStatus done={done} tier={tierShoot(down.length, gun.shots)} game="shoot" summary={`ยิงโดน ${down.length} จาก ${gun.shots} นัด`} onAgain={() => again()}>
+        <span>{gun.label} · กระสุนเหลือ {shots} · โดนแล้ว {down.length}</span>
+      </GameStatus>
     </div>
   );
 }
 
-// ------------------------------------------------------------------------------------------------ strongman hammer
-const tierHammer = (h: number) => (h >= 0.9 ? 3 : h >= 0.7 ? 2 : h >= 0.4 ? 1 : 0);
-const HAMMER_WORDS = ["เบาไปหน่อย", "พอใช้ได้", "แรงดีมาก!", "กระดิ่งดังเลย!"];
+// ------------------------------------------------------------------------------------------------ the can pyramid
+// three on the bottom, two in the middle, one on top; a can falls when anything under it falls
+const CANS = [
+  { x: 0.35, row: 0, on: [] as number[] }, { x: 0.5, row: 0, on: [] }, { x: 0.65, row: 0, on: [] },
+  { x: 0.425, row: 1, on: [0, 1] }, { x: 0.575, row: 1, on: [1, 2] },
+  { x: 0.5, row: 2, on: [3, 4] },
+];
+const CAN_COLOURS = ["#ef5a5a", "#ffd84a", "#5aa0ef", "#ff8fc0", "#4fc08a", "#c9b6ff"];
+const BALLS = 3;
+const tierCans = (n: number) => (n >= 6 ? 3 : n >= 4 ? 2 : n >= 1 ? 1 : 0);
 
-/** Strongman: hold to build up strength (it rises, then falls again), let go to swing the hammer. Three swings; the best counts. */
-export function Hammer({ onPrize, onHit }: Props) {
-  const [swings, setSwings] = useState(3);
-  const [best, setBest] = useState(0);
-  const [last, setLast] = useState<number | null>(null);
-  const power = useRef(0);
-  const started = useRef(0);
-  const [charging, setChargingState] = useState(false);
-  const holding = useRef(false); // read by the release handlers, which can fire twice in a row (pointer up, then leave)
-  const setCharging = (v: boolean) => { holding.current = v; setChargingState(v); };
-  const bar = useRef<HTMLDivElement>(null);
-  const done = swings === 0;
-  usePrize(done, tierHammer(best), "hammer", onPrize);
+/** Can pyramid: tap where to throw; the ball sails over and knocks down what it hits, and whatever stood on those cans comes down too. */
+export function KnockCans({ onPrize, sfx }: GameProps) {
+  const [balls, setBalls] = useState(BALLS);
+  const [down, setDown] = useState<number[]>([]);
+  const [round, setRound] = useState(0);
+  const [flying, setFlying] = useState(false);
+  const board = useRef<HTMLDivElement>(null);
+  const cans = useRef<(HTMLSpanElement | null)[]>([]);
+  const done = (balls === 0 || down.length === CANS.length) && !flying;
+  usePrize(done, tierCans(down.length), "cans", onPrize);
 
-  useEffect(() => {
-    if (!charging) return;
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = ((now - started.current) / 1500) % 2; // up for 1.5 s, down for 1.5 s
-      power.current = t < 1 ? t : 2 - t;
-      if (bar.current) bar.current.style.height = `${power.current * 100}%`;
-      raf = requestAnimationFrame(tick);
+  const throwAt = async (to: Pt) => {
+    const b = board.current;
+    if (!b || balls === 0 || flying || down.length === CANS.length) return;
+    setFlying(true);
+    setBalls((n) => n - 1);
+    const land = wobble(to, 9);
+    await fly(b, { x: b.clientWidth / 2, y: b.clientHeight + 30 }, land, { ms: 430, arc: 60, className: "ball", startScale: 1.8, endScale: 0.75, spin: 540 });
+    const fallen = new Set(down);
+    const floor = b.clientHeight;
+    const knock = (i: number, push: number) => {
+      const el = cans.current[i];
+      if (!el || fallen.has(i)) return;
+      fallen.add(i);
+      const r = el.getBoundingClientRect(), br = b.getBoundingClientRect();
+      tumble(el, push, floor - (r.bottom - br.top) + 6);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [charging]);
-
-  const start = () => { if (done || holding.current) return; started.current = performance.now(); power.current = 0; setCharging(true); };
-  const strike = () => {
-    if (!holding.current) return;
-    setCharging(false);
-    const h = power.current;
-    setLast(h);
-    setBest((b) => Math.max(b, h));
-    setSwings((s) => s - 1);
-    if (h >= 0.4) onHit?.();
-    if (bar.current) bar.current.style.height = `${h * 100}%`;
+    // the ball knocks whatever it touches, pushing it away from where it landed
+    let direct = 0;
+    CANS.forEach((_, i) => {
+      const el = cans.current[i];
+      if (!el || fallen.has(i)) return;
+      const c = centreOf(b, el), w = el.offsetWidth;
+      if (Math.abs(c.x - land.x) < w * 0.95 && Math.abs(c.y - land.y) < w * 1.2) { knock(i, (c.x >= land.x ? 1 : -1) * (40 + Math.random() * 30)); direct++; }
+    });
+    if (direct) {
+      sfx?.("pop");
+      burst(b, land, ["#fff4e2", "#ffd84a"], 8);
+      shout(b, land, direct > 1 ? `ล้ม ${direct}!` : "โป๊ก!");
+      // then the pyramid settles: anything standing on a fallen can comes down, level by level
+      for (let level = 1; level <= 2; level++) {
+        await new Promise((r) => window.setTimeout(r, 140));
+        CANS.forEach((c, i) => { if (c.row === level && c.on.some((j) => fallen.has(j))) knock(i, (Math.random() * 2 - 1) * 50); });
+      }
+    } else {
+      shout(b, land, "เฉียด!");
+    }
+    setDown([...fallen]);
+    if (fallen.size === CANS.length) shout(b, { x: b.clientWidth / 2, y: b.clientHeight * 0.4 }, "พังหมดเลย!");
+    setFlying(false);
   };
-  const again = () => { setSwings(3); setBest(0); setLast(null); power.current = 0; if (bar.current) bar.current.style.height = "0%"; };
+
+  const again = () => { setBalls(BALLS); setDown([]); setRound((r) => r + 1); };
+  const aimMiddle = () => {
+    const b = board.current;
+    const standing = CANS.map((_, i) => i).filter((i) => !down.includes(i));
+    if (!b || !standing.length) return;
+    const el = cans.current[standing[0]];
+    if (el) throwAt(centreOf(b, el));
+  };
 
   return (
     <div className="game">
-      <p className="game-help">กดค้างให้พลังขึ้น แล้วปล่อยตอนพลังสูง (ขึ้นแล้วก็ลงนะ) มี 3 ครั้ง</p>
-      <div className="hammer-game">
-        <div className="hammer-tower" aria-hidden="true">
-          <span className="hammer-bell">🔔</span>
-          <div ref={bar} className="hammer-bar" />
-          <span className="hammer-line l9" /><span className="hammer-line l7" /><span className="hammer-line l4" />
-        </div>
-        <div className="hammer-side">
-          <p>{last === null ? "ยังไม่ได้ตี" : `ครั้งล่าสุด ${Math.round(last * 100)}% · ${HAMMER_WORDS[tierHammer(last)]}`}</p>
-          {!done && (
-            <button
-              type="button"
-              className="panel-action hammer-hold"
-              onPointerDown={(e) => { e.preventDefault(); start(); }}
-              onPointerUp={strike}
-              onPointerCancel={strike}
-              onPointerLeave={strike}
-              onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); start(); } }}
-              onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") strike(); }}
-              onContextMenu={(e) => e.preventDefault()}
-            >{charging ? "ปล่อยเลย!" : "กดค้างเพื่อออกแรง"}</button>
-          )}
-        </div>
+      <p className="game-help">แตะกระป๋องเพื่อปาบอล มี {BALLS} ลูก ล้มหมดได้รางวัลใหญ่</p>
+      <div ref={board} className="can-table" onPointerDown={(e) => throwAt(boardPoint(e.currentTarget, e))} role="group" aria-label="กองกระป๋อง">
+        {CANS.map((c, i) => (
+          <span
+            key={`${round}-${i}`}
+            ref={(el) => { cans.current[i] = el; }}
+            className={`can ${down.includes(i) ? "down" : ""}`}
+            style={{ left: `${c.x * 100}%`, bottom: `calc(var(--shelf) + ${c.row} * var(--can-h))`, background: CAN_COLOURS[i % CAN_COLOURS.length] }}
+          />
+        ))}
+        <span className="can-shelf" aria-hidden="true" />
       </div>
-      <Result done={done} tier={tierHammer(best)} game="hammer" summary={`แรงสุด ${Math.round(best * 100)}%`} onAgain={again}>
-        <span>ค้อนเหลือ {swings} ครั้ง · แรงสุด {Math.round(best * 100)}%</span>
-      </Result>
+      <GameStatus done={done} tier={tierCans(down.length)} game="cans" summary={`ล้ม ${down.length} จาก ${CANS.length} กระป๋อง`} onAgain={again}>
+        <>
+          <span>ลูกบอลเหลือ {balls} · ล้มแล้ว {down.length}</span>
+          <button type="button" className="panel-action toss" onClick={aimMiddle} disabled={flying}>ปา!</button>
+        </>
+      </GameStatus>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------ lucky eggs
+const EGG_COLOURS = ["#ff8fc0", "#ffd84a", "#5aa0ef", "#4fc08a", "#c9b6ff", "#ef7a5a"];
+// a pile of eggs in the jar: four across, three deep, each a little off so it looks heaped
+const EGGS = Array.from({ length: 12 }, (_, i) => ({ x: 16 + (i % 4) * 22 + ((i * 7) % 9) - 4, y: 44 + Math.floor(i / 4) * 19 + ((i * 5) % 7) - 3, c: EGG_COLOURS[(i * 5) % EGG_COLOURS.length], r: ((i * 53) % 50) - 25 }));
+const PRIZE_ICON = ["", "🍬", "🗝️", "🎁"];
+const STARS = ["", "★ รางวัลเล็ก", "★★ รางวัลกลาง", "★★★ รางวัลใหญ่"];
+/** Every egg holds something: mostly small treats, sometimes a keyring, now and then the big prize. */
+const drawTier = () => { const r = Math.random(); return r < 0.15 ? 3 : r < 0.5 ? 2 : 1; };
+
+type EggStep = "ready" | "scooping" | "picked" | "open";
+
+/** Lucky eggs: scoop an egg out of the big jar, tap it to crack it open and see what is inside. One egg a turn. */
+export function LuckyEggs({ onPrize, sfx }: GameProps) {
+  const [step, setStep] = useState<EggStep>("ready");
+  const [tier, setTier] = useState(0);
+  const [taken, setTaken] = useState<number | null>(null);
+  const [colour, setColour] = useState(EGG_COLOURS[0]);
+  const [round, setRound] = useState(0);
+  const board = useRef<HTMLDivElement>(null);
+  const done = step === "open";
+  usePrize(done, tier, "eggs", onPrize);
+
+  const scoop = async () => {
+    const b = board.current;
+    if (!b || step !== "ready") return;
+    const i = Math.floor(Math.random() * EGGS.length);
+    const el = b.querySelector<HTMLElement>(`[data-egg="${i}"]`);
+    setStep("scooping");
+    setTaken(i);
+    setColour(EGGS[i].c);
+    const from = el ? centreOf(b, el) : { x: b.clientWidth * 0.3, y: b.clientHeight * 0.6 };
+    const egg = await fly(b, from, { x: b.clientWidth * 0.76, y: b.clientHeight * 0.52 }, { ms: 650, arc: 70, className: "egg-flying", startScale: 1, endScale: 1.9, spin: 360 });
+    egg.remove();
+    setStep("picked");
+  };
+
+  const crack = () => {
+    const b = board.current;
+    if (!b || step !== "picked") return;
+    const t = drawTier();
+    setTier(t);
+    setStep("open");
+    const at = { x: b.clientWidth * 0.76, y: b.clientHeight * 0.52 };
+    burst(b, at, [colour, "#fff4e2", "#ffd84a"], 16);
+    shout(b, { x: at.x, y: at.y - 30 }, t === 3 ? "รางวัลใหญ่!" : "เปิดแล้ว!");
+    sfx?.(t === 3 ? "bell" : "pop");
+  };
+
+  const again = () => { setStep("ready"); setTier(0); setTaken(null); setRound((r) => r + 1); };
+
+  return (
+    <div className="game">
+      <p className="game-help">กด "ตักไข่" แล้วแตะไข่เพื่อเปิด ทุกใบมีของ!</p>
+      <div ref={board} className="egg-stall" role="group" aria-label="โหลไข่พาโชค">
+        <div className="jar" onPointerDown={() => scoop()} aria-hidden="true">
+          {EGGS.map((e, i) => (
+            <span key={`${round}-${i}`} data-egg={i} className={`egg ${taken === i ? "gone" : ""}`} style={{ left: `${e.x}%`, top: `${e.y}%`, background: e.c, rotate: `${e.r}deg`, animationDelay: `${-i * 0.3}s` }} />
+          ))}
+        </div>
+        {step === "picked" && (
+          <button type="button" className="egg-out" style={{ background: colour }} onClick={crack} aria-label="แตะเพื่อเปิดไข่">
+            <span className="egg-tap">แตะ!</span>
+          </button>
+        )}
+        {step === "open" && (
+          <div className="egg-prize" role="status">
+            <span className="egg-shell left" style={{ background: colour }} aria-hidden="true" />
+            <span className="egg-shell right" style={{ background: colour }} aria-hidden="true" />
+            <span className="egg-icon" aria-hidden="true">{PRIZE_ICON[tier]}</span>
+            <span className="egg-stars">{STARS[tier]}</span>
+          </div>
+        )}
+      </div>
+      <GameStatus done={done} tier={tier} game="eggs" summary={STARS[tier]} onAgain={again}>
+        <>
+          <span>{step === "picked" ? "แตะไข่เพื่อเปิดเลย" : step === "scooping" ? "กำลังตัก…" : "ลุ้นของในไข่กัน"}</span>
+          <button type="button" className="panel-action toss" onClick={scoop} disabled={step !== "ready"}>ตักไข่!</button>
+        </>
+      </GameStatus>
     </div>
   );
 }
