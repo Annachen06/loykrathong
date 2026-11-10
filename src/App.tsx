@@ -526,7 +526,8 @@ export default function App() {
   const floatKrathong = (wish: string, share = false) => {
     const e = engineRef.current;
     if (!e || !openPlace?.action) return;
-    const k = krathong ?? config.krathongs[0];
+    if (!krathong) return; // only someone holding a krathong can float one
+    const k = krathong;
     const doneHint = openPlace.action.doneHint;
     setOpenId(null);
     setRitual(k);
@@ -735,7 +736,7 @@ export default function App() {
           onClose={closePanel}
         >
           {openPlace.panel === "float" && openPlace.action && (
-            <FloatForm shared={sharedOn} label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} />
+            <FloatForm shared={sharedOn} label={openPlace.action.label} krathong={krathong?.name ?? null} onFloat={floatKrathong} onShop={() => visit("boutique")} onLook={() => { closePanel(); say("เชิญเดินชมตามสบายเลยนะ ลมทะเลเย็นสบายมาก 🌊 ถ้าอยากลอยกระทงเมื่อไหร่ก็แวะร้านกระทงได้เสมอ"); }} />
           )}
           {openPlace.panel === "lantern" && openPlace.items && <LanternForm lanterns={openPlace.items} onRelease={releaseLantern} />}
           {openPlace.panel === "games" && <FairGames onPrize={onPrize} onPop={() => sfx("pop")} />}

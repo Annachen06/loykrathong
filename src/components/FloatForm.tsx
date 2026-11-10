@@ -9,12 +9,25 @@ type Props = {
   /** `share`: the person agreed to let others read this wish (anonymously). */
   onFloat: (wish: string, share: boolean) => void;
   onShop: () => void;
+  /** Not floating today: just here for the sea air. */
+  onLook: () => void;
 };
 
 /** At the end of the pier: write a wish (optional) and float your krathong. The wish stays on this device only. */
-export function FloatForm({ label, shared, krathong, onFloat, onShop }: Props) {
+export function FloatForm({ label, shared, krathong, onFloat, onShop, onLook }: Props) {
   const [wish, setWish] = useState("");
   const [share, setShare] = useState(true);
+  // only someone holding a krathong can float one: everyone else is asked, kindly, what they would like to do
+  if (!krathong) {
+    return (
+      <div className="float-ask">
+        <p className="float-ask-title">เอ๊ะ ยังไม่มีกระทงในมือเลยนะ 🌸</p>
+        <p>อยากไปเลือกกระทงสวยๆ ที่ร้านก่อนไหม หรือวันนี้แค่อยากมายืนชมบรรยากาศริมทะเลเฉยๆ ก็ได้เหมือนกันนะ ไม่ต้องรีบเลย</p>
+        <button type="button" className="panel-action" onClick={onShop}>🌸 ไปเลือกกระทงที่ร้าน</button>
+        <button type="button" className="panel-action secondary" onClick={onLook}>🌊 แค่มาชมบรรยากาศ</button>
+      </div>
+    );
+  }
   return (
     <form
       className="float-form"
@@ -25,8 +38,7 @@ export function FloatForm({ label, shared, krathong, onFloat, onShop }: Props) {
       }}
     >
       <p className="float-krathong">
-        {krathong ? <>ในมือคุณ: <strong>{krathong}</strong></> : <>ยังไม่ได้เลือกกระทง จะได้กระทงใบตองจากท่าน้ำไปก่อน</>}
-        {!krathong && <button type="button" className="link" onClick={onShop}>ไปเลือกที่ร้านกระทง</button>}
+        ในมือคุณ: <strong>{krathong}</strong>
       </p>
       <label htmlFor="wish-input">ตั้งจิตอธิษฐาน (ไม่ใส่ก็ได้)</label>
       <textarea id="wish-input" value={wish} maxLength={80} rows={2} placeholder="ขอให้…" onChange={(e) => setWish(e.target.value)} />

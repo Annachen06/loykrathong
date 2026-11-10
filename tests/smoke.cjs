@@ -43,6 +43,13 @@ async function viaMap(p, name, touch = false) {
   const sel = `.dock ul button[aria-label="เดินไป${name}"]`;
   await (touch ? p.tap(sel) : p.click(sel));
 }
+// Holding a krathong is what lets you float one: pick the lotus at the shop first.
+async function takeKrathong(p, touch = false) {
+  await viaMap(p, "ร้านกระทง", touch);
+  await p.waitForSelector('.item-pick[data-item="lotus"]', { timeout: 20000 });
+  await p.click('.item-pick[data-item="lotus"]');
+  await p.click(".panel-close");
+}
 async function panelTitle(p) {
   const el = await p.$(".panel h2");
   return el ? el.textContent() : null;
@@ -209,6 +216,23 @@ async function desktopSuite(browser) {
   check("floating: the krathong goes on the water and leaves your hand", st.stats.krathongsFloated === 1 && st.hold === null);
   await p.waitForTimeout(1500);
   await p.screenshot({ path: path.join(SHOTS, "desktop-floating.png") });
+
+  // Without a krathong in hand nobody can float one: the pier asks kindly what they would like to do instead.
+  await waitStopped(p).catch(() => {});
+  await viaMap(p, "ท่าลอยกระทง");
+  await p.waitForSelector(".float-ask", { timeout: 20000 }).catch(() => {});
+  const ask = await p.textContent(".float-ask").catch(() => "");
+  check("no krathong in hand: the pier asks kindly whether to choose one or just enjoy the view", ask.includes("ยังไม่มีกระทง") && ask.includes("ไปเลือกกระทงที่ร้าน") && ask.includes("แค่มาชมบรรยากาศ"), ask);
+  check("no krathong in hand: there is no way to float one", !(await p.$("#wish-input")) && !(await p.$(".float-form")));
+  await p.click('.float-ask button:has-text("แค่มาชมบรรยากาศ")');
+  await p.waitForTimeout(300);
+  check("just looking: the card closes and the visitor stays on the pier, nothing floated", !(await p.$(".panel")) && (await state(p)).stats.krathongsFloated === 1);
+  await viaMap(p, "ท่าลอยกระทง");
+  await p.waitForSelector(".float-ask", { timeout: 20000 }).catch(() => {});
+  await p.click('.float-ask button:has-text("ไปเลือกกระทงที่ร้าน")');
+  await p.waitForSelector('.item-pick[data-item="lotus"]', { timeout: 20000 });
+  check("choosing a krathong first: the button takes you to the krathong shop", (await panelTitle(p)) === "ร้านกระทง");
+  await p.click(".panel-close");
 
   // Tap another krathong on the water to read its (sample) wish.
   const floaters = await p.evaluate(() => window.__fair.scene.debug().floaters);
@@ -427,11 +451,11 @@ async function desktopSuite(browser) {
   if (darts.includes("แตก 3")) check("balloon darts: the big prize is carried by your character", (await state(p)).hold === "plushStar");
   await p.screenshot({ path: path.join(SHOTS, "desktop-darts.png") });
 
-  // Ring toss: three throws, then a result.
+  // Ring toss: four throws, then a result.
   await p.click('.tabs button:has-text("โยนห่วง")');
-  for (let i = 0; i < 3; i++) { await p.click(".toss"); await p.waitForTimeout(200); }
+  for (let i = 0; i < 4; i++) { await p.click(".toss"); await p.waitForTimeout(200); }
   const rings = await p.textContent(".game-status");
-  check("ring toss: throw 3 rings and get a result", rings.includes("คล้องได้") && rings.includes("เล่นอีกครั้ง"), rings);
+  check("ring toss: throw 4 rings and get a result", rings.includes("คล้องได้") && rings.includes("เล่นอีกครั้ง"), rings);
   await p.click(".panel-close");
 
   // Ram wong: the visitor goes up on stage and dances in the ring.
@@ -544,6 +568,7 @@ async function sharedSuite(browser) {
   // floating yours: the wish goes out only when the box is ticked, and only if it is plain kind words
   const floatOnce = async (wish, share) => {
     created = null;
+    await takeKrathong(p);
     await viaMap(p, "ท่าลอยกระทง");
     await p.waitForSelector("#wish-input", { timeout: 20000 });
     await p.fill("#wish-input", wish);
@@ -553,6 +578,7 @@ async function sharedSuite(browser) {
     await p.waitForTimeout(2600);
     return created;
   };
+  await takeKrathong(p);
   await viaMap(p, "ท่าลอยกระทง");
   await p.waitForSelector("#wish-input", { timeout: 20000 });
   check("float card asks whether others may read the wish, ticked by default, with a clear warning", (await p.locator(".share-wish input").isChecked()) && (await p.textContent(".float-form .privacy")).includes("ไม่บอกว่าเป็นของใคร") && (await p.textContent(".float-form .privacy")).includes("อย่าใส่ชื่อ"));
@@ -563,7 +589,7 @@ async function sharedSuite(browser) {
   await p.click(".float-form .panel-action");
   await p.waitForTimeout(2600);
   let keys = created ? Object.keys(created.fields).sort().join(",") : "";
-  check("shared sea: a shared wish goes out with only kind, colour, time, throwaway tag and the wish", keys === "c,l,s,t,w" && created.fields.w.stringValue === "ขอให้ฝนไม่ตกวันลอยกระทง" && created.fields.s.stringValue === "banana", JSON.stringify(created));
+  check("shared sea: a shared wish goes out with only kind, colour, time, throwaway tag and the wish", keys === "c,l,s,t,w" && created.fields.w.stringValue === "ขอให้ฝนไม่ตกวันลอยกระทง" && created.fields.s.stringValue === "lotus", JSON.stringify(created));
   check("floating a krathong adds one to the krathong count, on screen and in the database", bumps.some((b) => b?.fieldPath === "k" && b.increment?.integerValue === "1") && (await p.textContent(".fair-count")).includes("121"), JSON.stringify(bumps));
   const tapMine = async () => {
     const mine = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.mine).slice(-1)[0]);
@@ -606,6 +632,7 @@ async function sharedSuite(browser) {
   await p2.click(".intro-enter");
   await p2.waitForTimeout(1500);
   await p2.click('.start-option[data-start="stroll"]');
+  await takeKrathong(p2);
   await viaMap(p2, "ท่าลอยกระทง");
   await p2.waitForSelector("#wish-input", { timeout: 20000 });
   check("shared sea off when no database is set: nothing leaves the device and the card says so", calls === 0 && (await p2.textContent(".float-form .privacy")).includes("ไม่ได้ส่งไปที่ไหน"));

@@ -14,8 +14,10 @@ const PRIZES: Record<"darts" | "rings", (Prize | null)[]> = {
   rings: [null, { name: "สายไหมหนึ่งไม้", hold: "cottonCandy" }, { name: "ตุ๊กตาแมงกะพรุน", hold: "plushJelly" }, { name: "ตุ๊กตากระต่ายส่องจันทร์", hold: "plushRabbit" }],
 };
 
+const prizeFor = (game: "darts" | "rings", score: number) => PRIZES[game][Math.min(score, PRIZES[game].length - 1)];
+
 function prizeText(score: number, game: "darts" | "rings") {
-  const p = PRIZES[game][score];
+  const p = prizeFor(game, score);
   if (!p) return game === "darts" ? "เกือบได้แล้ว ลองอีกทีนะ" : "ห่วงไม่ลงเลย ลองอีกทีนะ";
   return p.hold ? `ได้${p.name}! ถืออยู่ในมือตัวละครแล้ว` : `ได้${p.name}! เก็บไว้ในการ์ดที่ระลึกแล้ว`;
 }
@@ -23,7 +25,7 @@ function prizeText(score: number, game: "darts" | "rings") {
 /** Hand over the prize once, when a round ends. */
 function usePrize(done: boolean, score: number, game: "darts" | "rings", onPrize: OnPrize) {
   useEffect(() => {
-    const p = PRIZES[game][score];
+    const p = prizeFor(game, score);
     if (done && p) onPrize(p);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
@@ -90,15 +92,18 @@ function BalloonDarts({ onPrize, onPop }: { onPrize: OnPrize; onPop?: () => void
   );
 }
 
-/** Ring toss: the ring's aim sweeps across the bottles; press "โยน" to throw. Three rings. */
+const RINGS = 4, REACH = 0.1; // how many rings you get, and how close the aim must be (0..1 across the table) to catch a bottle
+const BOTTLES = [0.1, 0.3, 0.5, 0.7, 0.9];
+
+/** Ring toss: the ring's aim sweeps slowly across the bottles; press "โยน" to throw. Four rings, and a bottle glows when the aim is close enough. */
 function RingToss({ onPrize }: { onPrize: OnPrize }) {
-  const [rings, setRings] = useState(3);
+  const [rings, setRings] = useState(RINGS);
   const [hits, setHits] = useState<number[]>([]);
   const [last, setLast] = useState<string>("");
   const aim = useRef(0); // 0..1 across the table
   const marker = useRef<HTMLDivElement>(null);
+  const table = useRef<HTMLDivElement>(null);
   const done = rings === 0;
-  const BOTTLES = [0.1, 0.3, 0.5, 0.7, 0.9];
   usePrize(done, hits.length, "rings", onPrize);
 
   useEffect(() => {
@@ -106,8 +111,9 @@ function RingToss({ onPrize }: { onPrize: OnPrize }) {
     let raf = 0;
     const t0 = performance.now();
     const tick = (now: number) => {
-      aim.current = 0.5 + 0.5 * Math.sin((now - t0) / 380);
+      aim.current = 0.5 + 0.5 * Math.sin((now - t0) / 650);
       if (marker.current) marker.current.style.left = `${aim.current * 100}%`;
+      table.current?.querySelectorAll<HTMLElement>(".bottle").forEach((el, i) => el.classList.toggle("near", Math.abs(BOTTLES[i] - aim.current) < REACH));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -117,18 +123,20 @@ function RingToss({ onPrize }: { onPrize: OnPrize }) {
   const toss = () => {
     if (done) return;
     const a = aim.current;
-    const i = BOTTLES.findIndex((b) => Math.abs(b - a) < 0.045);
+    // the closest bottle that does not have a ring yet, if the aim is near enough
+    let i = -1, best = REACH;
+    BOTTLES.forEach((b, j) => { const d = Math.abs(b - a); if (d < best && !hits.includes(j)) { best = d; i = j; } });
     setRings((r) => r - 1);
-    if (i >= 0 && !hits.includes(i)) { setHits((h) => [...h, i]); setLast("คล้องได้!"); }
+    if (i >= 0) { setHits((h) => [...h, i]); setLast("คล้องได้!"); }
     else setLast("พลาดไปนิดเดียว");
   };
 
-  const again = () => { setRings(3); setHits([]); setLast(""); };
+  const again = () => { setRings(RINGS); setHits([]); setLast(""); };
 
   return (
     <div className="game">
-      <p className="game-help">กด "โยน" ตอนที่ห่วงอยู่ตรงคอขวดพอดี มีห่วง 3 วง</p>
-      <div className="ring-table">
+      <p className="game-help">กด "โยน" ตอนที่ห่วงลอยมาใกล้ขวด (ขวดจะเรืองแสง) มีห่วง {RINGS} วง</p>
+      <div className="ring-table" ref={table}>
         {BOTTLES.map((b, i) => (
           <span key={i} className={`bottle ${hits.includes(i) ? "ringed" : ""}`} style={{ left: `${b * 100}%` }} />
         ))}

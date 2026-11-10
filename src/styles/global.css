@@ -650,6 +650,7 @@ button { font: inherit; color: inherit; }
   border-bottom: 0;
   background: #3f9a68;
 }
+.bottle.near { box-shadow: 0 0 12px 3px rgba(255, 207, 110, 0.85); background: #5cc58a; }
 .bottle.ringed::after {
   content: "";
   position: absolute;
@@ -723,6 +724,9 @@ a.panel-action { display: grid; place-items: center; text-decoration: none; }
 }
 .item-pick:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }
 
+.float-ask { display: flex; flex-direction: column; gap: 10px; }
+.float-ask p { margin: 0; font-size: 14.5px; line-height: 1.5; }
+.float-ask .float-ask-title { font-size: 17px; font-weight: 600; }
 .float-krathong { margin: 0; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
 button.link { border: 0; padding: 4px 0; min-height: 40px; background: none; color: #b0405e; font: inherit; font-size: 13.5px; text-decoration: underline; cursor: pointer; }
 
