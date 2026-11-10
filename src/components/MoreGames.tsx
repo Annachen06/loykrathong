@@ -276,7 +276,9 @@ export function Hammer({ onPrize, onHit }: Props) {
   const [last, setLast] = useState<number | null>(null);
   const power = useRef(0);
   const started = useRef(0);
-  const [charging, setCharging] = useState(false);
+  const [charging, setChargingState] = useState(false);
+  const holding = useRef(false); // read by the release handlers, which can fire twice in a row (pointer up, then leave)
+  const setCharging = (v: boolean) => { holding.current = v; setChargingState(v); };
   const bar = useRef<HTMLDivElement>(null);
   const done = swings === 0;
   usePrize(done, tierHammer(best), "hammer", onPrize);
@@ -294,9 +296,9 @@ export function Hammer({ onPrize, onHit }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [charging]);
 
-  const start = () => { if (done || charging) return; started.current = performance.now(); power.current = 0; setCharging(true); };
+  const start = () => { if (done || holding.current) return; started.current = performance.now(); power.current = 0; setCharging(true); };
   const strike = () => {
-    if (!charging) return;
+    if (!holding.current) return;
     setCharging(false);
     const h = power.current;
     setLast(h);
