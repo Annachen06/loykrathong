@@ -456,6 +456,35 @@ async function desktopSuite(browser) {
   for (let i = 0; i < 4; i++) { await p.click(".toss"); await p.waitForTimeout(200); }
   const rings = await p.textContent(".game-status");
   check("ring toss: throw 4 rings and get a result", rings.includes("คล้องได้") && rings.includes("เล่นอีกครั้ง"), rings);
+
+  // The other booth games: all in the same stall, as tabs.
+  check("booth: seven games in the same stall (no bigger map)", (await p.locator(".tabs button").count()) === 7);
+  await p.click('.tabs button:has-text("ยิงตุ๊กตา")');
+  for (let i = 0; i < 5; i++) { await p.locator(".doll:not(.down)").first().click({ force: true }); await p.waitForTimeout(120); }
+  const shoot = await p.textContent(".game-status");
+  check("shooting dolls: five corks, then a result", shoot.includes("ยิงล้ม") && shoot.includes("เล่นอีกครั้ง"), shoot);
+  await p.click('.tabs button:has-text("ล้มกระป๋อง")');
+  for (let i = 0; i < 3; i++) { await p.click(".toss"); await p.waitForTimeout(150); }
+  const cans = await p.textContent(".game-status");
+  check("knocking cans: three balls, then a result", cans.includes("ล้ม") && cans.includes("เล่นอีกครั้ง"), cans);
+  await p.click('.tabs button:has-text("ตักปลาทอง")');
+  await p.locator(".fish:not(.caught)").first().click({ force: true });
+  await p.waitForFunction(() => document.querySelector(".game-again"), null, { timeout: 15000 }).catch(() => {});
+  const fish = await p.textContent(".game-status");
+  check("goldfish: the paper wears out and the round ends with a result", fish.includes("ตักได้") && fish.includes("เล่นอีกครั้ง"), fish);
+  await p.click('.tabs button:has-text("ตกเป็ด")');
+  for (let i = 0; i < 3; i++) { await p.locator(".duck:not(.caught)").first().click({ force: true }); await p.waitForTimeout(120); }
+  const ducks = await p.textContent(".game-status");
+  check("duck fishing: three hooks show a mark under each duck, then a result", (await p.locator(".duck-mark").count()) === 3 && ducks.includes("เล่นอีกครั้ง"), ducks);
+  await p.click('.tabs button:has-text("ตีค้อน")');
+  for (let i = 0; i < 3; i++) {
+    await p.locator(".hammer-hold").dispatchEvent("pointerdown");
+    await p.waitForTimeout(900);
+    await p.locator(".hammer-hold").dispatchEvent("pointerup").catch(() => {});
+    await p.waitForTimeout(150);
+  }
+  const hammer = await p.textContent(".game-status");
+  check("strongman hammer: hold and let go three times, then a result", hammer.includes("แรงสุด") && hammer.includes("เล่นอีกครั้ง"), hammer);
   await p.click(".panel-close");
 
   // Ram wong: the visitor goes up on stage and dances in the ring.

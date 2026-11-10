@@ -187,7 +187,7 @@ export const loyKrathongConfig: FestivalConfig = {
       marker: { x: 1445, y: 628 },
       anchor: { x: 1445, y: 842 },
       hitArea: { x0: 1290, y0: 640, x1: 1600, y1: 812 },
-      description: "ปาเป้าลูกโป่งกับโยนห่วง ชนะแล้วได้ของรางวัลถือกลับไปเลย",
+      description: "เกมงานวัด 7 อย่าง เล่นฟรี ชนะแล้วได้ของรางวัล",
       panel: "games",
     },
     {

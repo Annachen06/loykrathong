@@ -1,35 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { HeldThing } from "../festivals/types";
+import { prizeText, usePrize, type OnPrize, type Prize } from "./gamePrizes";
+import { DuckPond, Hammer, KnockCans, ScoopFish, ShootDolls } from "./MoreGames";
 
-// Two small temple-fair games. Winning hands you a prize: soft toys are carried by your character,
-// and every prize is listed on your souvenir card at the Memory Corner. Nothing costs money.
+export type { Prize };
 
-export type Prize = { name: string; hold?: HeldThing };
-type OnPrize = (p: Prize) => void;
+// The booth games. Winning hands you a prize (see gamePrizes.ts). The darts and the ring toss live here; the rest are in MoreGames.tsx.
 
 const BALLOON_COLOURS = ["#ef5a5a", "#ffd84a", "#4fc08a", "#5aa0ef", "#ff8fc0", "#c9b6ff"];
-
-const PRIZES: Record<"darts" | "rings", (Prize | null)[]> = {
-  darts: [null, { name: "ลูกอมรสมะม่วง" }, { name: "พวงกุญแจเปลือกหอย" }, { name: "ตุ๊กตาปลาดาวตัวใหญ่", hold: "plushStar" }],
-  rings: [null, { name: "สายไหมหนึ่งไม้", hold: "cottonCandy" }, { name: "ตุ๊กตาแมงกะพรุน", hold: "plushJelly" }, { name: "ตุ๊กตากระต่ายส่องจันทร์", hold: "plushRabbit" }],
-};
-
-const prizeFor = (game: "darts" | "rings", score: number) => PRIZES[game][Math.min(score, PRIZES[game].length - 1)];
-
-function prizeText(score: number, game: "darts" | "rings") {
-  const p = prizeFor(game, score);
-  if (!p) return game === "darts" ? "เกือบได้แล้ว ลองอีกทีนะ" : "ห่วงไม่ลงเลย ลองอีกทีนะ";
-  return p.hold ? `ได้${p.name}! ถืออยู่ในมือตัวละครแล้ว` : `ได้${p.name}! เก็บไว้ในการ์ดที่ระลึกแล้ว`;
-}
-
-/** Hand over the prize once, when a round ends. */
-function usePrize(done: boolean, score: number, game: "darts" | "rings", onPrize: OnPrize) {
-  useEffect(() => {
-    const p = prizeFor(game, score);
-    if (done && p) onPrize(p);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [done]);
-}
 
 /** Balloon darts: balloons drift on the board; tap one to throw a dart at it. Three darts. */
 function BalloonDarts({ onPrize, onPop }: { onPrize: OnPrize; onPop?: () => void }) {
@@ -135,7 +112,7 @@ function RingToss({ onPrize }: { onPrize: OnPrize }) {
 
   return (
     <div className="game">
-      <p className="game-help">กด "โยน" ตอนที่ห่วงลอยมาใกล้ขวด (ขวดจะเรืองแสง) มีห่วง {RINGS} วง</p>
+      <p className="game-help">กด "โยน" ตอนห่วงใกล้ขวด (เรืองแสง) มีห่วง {RINGS} วง</p>
       <div className="ring-table" ref={table}>
         {BOTTLES.map((b, i) => (
           <span key={i} className={`bottle ${hits.includes(i) ? "ringed" : ""}`} style={{ left: `${b * 100}%` }} />
@@ -159,15 +136,33 @@ function RingToss({ onPrize }: { onPrize: OnPrize }) {
   );
 }
 
+type Tab = "darts" | "rings" | "shoot" | "cans" | "fish" | "ducks" | "hammer";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "darts", label: "ปาเป้าลูกโป่ง" },
+  { id: "rings", label: "โยนห่วง" },
+  { id: "shoot", label: "ยิงตุ๊กตา" },
+  { id: "cans", label: "ล้มกระป๋อง" },
+  { id: "fish", label: "ตักปลาทอง" },
+  { id: "ducks", label: "ตกเป็ด" },
+  { id: "hammer", label: "ตีค้อน" },
+];
+
 export function FairGames({ onPrize, onPop }: { onPrize: OnPrize; onPop?: () => void }) {
-  const [tab, setTab] = useState<"darts" | "rings">("darts");
+  const [tab, setTab] = useState<Tab>("darts");
   return (
     <div className="fair-games">
       <div className="tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "darts"} className={tab === "darts" ? "on" : ""} onClick={() => setTab("darts")}>ปาเป้าลูกโป่ง</button>
-        <button type="button" role="tab" aria-selected={tab === "rings"} className={tab === "rings" ? "on" : ""} onClick={() => setTab("rings")}>โยนห่วง</button>
+        {TABS.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
       </div>
-      {tab === "darts" ? <BalloonDarts onPrize={onPrize} onPop={onPop} /> : <RingToss onPrize={onPrize} />}
+      {tab === "darts" && <BalloonDarts onPrize={onPrize} onPop={onPop} />}
+      {tab === "rings" && <RingToss onPrize={onPrize} />}
+      {tab === "shoot" && <ShootDolls onPrize={onPrize} onHit={onPop} />}
+      {tab === "cans" && <KnockCans onPrize={onPrize} onHit={onPop} />}
+      {tab === "fish" && <ScoopFish onPrize={onPrize} onHit={onPop} />}
+      {tab === "ducks" && <DuckPond onPrize={onPrize} onHit={onPop} />}
+      {tab === "hammer" && <Hammer onPrize={onPrize} onHit={onPop} />}
       <p className="game-fine">ตุ๊กตาจะอยู่ในมือตัวละคร ของรางวัลทั้งหมดดูได้ที่มุมความทรงจำ เล่นฟรี</p>
     </div>
   );
