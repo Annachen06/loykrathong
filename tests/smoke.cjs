@@ -145,7 +145,6 @@ async function desktopSuite(browser) {
   await p.click(".sound-toggle");
   check("…and unmutes", !(await state(p)).sound.muted);
   check("map button is large and alone (no extra shortcut buttons)", (await p.locator(".dock-row button:visible").count()) === 1 && (await p.locator(".map-toggle").boundingBox()).height >= 48);
-  check("no on-screen stick on a desktop with a mouse", !(await p.isVisible(".joystick")));
   await p.click(".map-toggle");
   check("map lists every place as a tile, in sections", (await p.locator(".map-sheet section:not(.map-extra) ul button").count()) === (await places(p)).length && (await p.locator(".map-sheet section:not(.map-extra) h3").count()) === 3);
   // tap the sand just beside the visitor (the sky would send them out onto the pier)
@@ -792,25 +791,27 @@ async function phoneSuite(browser) {
   const s1 = await state(p);
   check("phone: tap the sand to walk", Math.abs(s1.x - (s0.x - 120)) < 3, `${s0.x} → ${s1.x}`);
 
-  // the on-screen stick: drag right to walk right, let go to stop
-  check("phone: an on-screen stick is shown", await p.isVisible(".joystick"));
-  const jb = await p.locator(".joystick").boundingBox();
-  const jc = { x: jb.x + jb.width / 2, y: jb.y + jb.height / 2 };
-  const fire = (type, x, y) => p.evaluate(([type, x, y]) => {
-    const t = type === "pointerdown" ? document.querySelector(".joystick") : window;
-    t.dispatchEvent(new PointerEvent(type, { pointerId: 7, clientX: x, clientY: y, bubbles: true, pointerType: "touch" }));
-  }, [type, x, y]);
-  const j0 = await state(p);
-  await fire("pointerdown", jc.x, jc.y);
-  await fire("pointermove", jc.x + 50, jc.y);
-  await p.waitForTimeout(700);
-  const j1 = await state(p);
-  check("phone: dragging the stick right walks the visitor right", j1.x > j0.x + 40 && j1.moving, `${j0.x} → ${j1.x}`);
-  await fire("pointerup", jc.x + 50, jc.y);
+  // hold and drag on the ground: the visitor follows the finger, and finishes walking to where it stopped
+  check("phone: no on-screen stick (walking is tap, or press and drag on the ground)", (await p.locator(".joystick").count()) === 0);
+  const h0 = await state(p);
+  const holdAt = await p.evaluate(([x, y]) => { const c = window.__fair.renderer.toScreen(x, y); return c; }, [h0.x + 60, h0.y]);
+  const fire = (type, pt) => p.evaluate(([type, pt]) => {
+    document.querySelector("canvas.world").dispatchEvent(new PointerEvent(type, { pointerId: 7, clientX: pt.x, clientY: pt.y, bubbles: true, pointerType: "touch" }));
+  }, [type, pt]);
+  await fire("pointerdown", holdAt);
   await p.waitForTimeout(200);
-  const j2 = await state(p);
-  await p.waitForTimeout(300);
-  check("phone: letting go of the stick stops the visitor", !j2.moving && (await state(p)).x === j2.x);
+  const farAt = await p.evaluate(([x, y]) => window.__fair.renderer.toScreen(x, y), [h0.x + 220, h0.y]);
+  await fire("pointermove", farAt);
+  await p.waitForTimeout(150);
+  await fire("pointermove", farAt);
+  await p.waitForTimeout(1500);
+  await fire("pointerup", farAt);
+  await waitStopped(p);
+  const h1 = await state(p);
+  check("phone: pressing on the ground and dragging further makes the visitor follow the finger", h1.x > h0.x + 150, `${h0.x} → ${h1.x}`);
+  const hSeen = h1.x;
+  await p.waitForTimeout(400);
+  check("phone: after letting go she stands still", (await state(p)).x === hSeen && !(await state(p)).moving);
 
   for (const pl of await places(p)) {
     await viaMap(p, pl.name, true);

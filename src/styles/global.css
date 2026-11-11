@@ -181,26 +181,6 @@ button { font: inherit; color: inherit; }
   .map-toggle { min-height: 48px; padding: 8px 14px 8px 12px; font-size: 15px; gap: 6px; }
 }
 
-/* ---------------------------------------------------------------- on-screen stick (phones and tablets) */
-.joystick {
-  display: none; position: absolute; right: calc(var(--safe-right) + 18px); bottom: calc(var(--safe-bottom) + 18px);
-  width: 96px; height: 96px; border-radius: 50%; border: 3px solid rgba(255, 244, 226, 0.7);
-  background: radial-gradient(circle, rgba(20, 18, 70, 0.55), rgba(20, 18, 70, 0.75)); backdrop-filter: blur(4px);
-  box-shadow: 0 6px 18px rgba(5, 4, 30, 0.45); z-index: 5; user-select: none; -webkit-user-select: none;
-  transition: opacity 0.3s;
-}
-@media (pointer: coarse), (max-width: 560px) { .joystick { display: block; } }
-.joystick.is-hidden { opacity: 0; pointer-events: none; }
-.joystick.is-on { border-color: var(--gold); }
-.joystick-knob {
-  position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
-  background: var(--paper); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink), 0 0 16px rgba(255, 207, 110, 0.55);
-}
-.joystick-arrow { position: absolute; width: 0; height: 0; border: 6px solid transparent; opacity: 0.8; }
-.joystick-arrow.up { left: 50%; top: 6px; margin-left: -6px; border-bottom-color: var(--moonlight); border-top-width: 0; }
-.joystick-arrow.down { left: 50%; bottom: 6px; margin-left: -6px; border-top-color: var(--moonlight); border-bottom-width: 0; }
-.joystick-arrow.left { top: 50%; left: 6px; margin-top: -6px; border-right-color: var(--moonlight); border-left-width: 0; }
-.joystick-arrow.right { top: 50%; right: 6px; margin-top: -6px; border-left-color: var(--moonlight); border-right-width: 0; }
 .map-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .map-sheet {
   display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px;

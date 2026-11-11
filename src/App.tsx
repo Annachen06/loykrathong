@@ -12,7 +12,6 @@ import { PlaceMarkers } from "./components/PlaceMarkers";
 import { PlacePanel } from "./components/PlacePanel";
 import { MapMenu } from "./components/MapMenu";
 import { StartChoice } from "./components/StartChoice";
-import { Joystick } from "./components/Joystick";
 import { NoteButton } from "./components/NoteButton";
 import { StorySheet } from "./components/StorySheet";
 import { Hint } from "./components/Hint";
@@ -404,11 +403,23 @@ export default function App() {
     if (place) return visit(place.id);
     closePanel();
     e.renderer.ripple(e.visitor.walkTo(w));
+    hold.current = { id: ev.pointerId, at: performance.now() };
+    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* not a real pointer (tests) */ }
   };
 
   const onPointerMove = (ev: React.PointerEvent<HTMLCanvasElement>) => {
     const e = engineRef.current;
-    if (!e || ev.pointerType !== "mouse") return;
+    if (!e) return;
+    // held down: keep walking towards the finger (a few times a second is plenty)
+    if (hold.current && hold.current.id === ev.pointerId) {
+      const now = performance.now();
+      if (now - hold.current.at > 90 && !e.scene.visitorAway()) {
+        hold.current.at = now;
+        e.visitor.walkTo(e.renderer.toWorld(ev.clientX, ev.clientY));
+      }
+      return;
+    }
+    if (ev.pointerType !== "mouse") return;
     const w = e.renderer.toWorld(ev.clientX, ev.clientY);
     const place = config.places.find((p) => w.x >= p.hitArea.x0 && w.x <= p.hitArea.x1 && w.y >= p.hitArea.y0 && w.y <= p.hitArea.y1);
     const curio = config.curios.some((c) => dist(w.x, w.y, c.at.x, c.at.y - 12) < c.radius);
@@ -457,14 +468,12 @@ export default function App() {
   }, [entered, closePanel]);
 
   const openPlace = config.places.find((p) => p.id === openId) ?? null;
-  // the on-screen stick: moving it closes any open card and walks that way, like the arrow keys
-  const steer = useCallback((x: number, y: number) => {
-    const e = engineRef.current;
-    if (!e || e.scene.visitorAway()) return;
-    if (x || y) closePanel();
-    e.visitor.steer.x = x;
-    e.visitor.steer.y = y;
-  }, [closePanel]);
+  // pressing on the ground and keeping the finger (or mouse button) down: the visitor follows it
+  const hold = useRef<{ id: number; at: number } | null>(null);
+  const endHold = (ev?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (ev && hold.current && hold.current.id !== ev.pointerId) return;
+    hold.current = null; // she finishes walking to the last place you pointed at
+  };
 
   const runAction = () => {
     const e = engineRef.current;
@@ -616,6 +625,8 @@ export default function App() {
         role="img"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
+        onPointerUp={endHold}
+        onPointerCancel={endHold}
         onPointerLeave={() => setHovered(null)}
       />
 
@@ -722,7 +733,6 @@ export default function App() {
           {friendCount < 0 ? "👫 ห้องนี้เต็มแล้ว (ไม่เกิน 6 คน)" : friendCount ? `👫 เพื่อนอยู่ด้วย ${friendCount} คน` : "👫 รอเพื่อนเข้ามา…"}
         </p>
       )}
-      <Joystick onSteer={steer} hidden={!entered || asking || !!openPlace || ride.view || story} />
       <NoteButton open={creatorOpen} onClose={closeCreator} support={config.support} inbox={sharedCfg} hidden={!entered || asking || !!openPlace || ride.view || story} />
       {config.story && <StorySheet story={config.story} open={story} onClose={() => setStory(false)} />}
       <StartChoice choices={config.startChoices} show={entered && asking} onPick={startWhere} />
