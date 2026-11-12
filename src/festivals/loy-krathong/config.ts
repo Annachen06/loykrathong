@@ -73,7 +73,7 @@ export const loyKrathongConfig: FestivalConfig = {
   ],
   startChoices: [
     { id: "merit", icon: "🙏", label: "ไปทำบุญก่อน", text: "ไหว้พระ จุดธูป เสี่ยงเซียมซี", go: "temple", hint: "ถึงวัดแล้ว ไหว้พระและเสี่ยงเซียมซีได้เลย" },
-    { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายตรงไหนก็ได้เพื่อเดินไปที่นั่น แตะค้างแล้วลากก็เดินต่อเนื่องได้ หรือกดปุ่มแผนที่เพื่อไปมุมต่างๆ ของงาน" },
+    { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายเพื่อเดิน หรือกดปุ่มแผนที่เพื่อไปมุมต่างๆ ของงาน" },
     { id: "float", icon: "🌸", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
   ],
   // Example wishes for the other krathongs on the water. Always shown with a "ตัวอย่าง" tag:
