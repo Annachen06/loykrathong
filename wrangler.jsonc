@@ -1,0 +1,6 @@
+{
+  // Cloudflare Workers static assets: publishes the built site in ./dist
+  "name": "polished-mud-b7d8",
+  "compatibility_date": "2025-01-01",
+  "assets": { "directory": "./dist" }
+}
