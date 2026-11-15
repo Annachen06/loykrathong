@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        ".read": "$room.matches(/^[a-z0-9]{6,12}$/)",
+        "$peer": {
+          ".write": "$room.matches(/^[a-z0-9]{6,12}$/) && $peer.matches(/^[a-z0-9]{6,16}$/)",
+          ".validate": "newData.hasChildren(['x', 'y', 'f', 't', 'l'])",
+          "x": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+          "y": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+          "f": { ".validate": "newData.val() === 1 || newData.val() === -1" },
+          "m": { ".validate": "newData.isBoolean()" },
+          "t": { ".validate": "newData.isNumber()" },
+          "l": { ".validate": "newData.isString() && newData.val().length <= 700" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}

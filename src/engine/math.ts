@@ -17,14 +17,34 @@ export function seeded(seed: number) {
   };
 }
 
-/** Soft radial glow. `rgb` is "r,g,b". */
+/**
+ * Soft radial glow. `rgb` is "r,g,b".
+ * Glows are everywhere (lanterns, krathongs, bulbs, the moon), so instead of building a new gradient
+ * every time, each colour is painted once into a small picture and then stretched into place.
+ */
+const glowSprites = new Map<string, HTMLCanvasElement>();
+function glowSprite(rgb: string) {
+  let c = glowSprites.get(rgb);
+  if (!c) {
+    c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g2 = c.getContext("2d")!;
+    const g = g2.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, `rgba(${rgb},1)`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    g2.fillStyle = g;
+    g2.fillRect(0, 0, 128, 128);
+    glowSprites.set(rgb, c);
+  }
+  return c;
+}
+
 export function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rgb: string, alpha: number) {
   if (r <= 0 || alpha <= 0) return;
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, `rgba(${rgb},${alpha})`);
-  g.addColorStop(1, `rgba(${rgb},0)`);
-  ctx.fillStyle = g;
-  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  const before = ctx.globalAlpha;
+  ctx.globalAlpha = before * Math.min(1, alpha);
+  ctx.drawImage(glowSprite(rgb), x - r, y - r, r * 2, r * 2);
+  ctx.globalAlpha = before;
 }
 
 export const prefersReducedMotion = () =>

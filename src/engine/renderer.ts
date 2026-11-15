@@ -12,12 +12,39 @@ export type Renderer = ReturnType<typeof createRenderer>;
 const MAX_LAYER_PIXELS = 16_000_000;
 
 export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig, scene: Scene, visitor: Visitor) {
-  const ctx = canvas.getContext("2d")!;
+  // The scene always paints every pixel, so the canvas needs no transparency (cheaper to draw and show).
+  const ctx = canvas.getContext("2d", { alpha: false })!;
   const back = document.createElement("canvas");
   const front = document.createElement("canvas");
-  const { width: W, height: H, focusY, portraitHeight } = config.layout;
+  const { width: W, height: H, focusY, portraitHeight, viewHeight } = config.layout;
 
-  const view = { vw: 1, vh: 1, scale: 1, dpr: 1, layerK: 1, visW: 1, visH: 1 };
+  const view = { vw: 1, vh: 1, scale: 1, dpr: 1, layerK: 1, visW: 1, visH: 1, zoom: 1 };
+  // The cached front layer is empty above the tallest building; only the part with something in it is copied each frame.
+  let frontTop = 0;
+
+  // A last resort for very slow devices: if frames come well under 40 a second, draw at a slightly lower
+  // resolution, but never below 1.5 pixels per point on a sharp screen, so text and outlines stay crisp.
+  // It only steps down after two slow stretches in a row, so a single hiccup changes nothing.
+  const QUALITY = [2, 1.5];
+  let quality = 0;
+  let slowRuns = 0;
+  let sampleFrom = 0;
+  const samples: number[] = [];
+  function watchSpeed(dt: number, now: number) {
+    if (document.hidden || now < sampleFrom) { samples.length = 0; return; }
+    samples.push(dt);
+    if (samples.length < 90) return;
+    const sorted = samples.slice().sort((a, b) => a - b);
+    const typical = sorted[Math.floor(sorted.length / 2)];
+    samples.length = 0;
+    slowRuns = typical > 0.026 ? slowRuns + 1 : 0; // under about 38 frames a second
+    if (slowRuns >= 2 && renderDpr() > 1.5) {
+      while (quality < QUALITY.length - 1 && QUALITY[quality] >= renderDpr()) quality++;
+      slowRuns = 0;
+      resize(false); // new canvas size; the camera stays where it is
+    }
+  }
+  const renderDpr = () => Math.min(window.devicePixelRatio || 1, QUALITY[quality]);
   const cam = { x: 0, y: 0 };
   const ripples: { x: number; y: number; life: number }[] = [];
   let following = false;
@@ -26,9 +53,19 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   let last = 0;
   let time = 0;
   let onFrame: (() => void) | null = null;
+  let crowd: (() => { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[]) | null = null;
 
   function cameraTarget() {
-    const focusX = following ? visitor.x : config.layout.spawn.x + view.visW * 0.35;
+    // the scene can take over the camera, e.g. to ride along in a Ferris wheel cabin
+    const over = following ? scene.camera?.() : null;
+    if (over) {
+      return {
+        x: clamp(over.x - view.visW / 2, 0, Math.max(0, W - view.visW)),
+        // a wide view may show more height than the world has: keep the ground at the bottom, open sky above
+        y: over.wide && view.visH > H ? H - view.visH : clamp(over.y - view.visH / 2, 0, Math.max(0, H - view.visH)),
+      };
+    }
+    const focusX = following ? visitor.x : config.layout.spawn.x + view.visW * 0.12;
     return {
       x: clamp(focusX - view.visW / 2, 0, Math.max(0, W - view.visW)),
       y: view.visH < H * 0.9 && view.vw / view.vh < 0.9
@@ -39,7 +76,7 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
   }
 
   function paintLayers() {
-    let k = view.scale * view.dpr;
+    let k = view.scale * Math.min(window.devicePixelRatio || 1, 2); // always at the screen's full sharpness
     k = Math.min(k, Math.sqrt(MAX_LAYER_PIXELS / (W * H)));
     view.layerK = k;
     for (const [layer, paint] of [[back, scene.paintBack], [front, scene.paintFront]] as const) {
@@ -49,50 +86,102 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
       c.setTransform(k, 0, 0, k, 0, 0);
       paint(c);
     }
+    frontTop = firstPaintedRow(front) / k;
   }
 
-  function resize() {
+  /** The highest row of a layer with anything drawn on it (checked on a small copy, once per repaint). */
+  function firstPaintedRow(layer: HTMLCanvasElement) {
+    try {
+      const sw = 64, sh = 128;
+      const probe = document.createElement("canvas");
+      probe.width = sw;
+      probe.height = sh;
+      const p = probe.getContext("2d", { willReadFrequently: true })!;
+      p.drawImage(layer, 0, 0, sw, sh);
+      const data = p.getImageData(0, 0, sw, sh).data;
+      for (let row = 0; row < sh; row++) {
+        for (let col = 0; col < sw; col++) if (data[(row * sw + col) * 4 + 3] > 0) return Math.max(0, ((row - 1) / sh) * layer.height);
+      }
+    } catch {
+      /* reading pixels can be refused; then copy the whole layer */
+    }
+    return 0;
+  }
+
+  function resize(snap = true) {
     view.vw = Math.max(1, window.innerWidth);
     view.vh = Math.max(1, window.innerHeight);
-    view.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    view.dpr = renderDpr();
     // Portrait phones: frame the lower part of the world (beach, stalls, sea) a little closer.
     const portrait = view.vw / view.vh < 0.9;
-    view.scale = Math.max(view.vw / W, view.vh / (portrait ? portraitHeight : H));
-    view.visW = view.vw / view.scale;
-    view.visH = view.vh / view.scale;
+    view.scale = Math.max(view.vw / W, view.vh / (portrait ? portraitHeight : viewHeight));
+    view.visW = view.vw / (view.scale * view.zoom);
+    view.visH = view.vh / (view.scale * view.zoom);
     canvas.width = Math.round(view.vw * view.dpr);
     canvas.height = Math.round(view.vh * view.dpr);
     paintLayers();
+    sampleFrom = performance.now() + 2000; // let things settle before judging speed again
+    if (!snap) return;
     const t = cameraTarget();
     cam.x = t.x;
     cam.y = t.y;
   }
 
-  const blit = (layer: HTMLCanvasElement) => {
+  // Copy the part of a cached layer that is on screen. The camera can look past the world's edges
+  // (the wide view from the Ferris wheel), so only the overlapping part is copied.
+  const blit = (layer: HTMLCanvasElement, top = 0) => {
     const k = view.layerK;
-    ctx.drawImage(layer, cam.x * k, cam.y * k, view.visW * k, view.visH * k, 0, 0, canvas.width, canvas.height);
+    const x0 = Math.max(0, cam.x), y0 = Math.max(top, cam.y);
+    const x1 = Math.min(W, cam.x + view.visW), y1 = Math.min(H, cam.y + view.visH);
+    if (x1 <= x0 || y1 <= y0) return;
+    const s = view.scale * view.zoom * view.dpr;
+    ctx.drawImage(layer, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, (x0 - cam.x) * s, (y0 - cam.y) * s, (x1 - x0) * s, (y1 - y0) * s);
   };
 
   function frame(now: number) {
     const dt = Math.min(0.05, (now - (last || now)) / 1000);
     last = now;
     time += dt;
+    watchSpeed(dt, now);
 
-    scene.update(dt);
+    scene.update(dt, visitor);
     visitor.update(dt);
+    const over = following ? scene.camera?.() : null;
+    let wantZoom = over?.zoom || 1;
+    if (over?.wide) wantZoom = Math.max(wantZoom, view.vw / (view.scale * W)); // never wider than the world
+    else if (view.vw / view.vh < 0.9) wantZoom = 1 + (wantZoom - 1) * 0.6; // phones are already close in
+    view.zoom = lerp(view.zoom, wantZoom, Math.min(1, dt * 1.6));
+    if (Math.abs(view.zoom - wantZoom) < 0.002) view.zoom = wantZoom;
+    view.visW = view.vw / (view.scale * view.zoom);
+    view.visH = view.vh / (view.scale * view.zoom);
     const t = cameraTarget();
     const ease = Math.min(1, dt * (following ? 3.2 : 0.5));
     cam.x = lerp(cam.x, t.x, ease);
     cam.y = lerp(cam.y, t.y, ease);
+    // never show past the sides or the bottom of the world while easing (zoom and camera move together)
+    cam.x = clamp(cam.x, 0, Math.max(0, W - view.visW));
+    cam.y = view.visH <= H ? clamp(cam.y, 0, H - view.visH) : Math.min(cam.y, H - view.visH);
 
-    const s = view.scale * view.dpr;
+    if (over?.cover) {
+      // a full-screen view covers the world (the Ferris wheel cabin): keep time moving, skip the drawing
+      onFrame?.();
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    const s = view.scale * view.zoom * view.dpr;
     const world = () => ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (cam.x < 0 || cam.y < 0 || cam.x + view.visW > W + 0.5 || cam.y + view.visH > H + 0.5) {
+      // looking past the edge of the world (the wide view from the Ferris wheel): night sky there
+      ctx.fillStyle = config.layout.skyTop ?? "#000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     blit(back);
     world();
     scene.drawMiddle(ctx, time, { x: cam.x, y: cam.y, w: view.visW, h: view.visH });
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    blit(front);
+    blit(front, frontTop);
     world();
     scene.drawGround(ctx, time, highlight);
 
@@ -109,7 +198,8 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
 
     // Draw people and creatures back-to-front so nearer ones overlap farther ones.
     const order: { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[] = [...scene.actors];
-    order.push({ y: visitor.y, draw: (c, tt) => visitor.draw(c, tt) });
+    if (!scene.visitorAway()) order.push({ y: visitor.y, draw: (c, tt) => visitor.draw(c, tt) });
+    if (crowd && !scene.visitorAway()) order.push(...crowd());
     order.sort((a, b) => a.y - b.y);
     for (const a of order) a.draw(ctx, time);
 
@@ -133,11 +223,66 @@ export function createRenderer(canvas: HTMLCanvasElement, config: FestivalConfig
       window.removeEventListener("resize", onResize);
     },
     follow(on: boolean) { following = on; },
+    /**
+     * Paint the fair (stalls, palms, lights and the people in it) onto another canvas whose transform is already
+     * set to world units: used by the view from the Ferris wheel cabin, which sees the fair from up high.
+     * Only world x from x0 to x1 is needed.
+     */
+    paintFair(c: CanvasRenderingContext2D, x0: number, x1: number) {
+      const k = view.layerK;
+      const a = Math.max(0, x0), b = Math.min(W, x1);
+      if (b <= a) return;
+      c.drawImage(front, a * k, frontTop * k, (b - a) * k, (H - frontTop) * k, a, frontTop, b - a, H - frontTop);
+      scene.drawGround(c, time, null);
+      const order = [...scene.actors].sort((p, q) => p.y - q.y);
+      for (const act of order) act.draw(c, time);
+    },
+    /**
+     * A still picture of the real fair for the souvenir card: the same scenery, lights, water and people as on screen,
+     * with no buttons or menus, painted afresh at the card's own size so it stays sharp. The window is 9:16, `zoom` times
+     * closer than the whole world, centred on `spot` with the ground in the lower part. `who` draws the visitor
+     * (standing still, holding what they chose) in place of the live one.
+     */
+    snapshot(out: HTMLCanvasElement, spot: Point, zoom: number, who: (c: CanvasRenderingContext2D, t: number) => void) {
+      const OW = out.width, OH = out.height;
+      const visH = H / zoom, visW = (visH * OW) / OH;
+      const s = OH / visH;
+      const x0 = clamp(spot.x - visW / 2, 0, Math.max(0, W - visW));
+      // a little of the world's bottom edge may fall below the picture: the card's dark gradient covers that part
+      const y0 = clamp(spot.y - visH * 0.74, 0, H - visH * 0.8);
+      const c = out.getContext("2d")!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.fillStyle = config.layout.skyTop ?? "#000";
+      c.fillRect(0, 0, OW, OH);
+      c.save();
+      c.setTransform(s, 0, 0, s, -x0 * s, -y0 * s);
+      scene.setStill?.(true);
+      scene.paintBack(c);
+      scene.drawMiddle(c, time, { x: x0, y: y0, w: visW, h: visH });
+      scene.paintFront(c);
+      scene.drawGround(c, time, null);
+      const order: { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[] = [...scene.actors];
+      order.push({ y: spot.y, draw: who });
+      order.sort((a, b) => a.y - b.y);
+      for (const a of order) a.draw(c, time);
+      scene.drawTop(c, time);
+      scene.setStill?.(false);
+      c.restore();
+      // below the world's edge: stretch the last bit of sand down (the card's shading covers it)
+      const edge = (H - y0) * s;
+      if (edge < OH - 1) {
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        const strip = Math.min(60, edge);
+        c.drawImage(out, 0, edge - strip, OW, strip, 0, edge, OW, OH - edge);
+      }
+    },
     setHighlight(id: string | null) { highlight = id; },
     ripple(p: Point) { ripples.push({ x: p.x, y: p.y, life: 0 }); },
     setOnFrame(fn: (() => void) | null) { onFrame = fn; },
-    toWorld: (sx: number, sy: number): Point => ({ x: sx / view.scale + cam.x, y: sy / view.scale + cam.y }),
-    toScreen: (wx: number, wy: number): Point => ({ x: (wx - cam.x) * view.scale, y: (wy - cam.y) * view.scale }),
+    /** Extra people to draw with the visitor, such as friends who joined the same room. */
+    setCrowd(fn: (() => { y: number; draw: (c: CanvasRenderingContext2D, t: number) => void }[]) | null) { crowd = fn; },
+    toWorld: (sx: number, sy: number): Point => ({ x: sx / (view.scale * view.zoom) + cam.x, y: sy / (view.scale * view.zoom) + cam.y }),
+    toScreen: (wx: number, wy: number): Point => ({ x: (wx - cam.x) * view.scale * view.zoom, y: (wy - cam.y) * view.scale * view.zoom }),
     view,
     cam,
   };

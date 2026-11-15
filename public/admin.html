@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>กล่องข้อความผู้สร้าง</title>
+<style>
+  body { font-family: "Mitr", system-ui, sans-serif; background: #0b1230; color: #f4efe2; margin: 0; padding: 20px 16px 60px; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 28px; }
+  input, button { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid #5b6aa0; margin: 4px 0; }
+  input { background: #fff; color: #111; width: 100%; box-sizing: border-box; }
+  button { background: #ffd68c; color: #2a1d05; cursor: pointer; border: 0; }
+  .card { background: #16204a; border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+  .card time { display: block; color: #a9b4e0; font-size: 12px; margin-bottom: 6px; }
+  .card p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .card img { max-width: 100%; border-radius: 8px; margin-top: 8px; background: #fff; }
+  .err { color: #ff9a9a; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>กล่องข้อความและสลิปของผู้สร้าง</h1>
+  <form id="login">
+    <p>เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่สร้างไว้ใน Firebase Authentication</p>
+    <input id="email" type="email" placeholder="อีเมล" autocomplete="username" required />
+    <input id="pass" type="password" placeholder="รหัสผ่าน" autocomplete="current-password" required />
+    <button type="submit">เข้าสู่ระบบ</button>
+    <p id="err" class="err" role="alert"></p>
+  </form>
+  <div id="inbox" hidden>
+    <button id="reload" type="button">โหลดใหม่</button>
+    <h2>ข้อความให้กำลังใจ</h2><div id="notes"></div>
+    <h2>สลิปโกโก้</h2><div id="slips"></div>
+  </div>
+</main>
+<script>
+  // These two values are public identifiers, not secrets. Only the signed-in creator can read the data.
+  var PROJECT = "lloyrimlay", KEY = "AIzaSyAR4YlbAK74KkXLe_2mu-IaaFHsLZr-OIA", token = "";
+  var $ = function (id) { return document.getElementById(id); };
+  $("login").addEventListener("submit", function (e) {
+    e.preventDefault();
+    $("err").textContent = "";
+    fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + KEY, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: $("email").value, password: $("pass").value, returnSecureToken: true })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.idToken) throw new Error("login");
+      token = j.idToken;
+      $("login").hidden = true; $("inbox").hidden = false;
+      load();
+    }).catch(function () { $("err").textContent = "เข้าสู่ระบบไม่สำเร็จ ตรวจสอบอีเมลและรหัสผ่านอีกครั้งนะคะ"; });
+  });
+  $("reload").addEventListener("click", function () { load(); });
+  function load() { show("notes", "notes"); show("slips", "slips"); }
+  function show(col, id) {
+    var box = $(id);
+    box.textContent = "กำลังโหลด…";
+    fetch("https://firestore.googleapis.com/v1/projects/" + PROJECT + "/databases/(default)/documents:runQuery", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: col }], orderBy: [{ field: { fieldPath: "t" }, direction: "DESCENDING" }], limit: 100 } })
+    }).then(function (r) { return r.json(); }).then(function (rows) {
+      if (!Array.isArray(rows)) throw new Error("read");
+      box.textContent = "";
+      var any = false;
+      rows.forEach(function (row) {
+        var f = row.document && row.document.fields; if (!f) return;
+        any = true;
+        var card = document.createElement("div"); card.className = "card";
+        var time = document.createElement("time");
+        time.textContent = new Date(Number(f.t && f.t.integerValue)).toLocaleString("th-TH");
+        card.appendChild(time);
+        if (f.m && f.m.stringValue) { var p = document.createElement("p"); p.textContent = f.m.stringValue; card.appendChild(p); }
+        var src = f.i && f.i.stringValue;
+        if (src && src.indexOf("data:image/jpeg;base64,") === 0) { var img = document.createElement("img"); img.src = src; img.alt = "สลิป"; card.appendChild(img); }
+        box.appendChild(card);
+      });
+      if (!any) box.textContent = "ยังไม่มี";
+    }).catch(function () { box.textContent = "อ่านไม่สำเร็จ ตรวจสอบว่ากฎ Firestore เผยแพร่แล้วและอีเมลตรงกับกฎ"; });
+  }
+</script>
+</body>
+</html>

@@ -34,8 +34,18 @@ function homeArea(layout: WorldLayout, p: Point): string | null {
 
 /** Waypoints from `from` to `to`: straight if they share an area, otherwise via the junction. */
 export function planPath(layout: WorldLayout, from: Point, to: Point): Point[] {
-  const target = nearestWalkable(layout, to);
   const a = homeArea(layout, from);
+  // The pier is a corridor to the sea: a tap towards you (down the screen) means "take me back to the sand", all the
+  // way, since on a phone the sand is out of view from the end of the pier. The same goes for a tap on the water
+  // around the foot of the pier. (Small steps along the planks still just walk there.)
+  let aim = to;
+  const here = layout.walkAreas.find((w) => w.id === a);
+  const ground = layout.walkAreas[0];
+  if (here && here.id !== ground.id) {
+    const towardShore = to.y > from.y + 40 || (!isWalkable(layout, to.x, to.y) && (to.y > from.y + 12 || to.y > here.rect.y1 - 110));
+    if (towardShore) aim = { x: clamp(to.x, ground.rect.x0, ground.rect.x1), y: Math.max(to.y, ground.rect.y0 + 35) };
+  }
+  const target = nearestWalkable(layout, aim);
   const b = homeArea(layout, target);
   if (a && b && a !== b) {
     const j = layout.junctions.find((j) => (j.a === a && j.b === b) || (j.a === b && j.b === a));
