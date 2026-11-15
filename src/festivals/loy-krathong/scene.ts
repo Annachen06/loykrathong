@@ -1465,7 +1465,7 @@ export function createLoyKrathongScene(): Scene {
         }
       }
       const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
-      const h = lines.length * 16 + 16;
+      const h = lines.length * 16 + 8;
       // keep the note on screen; its little tail still points at the krathong
       const x = clamp(k.x - w / 2, lastCam.x + 6, lastCam.x + lastCam.w - w - 6), y = k.y - 46 * s - h - 8;
       ctx.globalAlpha = a;
@@ -1483,9 +1483,6 @@ export function createLoyKrathongScene(): Scene {
       ctx.fillStyle = OUTLINE;
       ctx.textAlign = "center";
       lines.forEach((l, i) => ctx.fillText(l, x + w / 2, y + 11 + i * 16));
-      ctx.font = "400 9px Mitr, sans-serif";
-      ctx.fillStyle = "#c0506e";
-      ctx.fillText(config.ui.sampleTag, x + w / 2, y + h - 6);
       ctx.font = "500 12px Mitr, sans-serif";
     }
     ctx.restore();
@@ -1706,7 +1703,7 @@ export function createLoyKrathongScene(): Scene {
             : { title: "กระทงของใครสักคน", text: "มีคนมาลอยกระทงในงานนี้เหมือนกัน ไม่ระบุว่าเป็นของใคร ขอให้ทุกคำอธิษฐานเป็นจริงนะ", tag: "ผู้ร่วมงานจริง" }
           : best.mine
           ? { title: config.ui.wishTitle, text: best.wish || "กระทงของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: best.wishShared ? config.ui.yourWishSharedTag : config.ui.yourWishTag }
-          : { title: config.ui.wishTitle, text: best.wish, tag: config.ui.sampleTag },
+          : { title: config.ui.wishTitle, text: best.wish },
       };
     },
     visitorAway: () => ride.active || stageGuest.active,

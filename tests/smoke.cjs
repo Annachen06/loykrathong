@@ -238,6 +238,27 @@ async function desktopSuite(browser) {
   await p.click('.float-ask button:has-text("แค่มาชมบรรยากาศ")');
   await p.waitForTimeout(300);
   check("just looking: the card closes and the visitor stays on the pier, nothing floated", !(await p.$(".panel")) && (await state(p)).stats.krathongsFloated === 1);
+  // Walking back from the pier: tapping the planks walks (no float card), and tapping the water towards you leads back to the sand.
+  await p.evaluate(() => { const v = window.__fair.visitor; v.stop(); v.x = 1900; v.y = 690; });
+  await p.waitForTimeout(200);
+  const onPlank = await toScreen(p, 1900, 750);
+  await p.mouse.click(onPlank.x, onPlank.y);
+  await waitStopped(p).catch(() => {});
+  const planked = await state(p);
+  check("on the pier: tapping the planks walks there, it does not reopen the float card", !(await p.$(".panel")) && Math.abs(planked.y - 750) < 12, `${planked.x},${planked.y}`);
+  await p.evaluate(() => { const v = window.__fair.visitor; v.stop(); v.x = 1900; v.y = 690; });
+  const water = await toScreen(p, 1700, 780);
+  await p.mouse.click(water.x, water.y);
+  await waitStopped(p).catch(() => {});
+  const back = await state(p);
+  check("on the pier: tapping the water towards you walks back to the sand", back.y >= 805, `${back.x},${back.y}`);
+  // near the foot of the pier, tapping the open space beside it also carries you off the planks
+  await p.evaluate(() => { const v = window.__fair.visitor; v.stop(); v.x = 1900; v.y = 780; });
+  const emptySpot = await toScreen(p, 1780, 770);
+  await p.mouse.click(emptySpot.x, emptySpot.y);
+  await waitStopped(p).catch(() => {});
+  const off = await state(p);
+  check("at the foot of the pier: tapping the empty space beside it walks you off the pier", off.y >= 805, `${off.x},${off.y}`);
   await viaMap(p, "ท่าลอยกระทง");
   await p.waitForSelector(".float-ask", { timeout: 20000 }).catch(() => {});
   await p.click('.float-ask button:has-text("ไปเลือกกระทงที่ร้าน")');
@@ -256,10 +277,10 @@ async function desktopSuite(browser) {
     await p.mouse.click(q.x, q.y);
     await p.waitForSelector(".wish-bubble.show", { timeout: 3000 }).catch(() => {});
     const bubble = (await p.$(".wish-bubble.show")) ? await p.textContent(".wish-bubble") : "";
-    check("tapping another krathong shows its wish, tagged as an example", bubble.includes("ตัวอย่าง") && bubble.length > 12, bubble);
+    check("tapping another krathong shows its wish, with no \"example\" label", !bubble.includes("ตัวอย่าง") && bubble.length > 12, bubble);
     await p.screenshot({ path: path.join(SHOTS, "desktop-wish-bubble.png") });
   } else {
-    check("tapping another krathong shows its wish, tagged as an example", false, "no sample krathong near the shore to tap");
+    check("tapping another krathong shows its wish, with no \"example\" label", false, "no krathong near the shore to tap");
   }
 
   // Sky lanterns: pick a colour, write a wish, hold it up and let it go.
@@ -583,8 +604,9 @@ async function sharedSuite(browser) {
   check("shared sea: odd or unsafe data from outside is ignored", !fl.some((k) => !/^#[0-9a-f]{6}$/i.test(k.lotus)) && !fl.some((k) => String(k.style).includes("<")));
   check("shared sea: a shared wish can be read, but one with contact details or a blocked word is dropped (the krathong stays)", fl.find((k) => k.style === "gold").wish === "ขอให้ทุกคนมีความสุข" && fl.find((k) => k.style === "moon").wish === "" && fl.filter((k) => k.style === "lotus")[0].wish === "" && fl.every((k) => !k.mine));
   check("shared sea: arriving fills the water from the latest 100 floated", limits.includes(100), JSON.stringify(limits));
-  const nearestWish = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.wish).sort((a, b) => (Math.abs(a.x - 1900) + Math.abs(a.y - 778) / 2) - (Math.abs(b.x - 1900) + Math.abs(b.y - 778) / 2))[0]);
-  check("shared sea: real visitors' wishes take the places nearest the pier, ahead of the samples", !!nearestWish && nearestWish.shared, JSON.stringify(nearestWish));
+  // floaters drift, so "nearest" is checked loosely: a real wish is among the few wishes closest to the pier
+  const nearestWish = await p.evaluate(() => window.__fair.scene.debug().floaters.filter((k) => k.wish).sort((a, b) => (Math.abs(a.x - 1900) + Math.abs(a.y - 778) / 2) - (Math.abs(b.x - 1900) + Math.abs(b.y - 778) / 2)).slice(0, 3).find((k) => k.shared));
+  check("shared sea: real visitors' wishes take the places nearest the pier, ahead of the samples", !!nearestWish, JSON.stringify(nearestWish));
   const chip = await p.textContent(".fair-count").catch(() => "");
   check("everyone's totals show: krathongs and lanterns floated so far", chip.includes("120") && chip.includes("45"), chip);
   await p.waitForFunction(() => document.querySelector(".fair-count")?.textContent.includes("301"), null, { timeout: 5000 }).catch(() => {});

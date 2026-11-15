@@ -21,7 +21,6 @@ export const loyKrathongConfig: FestivalConfig = {
     mapLabel: "แผนที่งาน",
     placesLabel: "สถานที่ในงาน",
     wishTitle: "คำอธิษฐาน",
-    sampleTag: "ตัวอย่าง",
     yourWishTag: "ของคุณ · เห็นแค่คุณ",
     yourWishSharedTag: "ของคุณ · คนอื่นในงานอ่านได้ ไม่ระบุตัวตน",
   },
@@ -76,7 +75,7 @@ export const loyKrathongConfig: FestivalConfig = {
     { id: "stroll", icon: "🎡", label: "เดินเล่นในงานก่อน", text: "ชิงช้า รำวง เกม ของกิน", hint: "แตะพื้นทรายเพื่อเดิน หรือกดปุ่มแผนที่เพื่อไปมุมต่างๆ ของงาน" },
     { id: "float", icon: "🌸", label: "ลอยกระทงเลย", text: "ไปที่สะพาน แล้วปล่อยกระทงใต้พระจันทร์", go: "shore", hint: "เดินออกไปปลายสะพานเพื่อลอยกระทง" },
   ],
-  // Example wishes for the other krathongs on the water. Always shown with a "ตัวอย่าง" tag:
+  // Example wishes for the other krathongs on the water. Shown without a tag:
   // there is no shared online wall yet, so these are not real visitors.
   sampleWishes: [
     "ขอให้คุณแม่หายป่วยไวๆ",
@@ -210,7 +209,7 @@ export const loyKrathongConfig: FestivalConfig = {
       shortName: "ลอยกระทง",
       marker: { x: 1900, y: 556 },
       anchor: { x: 1900, y: 646 },
-      hitArea: { x0: 1845, y0: 560, x1: 1955, y1: 812 },
+      hitArea: { x0: 1845, y0: 560, x1: 1955, y1: 700 }, // only the far end of the pier: tapping the planks nearer the shore just walks there
       description: "เดินออกไปปลายสะพาน ระหว่างทางจะเห็นคำอธิษฐานบนกระทงที่ลอยอยู่ แล้วนั่งลงปล่อยกระทงของคุณ",
       panel: "float",
       action: { id: "float", label: "ลอยกระทง", doneHint: "กระทงของคุณลอยออกไปหาพระจันทร์แล้ว" },

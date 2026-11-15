@@ -140,7 +140,6 @@ export type FestivalConfig = {
     mapLabel: string;
     placesLabel: string;
     wishTitle: string;
-    sampleTag: string;
     yourWishTag: string;
     /** the tag on your own wish when you chose to let everyone read it */
     yourWishSharedTag: string;
