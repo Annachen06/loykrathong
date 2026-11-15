@@ -35,14 +35,15 @@ function homeArea(layout: WorldLayout, p: Point): string | null {
 /** Waypoints from `from` to `to`: straight if they share an area, otherwise via the junction. */
 export function planPath(layout: WorldLayout, from: Point, to: Point): Point[] {
   const a = homeArea(layout, from);
-  // On a narrow pier, a tap on the water towards you means "take me back", not "stay on the planks":
-  // aim for the sand straight below instead of snapping to the nearest plank.
+  // The pier is a corridor to the sea: a tap towards you (down the screen) means "take me back to the sand", all the
+  // way, since on a phone the sand is out of view from the end of the pier. The same goes for a tap on the water
+  // around the foot of the pier. (Small steps along the planks still just walk there.)
   let aim = to;
   const here = layout.walkAreas.find((w) => w.id === a);
-  // ...and so does a tap on the open space around the foot of the pier: keep walking until off the planks
-  if (here && a !== layout.walkAreas[0].id && !isWalkable(layout, to.x, to.y) && (to.y > from.y + 12 || to.y > here.rect.y1 - 110)) {
-    const ground = layout.walkAreas[0].rect;
-    aim = { x: clamp(to.x, ground.x0, ground.x1), y: Math.max(to.y, ground.y0) };
+  const ground = layout.walkAreas[0];
+  if (here && here.id !== ground.id) {
+    const towardShore = to.y > from.y + 40 || (!isWalkable(layout, to.x, to.y) && (to.y > from.y + 12 || to.y > here.rect.y1 - 110));
+    if (towardShore) aim = { x: clamp(to.x, ground.rect.x0, ground.rect.x1), y: Math.max(to.y, ground.rect.y0 + 35) };
   }
   const target = nearestWalkable(layout, aim);
   const b = homeArea(layout, target);

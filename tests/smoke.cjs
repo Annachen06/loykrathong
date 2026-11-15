@@ -245,7 +245,13 @@ async function desktopSuite(browser) {
   await p.mouse.click(onPlank.x, onPlank.y);
   await waitStopped(p).catch(() => {});
   const planked = await state(p);
-  check("on the pier: tapping the planks walks there, it does not reopen the float card", !(await p.$(".panel")) && Math.abs(planked.y - 750) < 12, `${planked.x},${planked.y}`);
+  check("on the pier: tapping the planks towards the shore walks all the way back to the sand, without the float card", !(await p.$(".panel")) && planked.y >= 805, `${planked.x},${planked.y}`);
+  await p.evaluate(() => { const v = window.__fair.visitor; v.stop(); v.x = 1900; v.y = 690; });
+  const smallStep = await toScreen(p, 1900, 710);
+  await p.mouse.click(smallStep.x, smallStep.y);
+  await waitStopped(p).catch(() => {});
+  const stepped = await state(p);
+  check("on the pier: a tap just a little further down the planks is only a small step", Math.abs(stepped.y - 710) < 12 && !(await p.$(".panel")), `${stepped.x},${stepped.y}`);
   await p.evaluate(() => { const v = window.__fair.visitor; v.stop(); v.x = 1900; v.y = 690; });
   const water = await toScreen(p, 1700, 780);
   await p.mouse.click(water.x, water.y);

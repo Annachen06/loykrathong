@@ -1685,10 +1685,13 @@ export function createLoyKrathongScene(): Scene {
         burst(l.x, l.y, "255,246,225", 6);
         return { bubble: { title: "คำอธิษฐานบนโคมของคุณ", text: l.wish || "โคมของคุณ (ไม่ได้เขียนคำอธิษฐาน)", tag: config.ui.yourWishTag } };
       }
-      // a krathong on the water: read its wish
+      // a krathong on the water: read its wish. Not from the pier: the wishes already pop up there on their own, and
+      // krathongs bob right beside the planks, so a tap there is almost always "walk" (back towards the sand).
+      const onPierNow = you.x > PIER.x0 - 70 && you.x < PIER.x1 + 70 && you.y < GROUND + 30;
       let best: Floater | null = null, bestD = Infinity;
       for (const k of floaters) {
         if (!k.wish && !k.mine && !k.shared) continue;
+        if (onPierNow && !k.mine) continue; // (your own krathong stays tappable)
         const depth = clamp((k.y - HORIZON) / (SHORE - HORIZON), 0, 1);
         const s = 0.25 + depth * 0.8;
         const d = dist(p.x, p.y, k.x, k.y - 16 * s);

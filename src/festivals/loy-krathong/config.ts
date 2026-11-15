@@ -209,7 +209,7 @@ export const loyKrathongConfig: FestivalConfig = {
       shortName: "ลอยกระทง",
       marker: { x: 1900, y: 556 },
       anchor: { x: 1900, y: 646 },
-      hitArea: { x0: 1845, y0: 560, x1: 1955, y1: 700 }, // only the far end of the pier: tapping the planks nearer the shore just walks there
+      hitArea: { x0: 1845, y0: 560, x1: 1955, y1: 672 }, // only the far end of the pier: tapping the planks nearer the shore just walks there
       description: "เดินออกไปปลายสะพาน ระหว่างทางจะเห็นคำอธิษฐานบนกระทงที่ลอยอยู่ แล้วนั่งลงปล่อยกระทงของคุณ",
       panel: "float",
       action: { id: "float", label: "ลอยกระทง", doneHint: "กระทงของคุณลอยออกไปหาพระจันทร์แล้ว" },
